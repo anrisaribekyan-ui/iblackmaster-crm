@@ -36,7 +36,7 @@
 (создай в тесте роль с пустыми permissions и сотрудника с ней, залогинь).
 Подсказка для теста без прав: сделай фикстуру `make_user(db, permissions=[...])` в `tests/conftest.py` — можно, это не запрещённый файл.
 
-### [ ] T-04. API складов
+### [x] T-04. API складов
 Файл `backend/app/api/stores.py`, префикс `/stores`.
 - `GET /stores?location_id=` — склады (только доступных локаций).
 - `POST`, `PUT /stores/{id}` — `storeSettingAccess`. Поля: location_id, name, is_default (если True — у остальных складов этой локации сбросить).
