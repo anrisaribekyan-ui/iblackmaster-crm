@@ -26,7 +26,7 @@
 
 ## Блок 1. Настройки (бэкенд)
 
-### [ ] T-03. API локаций
+### [x] T-03. API локаций
 Файл `backend/app/api/locations.py`, префикс `/locations`. Модель `Location` (+ `stores`).
 - `GET /locations` — активные локации, к которым у сотрудника есть доступ (`location_ids(me)`; пусто = все),
   по `sort`. В ответе: id, name, address, phones, color, sort, stores[{id, name, is_default}].
