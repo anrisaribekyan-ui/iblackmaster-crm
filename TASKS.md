@@ -43,7 +43,7 @@
 - `DELETE` — мягко; нельзя, если на складе есть остатки (StockBalance.quantity > 0) → BusinessError «На складе есть товар».
 Тесты: создание, is_default переключается, запрет удаления склада с остатком (остаток создай через `stock.receive`).
 
-### [ ] T-05. API касс (без операций с деньгами)
+### [x] T-05. API касс (без операций с деньгами)
 Файл `backend/app/api/cash_registers.py`, префикс `/cash-registers`.
 - `GET /cash-registers` — кассы доступных локаций + глобальные. Поля cash_balance/bank_balance отдавать ТОЛЬКО
   при праве `moneyCashRegisterAccess`, иначе null.
