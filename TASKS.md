@@ -116,7 +116,7 @@
 
 ## Блок 3. Справочники
 
-### [ ] T-10. API простых справочников
+### [x] T-10. API простых справочников
 По образцу `how_knows.py` сделай 4 роутера: `/problems` (Problem, право problemAccess),
 `/complete-sets` (CompleteSet, completeSetAccess), `/measures` (Measure, measureAccess; поле is_float),
 `/counteragent-types` (CounteragentType, counteragentAccess). У Problem/CompleteSet нет is_active —
