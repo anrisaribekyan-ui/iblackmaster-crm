@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 import app.models  # noqa: F401  — регистрирует все таблицы
-from app.api import auth, cash_registers, how_knows, locations, order_types, stores
+from app.api import auth, cash_registers, how_knows, locations, order_types, staff, stores
 from app.db import Base, engine
 from app.errors import BusinessError
 
@@ -50,3 +50,4 @@ app.include_router(locations.router, prefix="/api")
 app.include_router(stores.router, prefix="/api")
 app.include_router(cash_registers.router, prefix="/api")
 app.include_router(order_types.router, prefix="/api")
+app.include_router(staff.router, prefix="/api")

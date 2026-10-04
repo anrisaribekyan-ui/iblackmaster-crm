@@ -74,7 +74,7 @@
   отсутствующие в списке — is_visible=False. Поле `name` (имя клиента) нельзя сделать необязательным.
 Тесты: копирование полей при создании типа, сохранение формы, запрет снять обязательность с name.
 
-### [ ] T-08. API ролей и сотрудников
+### [x] T-08. API ролей и сотрудников
 Файл `backend/app/api/staff.py`.
 - `GET /permissions` — каталог прав из `app.permissions` (PERMISSIONS сгруппировать по section + SCOPES).
 - `GET /roles`, `POST /roles`, `PUT /roles/{id}`, `DELETE /roles/{id}` — `settingAccess`. Проверять, что все коды
