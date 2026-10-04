@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+/* Цвета задаём токенами, чтобы потом легко сменить тему. В компонентах используй классы
+   вида bg-surface, text-muted, border-line (они объявлены ниже через @theme). */
+@theme {
+  --color-surface: #ffffff;
+  --color-canvas: #f4f5f7;
+  --color-ink: #1d1f23;
+  --color-muted: #6b7280;
+  --color-line: #e3e5e8;
+  --color-accent: #e64823; /* фирменный цвет точки Панфиловский */
+  --color-accent-ink: #ffffff;
+  --color-danger: #d92d20;
+  --color-success: #12a150;
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+
+/* Денежные и числовые колонки — моноширинные цифры, чтобы суммы выравнивались */
+.num {
+  font-variant-numeric: tabular-nums;
+}

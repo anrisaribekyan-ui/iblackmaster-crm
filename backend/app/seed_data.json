@@ -1,0 +1,1945 @@
+{
+ "company": {
+  "name": "iBlackMaster",
+  "inn": "504713949113",
+  "ogrn": "320508100067383",
+  "kpp": null,
+  "director": "Сарибекян Анри Егорович",
+  "position": "Директор",
+  "phone": "+7 (925) 171-85-93",
+  "email": "anrisar@my.com",
+  "currency": "RUB",
+  "order_number_prefix": "A",
+  "next_order_number": 15843
+ },
+ "locations": [
+  {
+   "name": "iBlackMaster (ТК Панфиловский)",
+   "address": "Зеленоград, Панфиловский проезд,6а",
+   "phones": "+7 (925) 171-85-93",
+   "color": "#E64823",
+   "sort": 0,
+   "stores": [
+    {
+     "name": "Склад Панфиловский"
+    }
+   ],
+   "cash_registers": [
+    {
+     "name": "Касса Панфиловский",
+     "accepts_cash": true,
+     "accepts_bank": false,
+     "bank_percent": "0",
+     "allow_negative": true,
+     "allow_internal_move": true,
+     "is_default": true
+    },
+    {
+     "name": "Перевод 89996671607",
+     "accepts_cash": false,
+     "accepts_bank": true,
+     "bank_percent": "0",
+     "allow_negative": true,
+     "allow_internal_move": true,
+     "is_default": false
+    }
+   ]
+  },
+  {
+   "name": "iBlackMaster (ТК Лента)",
+   "address": "Зеленоград, ул Гоголя д2",
+   "phones": "+7 (926) 827-51-16",
+   "color": "#171717",
+   "sort": 1,
+   "stores": [
+    {
+     "name": "Склад Лента"
+    }
+   ],
+   "cash_registers": [
+    {
+     "name": "Касса Лента",
+     "accepts_cash": true,
+     "accepts_bank": false,
+     "bank_percent": "0",
+     "allow_negative": true,
+     "allow_internal_move": true,
+     "is_default": true
+    },
+    {
+     "name": "Перевод 89996671607",
+     "accepts_cash": false,
+     "accepts_bank": true,
+     "bank_percent": "0",
+     "allow_negative": true,
+     "allow_internal_move": true,
+     "is_default": false
+    }
+   ]
+  },
+  {
+   "name": "iBlackMaster (ТК 1000 мелочей)",
+   "address": "Зеленоград,к438",
+   "phones": "+7 (926) 788-66-80",
+   "color": "#0033FF",
+   "sort": 2,
+   "stores": [
+    {
+     "name": "Склад"
+    }
+   ],
+   "cash_registers": [
+    {
+     "name": "Касса 1000мелочей",
+     "accepts_cash": true,
+     "accepts_bank": false,
+     "bank_percent": "0",
+     "allow_negative": true,
+     "allow_internal_move": true,
+     "is_default": true
+    },
+    {
+     "name": "Перевод 89996671607",
+     "accepts_cash": false,
+     "accepts_bank": true,
+     "bank_percent": "0",
+     "allow_negative": true,
+     "allow_internal_move": true,
+     "is_default": false
+    }
+   ]
+  }
+ ],
+ "global_cash_registers": [
+  {
+   "name": "Терминал",
+   "accepts_cash": false,
+   "accepts_bank": true,
+   "bank_percent": "9.7",
+   "allow_negative": true,
+   "allow_internal_move": true,
+   "is_default": false
+  }
+ ],
+ "statuses": [
+  {
+   "group": "new",
+   "name": "Принят",
+   "client_name": "Принят в работу",
+   "color": "#223DD6",
+   "sort": 1,
+   "pay_required": false
+  },
+  {
+   "group": "inWork",
+   "name": "В работе",
+   "client_name": "В работе",
+   "color": "#5CB85C",
+   "sort": 0,
+   "pay_required": false
+  },
+  {
+   "group": "inWork",
+   "name": "В пайке",
+   "client_name": "В лаборатории на диагностике\\ремонте",
+   "color": "#9AD03B",
+   "sort": 1,
+   "pay_required": false
+  },
+  {
+   "group": "inWork",
+   "name": "В переклейной",
+   "client_name": "Переклей",
+   "color": "#169672",
+   "sort": 2,
+   "pay_required": false
+  },
+  {
+   "group": "wait",
+   "name": "Ждет запчасть",
+   "client_name": "Ждет запчасть",
+   "color": "#F0AD4E",
+   "sort": 1,
+   "pay_required": false
+  },
+  {
+   "group": "wait",
+   "name": "Клиент оповещен",
+   "client_name": "Ждем ответ от клиента",
+   "color": "#F0AD4E",
+   "sort": 2,
+   "pay_required": false
+  },
+  {
+   "group": "wait",
+   "name": "Согласовать",
+   "client_name": "Согласовать",
+   "color": "#CE0ECC",
+   "sort": 2,
+   "pay_required": false
+  },
+  {
+   "group": "wait",
+   "name": "Оповестить (запчасть в наличии)",
+   "client_name": "Оповестить",
+   "color": "#FB851A",
+   "sort": 3,
+   "pay_required": false
+  },
+  {
+   "group": "wait",
+   "name": "Передать в пайку",
+   "client_name": null,
+   "color": "#FF8311",
+   "sort": 4,
+   "pay_required": false
+  },
+  {
+   "group": "finish",
+   "name": "Готов и клиент уведомлен",
+   "client_name": "Готов",
+   "color": "#272729",
+   "sort": 1,
+   "pay_required": false
+  },
+  {
+   "group": "finish",
+   "name": "Готов (позвонить клиенту)",
+   "client_name": "Готов",
+   "color": "#0C0CFD",
+   "sort": 1,
+   "pay_required": false
+  },
+  {
+   "group": "closed",
+   "name": "Закрыт (Выдан)",
+   "client_name": "Выдан",
+   "color": "#8E8E8E",
+   "sort": 1,
+   "pay_required": true
+  },
+  {
+   "group": "closed",
+   "name": "Отказ",
+   "client_name": "Отказ от ремонта",
+   "color": "#D6D6D6",
+   "sort": 2,
+   "pay_required": true
+  },
+  {
+   "group": "closed",
+   "name": "Без ремонта",
+   "client_name": "Выдан без ремонта",
+   "color": "#D6D6D6",
+   "sort": 3,
+   "pay_required": true
+  }
+ ],
+ "order_types": [
+  "Негарантийный",
+  "Ноутбук/ПК Негарантийный",
+  "Гарантийный",
+  "отвязка от пк (2)",
+  "Отвязка аккаунта при помощи пк"
+ ],
+ "form_fields": {
+  "Негарантийный": [
+   {
+    "key": "name",
+    "label": "Имя",
+    "group": "counteragent",
+    "data_type": "string",
+    "place": "0.0.1",
+    "is_required": true,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "phones",
+    "label": "Телефон",
+    "group": "counteragent",
+    "data_type": "multiple",
+    "place": "0.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "howKnow",
+    "label": "Рекламный источник",
+    "group": "counteragent",
+    "data_type": "enum",
+    "place": "0.1.0",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "brand",
+    "label": "Марка",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.0.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "model",
+    "label": "Модель",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "appearance",
+    "label": "Внешний вид",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.1.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": [
+     "царапины",
+     "потертости"
+    ]
+   },
+   {
+    "key": "sn",
+    "label": "Серийный номер / IMEI",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.1.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "problem",
+    "label": "Неисправность",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.2.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "password",
+    "label": "Пароль",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.2.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "orderNode",
+    "label": "Комментарий приемщика",
+    "group": "device",
+    "data_type": "text",
+    "place": "1.3.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "completeSet",
+    "label": "Комплектация",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.3.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "approximatePrice",
+    "label": "Ориентировочная цена",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.0.1",
+    "is_required": true,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "prepayment",
+    "label": "Предоплата",
+    "group": "other",
+    "data_type": "boolean",
+    "place": "2.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": false
+   },
+   {
+    "key": "deadline",
+    "label": "Крайний срок",
+    "group": "other",
+    "data_type": "dateTime",
+    "place": "2.1.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "master",
+    "label": "Мастер",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.1.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": {
+     "current_user": true
+    }
+   },
+   {
+    "key": "isUrgent",
+    "label": "Срочно",
+    "group": "other",
+    "data_type": "boolean",
+    "place": "2.2.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "manager",
+    "label": "Менеджер",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.2.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": {
+     "current_user": true
+    }
+   }
+  ],
+  "Ноутбук/ПК Негарантийный": [
+   {
+    "key": "name",
+    "label": "Имя",
+    "group": "counteragent",
+    "data_type": "string",
+    "place": "0.0.1",
+    "is_required": true,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "phones",
+    "label": "Телефон",
+    "group": "counteragent",
+    "data_type": "multiple",
+    "place": "0.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "howKnow",
+    "label": "Рекламный источник",
+    "group": "counteragent",
+    "data_type": "enum",
+    "place": "0.1.0",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "brand",
+    "label": "Марка",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.0.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "model",
+    "label": "Модель",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "appearance",
+    "label": "Внешний вид",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.1.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": [
+     "царапины",
+     "потертости"
+    ]
+   },
+   {
+    "key": "sn",
+    "label": "Серийный номер / IMEI",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.1.2",
+    "is_required": true,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "problem",
+    "label": "Неисправность",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.2.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "password",
+    "label": "Пароль",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.2.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "orderNode",
+    "label": "Комментарий приемщика",
+    "group": "device",
+    "data_type": "text",
+    "place": "1.3.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "completeSet",
+    "label": "Комплектация",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.3.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "approximatePrice",
+    "label": "Ориентировочная цена",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.0.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "prepayment",
+    "label": "Предоплата",
+    "group": "other",
+    "data_type": "boolean",
+    "place": "2.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": false
+   },
+   {
+    "key": "deadline",
+    "label": "Крайний срок",
+    "group": "other",
+    "data_type": "dateTime",
+    "place": "2.1.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "master",
+    "label": "Мастер",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.1.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": {
+     "current_user": true
+    }
+   },
+   {
+    "key": "isUrgent",
+    "label": "Срочно",
+    "group": "other",
+    "data_type": "boolean",
+    "place": "2.2.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "manager",
+    "label": "Менеджер",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.2.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": {
+     "current_user": true
+    }
+   }
+  ],
+  "Гарантийный": [
+   {
+    "key": "name",
+    "label": "Имя",
+    "group": "counteragent",
+    "data_type": "string",
+    "place": "0.0.1",
+    "is_required": true,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "phones",
+    "label": "Телефон",
+    "group": "counteragent",
+    "data_type": "multiple",
+    "place": "0.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "howKnow",
+    "label": "Рекламный источник",
+    "group": "counteragent",
+    "data_type": "enum",
+    "place": "0.1.0",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "brand",
+    "label": "Марка",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.0.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "model",
+    "label": "Модель",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "appearance",
+    "label": "Внешний вид",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.1.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": [
+     "царапины",
+     "потертости"
+    ]
+   },
+   {
+    "key": "sn",
+    "label": "Серийный номер / IMEI",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.1.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "problem",
+    "label": "Неисправность",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.2.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "password",
+    "label": "Пароль",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.2.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "orderNode",
+    "label": "Комментарий приемщика",
+    "group": "device",
+    "data_type": "text",
+    "place": "1.3.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "completeSet",
+    "label": "Комплектация",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.3.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "approximatePrice",
+    "label": "Ориентировочная цена",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.0.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "prepayment",
+    "label": "Предоплата",
+    "group": "other",
+    "data_type": "boolean",
+    "place": "2.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": false
+   },
+   {
+    "key": "deadline",
+    "label": "Крайний срок",
+    "group": "other",
+    "data_type": "dateTime",
+    "place": "2.1.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "master",
+    "label": "Мастер",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.1.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "isUrgent",
+    "label": "Срочно",
+    "group": "other",
+    "data_type": "boolean",
+    "place": "2.2.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "manager",
+    "label": "Менеджер",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.2.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": {
+     "current_user": true
+    }
+   }
+  ],
+  "отвязка от пк (2)": [
+   {
+    "key": "name",
+    "label": "Имя",
+    "group": "counteragent",
+    "data_type": "string",
+    "place": "0.0.1",
+    "is_required": true,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "phones",
+    "label": "Телефон",
+    "group": "counteragent",
+    "data_type": "multiple",
+    "place": "0.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "howKnow",
+    "label": "Рекламный источник",
+    "group": "counteragent",
+    "data_type": "enum",
+    "place": "0.1.0",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "brand",
+    "label": "Марка",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.0.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "model",
+    "label": "Модель",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "appearance",
+    "label": "Внешний вид",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.1.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": [
+     "царапины",
+     "потертости"
+    ]
+   },
+   {
+    "key": "sn",
+    "label": "Серийный номер / IMEI",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.1.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "problem",
+    "label": "Неисправность",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.2.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "password",
+    "label": "Пароль",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.2.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "orderNode",
+    "label": "Комментарий приемщика",
+    "group": "device",
+    "data_type": "text",
+    "place": "1.3.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "completeSet",
+    "label": "Комплектация",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.3.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "approximatePrice",
+    "label": "Ориентировочная цена",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.0.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "prepayment",
+    "label": "Предоплата",
+    "group": "other",
+    "data_type": "boolean",
+    "place": "2.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": false
+   },
+   {
+    "key": "deadline",
+    "label": "Крайний срок",
+    "group": "other",
+    "data_type": "dateTime",
+    "place": "2.1.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "master",
+    "label": "Мастер",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.1.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "isUrgent",
+    "label": "Срочно",
+    "group": "other",
+    "data_type": "boolean",
+    "place": "2.2.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "manager",
+    "label": "Менеджер",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.2.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": {
+     "current_user": true
+    }
+   }
+  ],
+  "Отвязка аккаунта при помощи пк": [
+   {
+    "key": "name",
+    "label": "Имя",
+    "group": "counteragent",
+    "data_type": "string",
+    "place": "0.0.1",
+    "is_required": true,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "phones",
+    "label": "Телефон",
+    "group": "counteragent",
+    "data_type": "multiple",
+    "place": "0.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "howKnow",
+    "label": "Рекламный источник",
+    "group": "counteragent",
+    "data_type": "enum",
+    "place": "0.1.0",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "brand",
+    "label": "Марка",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.0.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "model",
+    "label": "Модель",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "appearance",
+    "label": "Внешний вид",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.1.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": [
+     "царапины",
+     "потертости"
+    ]
+   },
+   {
+    "key": "sn",
+    "label": "Серийный номер / IMEI",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.1.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "problem",
+    "label": "Неисправность",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.2.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "password",
+    "label": "Пароль",
+    "group": "device",
+    "data_type": "string",
+    "place": "1.2.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "orderNode",
+    "label": "Комментарий приемщика",
+    "group": "device",
+    "data_type": "text",
+    "place": "1.3.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "completeSet",
+    "label": "Комплектация",
+    "group": "device",
+    "data_type": "multiple",
+    "place": "1.3.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "approximatePrice",
+    "label": "Ориентировочная цена",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.0.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "prepayment",
+    "label": "Предоплата",
+    "group": "other",
+    "data_type": "boolean",
+    "place": "2.0.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": false
+   },
+   {
+    "key": "deadline",
+    "label": "Крайний срок",
+    "group": "other",
+    "data_type": "dateTime",
+    "place": "2.1.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "master",
+    "label": "Мастер",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.1.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "isUrgent",
+    "label": "Срочно",
+    "group": "other",
+    "data_type": "boolean",
+    "place": "2.2.1",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": null
+   },
+   {
+    "key": "manager",
+    "label": "Менеджер",
+    "group": "other",
+    "data_type": "string",
+    "place": "2.2.2",
+    "is_required": false,
+    "is_only_dictionary": false,
+    "default_value": {
+     "current_user": true
+    }
+   }
+  ]
+ },
+ "field_items": {
+  "appearance": [
+   "царапины",
+   "потертости"
+  ],
+  "color": [
+   "белый",
+   "желтый",
+   "зеленый",
+   "золотой",
+   "красный",
+   "розовый",
+   "серебристый",
+   "синий",
+   "черный"
+  ]
+ },
+ "counteragent_types": [
+  "Компания",
+  "Частное лицо"
+ ],
+ "how_knows": [
+  "Авито",
+  "Повторное обращение",
+  "Проходящий трафик",
+  "Сарафанное радио",
+  "Яндекс"
+ ],
+ "cash_items": [
+  {
+   "name": "Внесение денежных средств в кассу работником",
+   "is_income": true,
+   "type": null,
+   "affects_balance": false
+  },
+  {
+   "name": "Внесение денежных средств в кассу учредителем",
+   "is_income": true,
+   "type": null,
+   "affects_balance": false
+  },
+  {
+   "name": "Возврат товара поставщику",
+   "is_income": true,
+   "type": "purchaseReturn",
+   "affects_balance": true
+  },
+  {
+   "name": "Оплата за заказ",
+   "is_income": true,
+   "type": "order",
+   "affects_balance": true
+  },
+  {
+   "name": "Оплата за перемещение",
+   "is_income": true,
+   "type": "productMove",
+   "affects_balance": false
+  },
+  {
+   "name": "Оплата по счёту",
+   "is_income": true,
+   "type": "invoice",
+   "affects_balance": true
+  },
+  {
+   "name": "Оплата чека",
+   "is_income": true,
+   "type": "sale",
+   "affects_balance": true
+  },
+  {
+   "name": "Перемещение денег в кассу",
+   "is_income": true,
+   "type": "moveFrom",
+   "affects_balance": false
+  },
+  {
+   "name": "Прочее",
+   "is_income": true,
+   "type": null,
+   "affects_balance": true
+  },
+  {
+   "name": "Возврат денежных средств покупателю за заказ",
+   "is_income": false,
+   "type": "orderReturn",
+   "affects_balance": true
+  },
+  {
+   "name": "Возврат денежных средств покупателю по чеку",
+   "is_income": false,
+   "type": "saleReturn",
+   "affects_balance": true
+  },
+  {
+   "name": "Выдача денежных средств из кассы работнику",
+   "is_income": false,
+   "type": null,
+   "affects_balance": false
+  },
+  {
+   "name": "Выдача денежных средств из кассы учредителю",
+   "is_income": false,
+   "type": null,
+   "affects_balance": false
+  },
+  {
+   "name": "Выплата заработной платы",
+   "is_income": false,
+   "type": "salary",
+   "affects_balance": false
+  },
+  {
+   "name": "Инкассация",
+   "is_income": false,
+   "type": "collection",
+   "affects_balance": false
+  },
+  {
+   "name": "Комиссия банка (эквайринг)",
+   "is_income": false,
+   "type": "bankPercent",
+   "affects_balance": false
+  },
+  {
+   "name": "Оплата за перемещение",
+   "is_income": false,
+   "type": "productMoveFrom",
+   "affects_balance": false
+  },
+  {
+   "name": "Оплата за товар поставщику",
+   "is_income": false,
+   "type": "purchase",
+   "affects_balance": true
+  },
+  {
+   "name": "Перемещение денег из кассы",
+   "is_income": false,
+   "type": "move",
+   "affects_balance": false
+  },
+  {
+   "name": "Прочее",
+   "is_income": false,
+   "type": null,
+   "affects_balance": true
+  }
+ ],
+ "price_types": [
+  {
+   "name": "Розничная",
+   "is_minimal": false
+  },
+  {
+   "name": "Ремонтная",
+   "is_minimal": false
+  },
+  {
+   "name": "Минимальная",
+   "is_minimal": true
+  }
+ ],
+ "measures": [
+  {
+   "name": "шт.",
+   "is_float": false
+  }
+ ],
+ "problems": [
+  "Битый дисплей",
+  "Был залит",
+  "Быстро разряжается",
+  "Вздулся АКБ",
+  "Видеодрайвер",
+  "Внутри было много коррозии",
+  "Грязная камера",
+  "Замена АКБ",
+  "Замена верхнего динамика",
+  "Замена дисплея",
+  "Медленно заря",
+  "Медленно заряжается",
+  "Не включается",
+  "Не включается дисплНей",
+  "Не включается дисплей",
+  "Не держит аккумулятор",
+  "Не заряжается",
+  "Не работает кнопка включения",
+  "Не работает фэйс-айди",
+  "был залит томатным соком",
+  "быстро разряжается",
+  "быстро садится",
+  "вздулась акб",
+  "гнутая рамка",
+  "греется в области под экраном сильно шумит и запах горящего",
+  "диагностика",
+  "забыли пароль",
+  "замена запчастей клиента",
+  "замена разъема",
+  "камеры трясутся и крышка разбита на 8",
+  "на логотипе",
+  "не включается, висит на лого, не заряжается",
+  "не включается, упал перестала работать камера, поменяли телефон поработал 10 минут с новой камерой и выключился",
+  "не заряжается",
+  "не заряжается, выключается сразу после включения",
+  "не зхаряжается нормально и не вкл с родным акб",
+  "не раб микрофоны",
+  "не работает отпечаток пальца",
+  "не слышно и нет амбушюр",
+  "некоррекитное изо"
+ ],
+ "complete_sets": [
+  "2 M2 диска",
+  "Mышь",
+  "Без сим-лотка",
+  "Зарядное устройство",
+  "Сумка",
+  "нет сим лотка",
+  "телефон у клиента"
+ ],
+ "nomenclature_groups": [
+  {
+   "name": "Запчасти Android",
+   "children": [
+    {
+     "name": "аккумуляторы android",
+     "children": []
+    },
+    {
+     "name": "Дисплеи Android",
+     "children": []
+    },
+    {
+     "name": "Дисплеи Samsung",
+     "children": []
+    },
+    {
+     "name": "Запчасти Huawei/Honor",
+     "children": [
+      {
+       "name": "Дисплеи Huawei/Honor",
+       "children": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Запчасти iPhone",
+   "children": [
+    {
+     "name": "Аккумуляторы iPhone",
+     "children": []
+    },
+    {
+     "name": "Дисплеи iPhone (Копия)",
+     "children": []
+    },
+    {
+     "name": "Дисплеи iPhone (Оригинал)",
+     "children": []
+    }
+   ]
+  },
+  {
+   "name": "Магазин",
+   "children": [
+    {
+     "name": "Power bank",
+     "children": []
+    },
+    {
+     "name": "Батарейки",
+     "children": []
+    },
+    {
+     "name": "Держатели для авто",
+     "children": []
+    },
+    {
+     "name": "Кабели",
+     "children": [
+      {
+       "name": "Провода",
+       "children": []
+      }
+     ]
+    },
+    {
+     "name": "Кабели/Провода",
+     "children": []
+    },
+    {
+     "name": "Наушники",
+     "children": []
+    },
+    {
+     "name": "СЗУ АЗУ ЗУ",
+     "children": []
+    },
+    {
+     "name": "Стекла, пленка Android",
+     "children": []
+    },
+    {
+     "name": "Стекла, пленки iPhone",
+     "children": [
+      {
+       "name": "iPhone \"Премиум\"",
+       "children": []
+      },
+      {
+       "name": "Антишпион",
+       "children": []
+      },
+      {
+       "name": "стекла iPhone Remax",
+       "children": []
+      }
+     ]
+    },
+    {
+     "name": "Флешки",
+     "children": []
+    },
+    {
+     "name": "Чехлы",
+     "children": [
+      {
+       "name": "Чехлы AirPods",
+       "children": []
+      },
+      {
+       "name": "Чехлы iPhone",
+       "children": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "name": "Мусор",
+   "children": []
+  },
+  {
+   "name": "Приехало",
+   "children": []
+  }
+ ],
+ "roles": [
+  {
+   "name": "БОСС",
+   "home_page": "orders",
+   "permissions": "ALL",
+   "scopes": "FULL",
+   "note": "полный доступ"
+  },
+  {
+   "name": "Администратор",
+   "home_page": "orders",
+   "permissions": [
+    "exportAccess",
+    "returnOrderProductAccess",
+    "counteragentSellerAccess",
+    "changeNotificationAccess",
+    "isManagerAccess",
+    "isMasterAccess",
+    "dashboardCustomerAccess",
+    "dashboardFinanceAccess",
+    "dashboardOrderPeriodAccess",
+    "dashboardOrderClosedAccess",
+    "dashboardDeadlineAccess",
+    "dashboardHowKnowAccess",
+    "dashboardCartAccess",
+    "createOrderAccess",
+    "deleteOrderAccess",
+    "viewDeleteOrderAccess",
+    "counteragentOrderAccess",
+    "orderPurchasePriceAccess",
+    "createOrderProductAccess",
+    "giveOrderAccess",
+    "changeOrderInfoAccess",
+    "changeOrderPositionAccess",
+    "changeOrderMasterAccess",
+    "changeOrderManagerAccess",
+    "deleteSaleDocumentAccess",
+    "counteragentShopAccess",
+    "remainAccess",
+    "purchaseAccess",
+    "createPurchaseDocumentAccess",
+    "changePurchaseDocumentAccess",
+    "deletePurchaseDocumentAccess",
+    "moveAccess",
+    "createMoveDocumentAccess",
+    "changeMoveDocumentAccess",
+    "deleteMoveDocumentAccess",
+    "allStoreMoveAccess",
+    "saleReturnAccess",
+    "changeSaleReturnDocumentAccess",
+    "deleteSaleReturnDocumentAccess",
+    "purchaseReturnAccess",
+    "createPurchaseReturnDocumentAccess",
+    "changePurchaseReturnDocumentAccess",
+    "deletePurchaseReturnDocumentAccess",
+    "inventoryAccess",
+    "createInventoryDocumentAccess",
+    "changeInventoryDocumentAccess",
+    "deleteInventoryDocumentAccess",
+    "cancellationAccess",
+    "createCancellationDocumentAccess",
+    "changeCancellationDocumentAccess",
+    "deleteCancellationDocumentAccess",
+    "storeSettingAccess",
+    "createTaskAccess",
+    "changeAllTaskAccess",
+    "deleteAllTaskAccess",
+    "shopSellerAccess",
+    "sellerAccess",
+    "globalShopAccess",
+    "changeCashRegisterAccess",
+    "moneyCashRegisterAccess",
+    "fiscalRegisterAccess",
+    "operationCashRegisterAccess",
+    "bonusPenaltyRevenueSalaryAccess",
+    "cashSalaryAccess",
+    "transactionAccess",
+    "changeTransactionAccess",
+    "completeDeleteTransactionAccess",
+    "viewDeleteTransactionAccess",
+    "bookkeepingAccess",
+    "invoiceAccess",
+    "allPriceAccess",
+    "purchasePriceAccess",
+    "discountSaleAccess",
+    "minPriceAccess",
+    "setPriceAccess",
+    "changeCounteragentBalanceAccess",
+    "cashDateAccess",
+    "statisticCallAccess",
+    "notificationAccess",
+    "howKnowAccess",
+    "nomenclatureAccess",
+    "workAccess",
+    "counteragentAccess",
+    "brandModelDeviceAccess",
+    "completeSetAccess",
+    "problemAccess",
+    "cashItemAccess",
+    "measureAccess"
+   ],
+   "scopes": {
+    "orders": "all",
+    "orderSalary": "own",
+    "tasks": "all",
+    "cart": "all",
+    "salary": "own"
+   },
+   "note": "снято с LiveSklad 1-в-1"
+  },
+  {
+   "name": "Сиськи Админа",
+   "home_page": "orders",
+   "permissions": [
+    "exportAccess",
+    "returnOrderProductAccess",
+    "counteragentSellerAccess",
+    "changeNotificationAccess",
+    "isManagerAccess",
+    "isMasterAccess",
+    "dashboardCustomerAccess",
+    "dashboardFinanceAccess",
+    "dashboardOrderPeriodAccess",
+    "dashboardOrderClosedAccess",
+    "dashboardDeadlineAccess",
+    "dashboardHowKnowAccess",
+    "dashboardCartAccess",
+    "createOrderAccess",
+    "deleteOrderAccess",
+    "viewDeleteOrderAccess",
+    "counteragentOrderAccess",
+    "orderPurchasePriceAccess",
+    "createOrderProductAccess",
+    "giveOrderAccess",
+    "changeOrderInfoAccess",
+    "changeOrderPositionAccess",
+    "changeOrderMasterAccess",
+    "changeOrderManagerAccess",
+    "deleteSaleDocumentAccess",
+    "counteragentShopAccess",
+    "remainAccess",
+    "purchaseAccess",
+    "createPurchaseDocumentAccess",
+    "changePurchaseDocumentAccess",
+    "deletePurchaseDocumentAccess",
+    "moveAccess",
+    "createMoveDocumentAccess",
+    "changeMoveDocumentAccess",
+    "deleteMoveDocumentAccess",
+    "allStoreMoveAccess",
+    "saleReturnAccess",
+    "changeSaleReturnDocumentAccess",
+    "deleteSaleReturnDocumentAccess",
+    "purchaseReturnAccess",
+    "createPurchaseReturnDocumentAccess",
+    "changePurchaseReturnDocumentAccess",
+    "deletePurchaseReturnDocumentAccess",
+    "inventoryAccess",
+    "createInventoryDocumentAccess",
+    "changeInventoryDocumentAccess",
+    "deleteInventoryDocumentAccess",
+    "cancellationAccess",
+    "createCancellationDocumentAccess",
+    "changeCancellationDocumentAccess",
+    "deleteCancellationDocumentAccess",
+    "storeSettingAccess",
+    "createTaskAccess",
+    "changeAllTaskAccess",
+    "deleteAllTaskAccess",
+    "shopSellerAccess",
+    "sellerAccess",
+    "globalShopAccess",
+    "changeCashRegisterAccess",
+    "moneyCashRegisterAccess",
+    "fiscalRegisterAccess",
+    "operationCashRegisterAccess",
+    "bonusPenaltyRevenueSalaryAccess",
+    "cashSalaryAccess",
+    "transactionAccess",
+    "changeTransactionAccess",
+    "completeDeleteTransactionAccess",
+    "viewDeleteTransactionAccess",
+    "bookkeepingAccess",
+    "invoiceAccess",
+    "allPriceAccess",
+    "purchasePriceAccess",
+    "discountSaleAccess",
+    "minPriceAccess",
+    "setPriceAccess",
+    "changeCounteragentBalanceAccess",
+    "cashDateAccess",
+    "statisticCallAccess",
+    "notificationAccess",
+    "howKnowAccess",
+    "nomenclatureAccess",
+    "workAccess",
+    "counteragentAccess",
+    "brandModelDeviceAccess",
+    "completeSetAccess",
+    "problemAccess",
+    "cashItemAccess",
+    "measureAccess"
+   ],
+   "scopes": {
+    "orders": "all",
+    "orderSalary": "own",
+    "tasks": "all",
+    "cart": "all",
+    "salary": "own"
+   },
+   "note": "ПРОВЕРИТЬ: права скопированы с Администратора — уточнить по LiveSklad"
+  },
+  {
+   "name": "Мастер",
+   "home_page": "orders",
+   "permissions": [
+    "exportAccess",
+    "returnOrderProductAccess",
+    "counteragentSellerAccess",
+    "changeNotificationAccess",
+    "isManagerAccess",
+    "isMasterAccess",
+    "dashboardCustomerAccess",
+    "dashboardFinanceAccess",
+    "dashboardOrderPeriodAccess",
+    "dashboardOrderClosedAccess",
+    "dashboardDeadlineAccess",
+    "dashboardHowKnowAccess",
+    "dashboardCartAccess",
+    "createOrderAccess",
+    "deleteOrderAccess",
+    "viewDeleteOrderAccess",
+    "counteragentOrderAccess",
+    "orderPurchasePriceAccess",
+    "createOrderProductAccess",
+    "giveOrderAccess",
+    "changeOrderInfoAccess",
+    "changeOrderPositionAccess",
+    "changeOrderMasterAccess",
+    "changeOrderManagerAccess",
+    "deleteSaleDocumentAccess",
+    "counteragentShopAccess",
+    "remainAccess",
+    "purchaseAccess",
+    "createPurchaseDocumentAccess",
+    "changePurchaseDocumentAccess",
+    "deletePurchaseDocumentAccess",
+    "moveAccess",
+    "createMoveDocumentAccess",
+    "changeMoveDocumentAccess",
+    "deleteMoveDocumentAccess",
+    "allStoreMoveAccess",
+    "saleReturnAccess",
+    "changeSaleReturnDocumentAccess",
+    "deleteSaleReturnDocumentAccess",
+    "purchaseReturnAccess",
+    "createPurchaseReturnDocumentAccess",
+    "changePurchaseReturnDocumentAccess",
+    "deletePurchaseReturnDocumentAccess",
+    "inventoryAccess",
+    "createInventoryDocumentAccess",
+    "changeInventoryDocumentAccess",
+    "deleteInventoryDocumentAccess",
+    "cancellationAccess",
+    "createCancellationDocumentAccess",
+    "changeCancellationDocumentAccess",
+    "deleteCancellationDocumentAccess",
+    "storeSettingAccess",
+    "createTaskAccess",
+    "changeAllTaskAccess",
+    "deleteAllTaskAccess",
+    "shopSellerAccess",
+    "sellerAccess",
+    "globalShopAccess",
+    "changeCashRegisterAccess",
+    "moneyCashRegisterAccess",
+    "fiscalRegisterAccess",
+    "operationCashRegisterAccess",
+    "bonusPenaltyRevenueSalaryAccess",
+    "cashSalaryAccess",
+    "transactionAccess",
+    "changeTransactionAccess",
+    "completeDeleteTransactionAccess",
+    "viewDeleteTransactionAccess",
+    "bookkeepingAccess",
+    "invoiceAccess",
+    "allPriceAccess",
+    "purchasePriceAccess",
+    "discountSaleAccess",
+    "minPriceAccess",
+    "setPriceAccess",
+    "changeCounteragentBalanceAccess",
+    "cashDateAccess",
+    "statisticCallAccess",
+    "notificationAccess",
+    "howKnowAccess",
+    "nomenclatureAccess",
+    "workAccess",
+    "counteragentAccess",
+    "brandModelDeviceAccess",
+    "completeSetAccess",
+    "problemAccess",
+    "cashItemAccess",
+    "measureAccess"
+   ],
+   "scopes": {
+    "orders": "all",
+    "orderSalary": "own",
+    "tasks": "all",
+    "cart": "all",
+    "salary": "own"
+   },
+   "note": "ПРОВЕРИТЬ: права скопированы с Администратора — уточнить по LiveSklad"
+  },
+  {
+   "name": "Продавец",
+   "home_page": "sales",
+   "permissions": [
+    "exportAccess",
+    "returnOrderProductAccess",
+    "counteragentSellerAccess",
+    "changeNotificationAccess",
+    "isManagerAccess",
+    "isMasterAccess",
+    "dashboardCustomerAccess",
+    "dashboardFinanceAccess",
+    "dashboardOrderPeriodAccess",
+    "dashboardOrderClosedAccess",
+    "dashboardDeadlineAccess",
+    "dashboardHowKnowAccess",
+    "dashboardCartAccess",
+    "createOrderAccess",
+    "deleteOrderAccess",
+    "viewDeleteOrderAccess",
+    "counteragentOrderAccess",
+    "orderPurchasePriceAccess",
+    "createOrderProductAccess",
+    "giveOrderAccess",
+    "changeOrderInfoAccess",
+    "changeOrderPositionAccess",
+    "changeOrderMasterAccess",
+    "changeOrderManagerAccess",
+    "deleteSaleDocumentAccess",
+    "counteragentShopAccess",
+    "remainAccess",
+    "purchaseAccess",
+    "createPurchaseDocumentAccess",
+    "changePurchaseDocumentAccess",
+    "deletePurchaseDocumentAccess",
+    "moveAccess",
+    "createMoveDocumentAccess",
+    "changeMoveDocumentAccess",
+    "deleteMoveDocumentAccess",
+    "allStoreMoveAccess",
+    "saleReturnAccess",
+    "changeSaleReturnDocumentAccess",
+    "deleteSaleReturnDocumentAccess",
+    "purchaseReturnAccess",
+    "createPurchaseReturnDocumentAccess",
+    "changePurchaseReturnDocumentAccess",
+    "deletePurchaseReturnDocumentAccess",
+    "inventoryAccess",
+    "createInventoryDocumentAccess",
+    "changeInventoryDocumentAccess",
+    "deleteInventoryDocumentAccess",
+    "cancellationAccess",
+    "createCancellationDocumentAccess",
+    "changeCancellationDocumentAccess",
+    "deleteCancellationDocumentAccess",
+    "storeSettingAccess",
+    "createTaskAccess",
+    "changeAllTaskAccess",
+    "deleteAllTaskAccess",
+    "shopSellerAccess",
+    "sellerAccess",
+    "globalShopAccess",
+    "changeCashRegisterAccess",
+    "moneyCashRegisterAccess",
+    "fiscalRegisterAccess",
+    "operationCashRegisterAccess",
+    "bonusPenaltyRevenueSalaryAccess",
+    "cashSalaryAccess",
+    "transactionAccess",
+    "changeTransactionAccess",
+    "completeDeleteTransactionAccess",
+    "viewDeleteTransactionAccess",
+    "bookkeepingAccess",
+    "invoiceAccess",
+    "allPriceAccess",
+    "purchasePriceAccess",
+    "discountSaleAccess",
+    "minPriceAccess",
+    "setPriceAccess",
+    "changeCounteragentBalanceAccess",
+    "cashDateAccess",
+    "statisticCallAccess",
+    "notificationAccess",
+    "howKnowAccess",
+    "nomenclatureAccess",
+    "workAccess",
+    "counteragentAccess",
+    "brandModelDeviceAccess",
+    "completeSetAccess",
+    "problemAccess",
+    "cashItemAccess",
+    "measureAccess"
+   ],
+   "scopes": {
+    "orders": "all",
+    "orderSalary": "own",
+    "tasks": "all",
+    "cart": "all",
+    "salary": "own"
+   },
+   "note": "ПРОВЕРИТЬ: права скопированы с Администратора — уточнить по LiveSklad"
+  }
+ ],
+ "employees": [
+  {
+   "short_name": "Sar. Anri",
+   "name": "Анри",
+   "surname": "Сарибекян",
+   "role": "БОСС",
+   "is_owner": true,
+   "email": "anrisar@my.com"
+  },
+  {
+   "short_name": "Сарибекян Гор",
+   "name": "Гор",
+   "surname": "Сарибекян",
+   "role": "БОСС",
+   "is_owner": false,
+   "email": "gor@iblackmaster.local"
+  },
+  {
+   "short_name": "Алексей Яковлев",
+   "name": "Алексей",
+   "surname": "Яковлев",
+   "role": "Сиськи Админа",
+   "is_owner": false,
+   "email": "alexey@iblackmaster.local"
+  },
+  {
+   "short_name": "Евгений Черкасов",
+   "name": "Евгений",
+   "surname": "Черкасов",
+   "role": "Администратор",
+   "is_owner": false,
+   "email": "evgeniy@iblackmaster.local"
+  },
+  {
+   "short_name": "Николай Липатунин",
+   "name": "Николай",
+   "surname": "Липатунин",
+   "role": "Администратор",
+   "is_owner": false,
+   "email": "nikolay@iblackmaster.local"
+  }
+ ]
+}

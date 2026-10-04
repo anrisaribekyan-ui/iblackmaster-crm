@@ -1,0 +1,56 @@
+# Правила проекта iBlackMaster CRM (для Cline / DeepSeek)
+
+Ты пишешь CRM для сети сервисных центров по ремонту телефонов. Она заменяет LiveSklad.
+Архитектор и ревьюер проекта — Claude. Ты выполняешь задачи из TASKS.md строго по карточкам.
+
+## Перед любой задачей
+1. Прочитай карточку задачи в TASKS.md целиком.
+2. Прочитай нужный раздел docs/SPEC.md и файлы, указанные в карточке.
+3. Посмотри образцы: backend/app/api/how_knows.py (роутер), backend/tests/test_how_knows.py (тест),
+   frontend/src/pages/HowKnowsPage.tsx (страница). Новый код пиши в том же стиле.
+
+## Как выполнять задачу
+- Делай ТОЛЬКО то, что в карточке. Не рефактори чужой код, не меняй структуру проекта, не обновляй библиотеки.
+- Одна задача = один коммит. Сообщение: `T-NN: краткое описание` (например `T-05: CRUD статусов заказа`).
+- Задача готова, только когда:
+  1. `cd backend && python -m pytest -q` — все тесты зелёные (и старые, и твои новые);
+  2. если менял фронтенд: `cd frontend && npm run build` — без ошибок;
+  3. в TASKS.md у задачи поставлена отметка `[x]`.
+- Потом: `git add -A && git commit -m "T-NN: ..." && git push`.
+- Если тест падает — чини свой код. Если за 3 попытки не получилось, ОСТАНОВИСЬ: в TASKS.md у задачи
+  напиши `[!] Застрял: <в чём проблема>`, закоммить и переходи к следующей задаче.
+- Если в карточке что-то непонятно или противоречит коду — не выдумывай. Пометь `[?] Вопрос: ...` и пропусти.
+
+## ЗАПРЕЩЕНО (это пишет и проверяет только Claude)
+- Менять файлы: backend/app/services/money.py, backend/app/services/stock.py, backend/app/services/orders.py,
+  backend/app/models/*.py, backend/app/permissions.py, backend/app/seed.py, backend/app/seed_data.json,
+  backend/tests/test_core_services.py. Если кажется, что без правки не обойтись — `[?] Вопрос` в TASKS.md.
+- Напрямую менять поля: CashRegister.cash_balance / bank_balance, Counteragent.balance, StockBalance.*,
+  Order.paid / total_price / total_purchase. Только через функции app.services.money / stock / orders.
+- Использовать float для денег и количества. Только Decimal (в Pydantic — `Decimal`, в JSON приходит строкой/числом).
+- Удалять или ослаблять существующие тесты, ставить skip, ловить исключения ради «зелёных» тестов.
+- Хардкодить пароли, ключи, токены. Коммитить .env, *.db, node_modules.
+- Вызывать db.commit() внутри app/services/*. Коммит делает роутер.
+
+## Стиль бэкенда (Python 3.12+, FastAPI, SQLAlchemy 2.0)
+- Роутер в backend/app/api/<имя>.py, подключение в backend/app/main.py (одна строка include_router).
+- Схемы Pydantic v2: `model_config = ConfigDict(from_attributes=True)` для Out-схем.
+- Запросы: `db.scalars(select(Model).where(...))`, а не устаревший `db.query`.
+- Права: `dependencies=[Depends(require("кодПрава"))]`, коды бери ТОЛЬКО из app/permissions.py.
+- Доступ к точке: `check_location(me, location_id)` для всего, что привязано к локации.
+- Ошибки: `raise BusinessError("Понятный текст по-русски")` / `NotFound("Заказ")` / `Forbidden(...)`.
+- Справочники удаляются мягко (is_active=False / is_deleted=True), не DELETE из БД.
+- Даты храним в UTC (`app.db.utcnow()`), на фронте показываем по Москве.
+- Каждый новый эндпоинт — минимум один тест в backend/tests/test_<имя>.py (успех + отказ без права или 404).
+
+## Стиль фронтенда (React 19 + TypeScript + Tailwind 4)
+- Запросы только через `api` из src/api/client.ts. Права в интерфейсе: `useAuth().can('код')`.
+- Цвета только токенами: bg-surface, bg-canvas, text-ink, text-muted, border-line, bg-accent, text-danger.
+- У каждой страницы три состояния: загрузка, пусто (с подсказкой, что сделать), ошибка (текст из ApiError).
+- Все тексты интерфейса — по-русски. Суммы — `toLocaleString('ru-RU')` + « ₽», класс `num`.
+- Новая страница: файл в src/pages/, маршрут в src/App.tsx, пункт меню — только если сказано в карточке.
+
+## Окружение
+- Бэкенд: `cd backend && python -m uvicorn app.main:app --reload` (порт 8000). БД по умолчанию — SQLite crm.db.
+- Первое заполнение: `cd backend && python -m app.seed --demo` (вход anrisar@my.com / demo1234).
+- Фронтенд: `cd frontend && npm run dev` (порт 5173, /api проксируется на 8000).
