@@ -2,11 +2,11 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 
-from app.api.deps import CurrentEmployee, DbSession, has_permission, require, scope_of
+from app.api.deps import CurrentEmployee, DbSession, has_permission, location_ids, require, scope_of
 from app.errors import BusinessError, Forbidden, NotFound
-from app.models import Counteragent, CounteragentType, Employee, HowKnow, Order
+from app.models import Counteragent, CounteragentType, Employee, HowKnow, Order, Sale, Transaction
 from app.utils.phone import normalize_phone
 
 router = APIRouter(prefix="/counteragents", tags=["Контрагенты"])
@@ -161,6 +161,72 @@ def get_counteragent(counteragent_id: int, db: DbSession, me: CurrentEmployee):
         select(func.count()).select_from(Order).where(Order.counteragent_id == item.id, Order.is_deleted.is_(False))
     )
     return CounteragentDetail.model_validate({**CounteragentOut.model_validate(item).model_dump(), "orders_count": orders_count})
+
+
+@router.get("/{counteragent_id}/history")
+def counteragent_history(counteragent_id: int, db: DbSession, me: CurrentEmployee):
+    require_order_read(me)
+    item = db.get(Counteragent, counteragent_id)
+    if item is None or item.is_deleted:
+        raise NotFound("Контрагент")
+    if item.is_vendor and not has_permission(me, "counteragentSellerAccess"):
+        raise NotFound("Контрагент")
+
+    scope = scope_of(me, "orders")
+    orders_query = select(Order).where(Order.counteragent_id == item.id, Order.is_deleted.is_(False))
+    allowed = location_ids(me)
+    if allowed:
+        orders_query = orders_query.where(Order.location_id.in_(allowed))
+    if scope == "own":
+        orders_query = orders_query.where(
+            or_(Order.master_id == me.id, Order.manager_id == me.id, Order.created_by_id == me.id)
+        )
+    orders = db.scalars(orders_query.order_by(Order.created_at.desc(), Order.id.desc()).limit(100)).all()
+
+    sales = db.scalars(
+        select(Sale)
+        .where(Sale.counteragent_id == item.id, Sale.is_deleted.is_(False))
+        .order_by(Sale.date.desc(), Sale.id.desc())
+        .limit(100)
+    ).all()
+
+    transactions = db.scalars(
+        select(Transaction)
+        .where(Transaction.counteragent_id == item.id, Transaction.is_deleted.is_(False))
+        .order_by(Transaction.date.desc(), Transaction.id.desc())
+        .limit(100)
+    ).all()
+
+    return {
+        "orders": [
+            {
+                "id": order.id,
+                "number": order.number,
+                "created_at": order.created_at,
+                "status_name": order.status.name if order.status else None,
+                "status_color": order.status.color if order.status else None,
+                "device": " ".join(part for part in [order.device_type, order.brand, order.model] if part) or None,
+                "total_price": order.total_price,
+                "paid": order.paid,
+            }
+            for order in orders
+        ],
+        "sales": [
+            {"id": sale.id, "number": sale.number, "date": sale.date, "total_price": sale.total_price}
+            for sale in sales
+        ],
+        "transactions": [
+            {
+                "id": tx.id,
+                "date": tx.date,
+                "amount": tx.amount,
+                "is_income": tx.is_income,
+                "cash_item_name": tx.cash_item.name if tx.cash_item else None,
+                "note": tx.note,
+            }
+            for tx in transactions
+        ],
+    }
 
 
 @router.post("", response_model=CounteragentOut, dependencies=[Depends(require("counteragentAccess"))])

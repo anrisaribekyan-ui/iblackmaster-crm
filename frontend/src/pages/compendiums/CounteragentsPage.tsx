@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
+import { formatDateTime, money } from '../shared'
 
 type Counteragent = {
   id: number
@@ -251,28 +253,101 @@ export default function CounteragentsPage() {
   )
 }
 
+type History = {
+  orders: { id: number; number: string; created_at: string; status_name: string | null; status_color: string | null; device: string | null; total_price: string; paid: string }[]
+  sales: { id: number; number: string; date: string; total_price: string }[]
+  transactions: { id: number; date: string; amount: string; is_income: boolean; cash_item_name: string | null; note: string | null }[]
+}
+
+type HistoryTab = 'orders' | 'sales' | 'transactions'
+
 function CounteragentCard({ item, onClose }: { item: Counteragent; onClose: () => void }) {
   const [details, setDetails] = useState<CounteragentDetail | null>(null)
+  const [history, setHistory] = useState<History | null>(null)
+  const [tab, setTab] = useState<HistoryTab>('orders')
   const [error, setError] = useState('')
   useEffect(() => {
-    api.get<CounteragentDetail>(`/counteragents/${item.id}`)
-      .then(setDetails)
+    Promise.all([
+      api.get<CounteragentDetail>(`/counteragents/${item.id}`),
+      api.get<History>(`/counteragents/${item.id}/history`),
+    ])
+      .then(([detailData, historyData]) => {
+        setDetails(detailData)
+        setHistory(historyData)
+      })
       .catch((e: unknown) => setError(e instanceof ApiError ? e.message : 'Не удалось загрузить карточку'))
   }, [item.id])
   return (
     <Modal title={`Карточка контрагента · ${item.name}`} onClose={onClose}>
-      {error ? <p role="alert" className="text-danger">{error}</p> : details === null ? (
+      {error ? <p role="alert" className="text-danger">{error}</p> : details === null || history === null ? (
         <p className="text-muted">Загрузка…</p>
       ) : (
-        <dl className="grid gap-3 sm:grid-cols-2">
-          <div><dt className="text-sm text-muted">Имя</dt><dd>{details.name}</dd></div>
-          <div><dt className="text-sm text-muted">Телефоны</dt><dd>{formatPhoneList(details.phones) || '—'}</dd></div>
-          <div><dt className="text-sm text-muted">Email</dt><dd>{details.email || '—'}</dd></div>
-          <div><dt className="text-sm text-muted">Адрес</dt><dd>{details.address || '—'}</dd></div>
-          <div><dt className="text-sm text-muted">Баланс</dt><dd className="num">{Number(details.balance).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽</dd></div>
-          <div><dt className="text-sm text-muted">Заказов</dt><dd>{details.orders_count}</dd></div>
-          {details.note && <div className="sm:col-span-2"><dt className="text-sm text-muted">Примечание</dt><dd className="whitespace-pre-wrap">{details.note}</dd></div>}
-        </dl>
+        <>
+          <dl className="grid gap-3 sm:grid-cols-2">
+            <div><dt className="text-sm text-muted">Имя</dt><dd>{details.name}</dd></div>
+            <div><dt className="text-sm text-muted">Телефоны</dt><dd>{formatPhoneList(details.phones) || '—'}</dd></div>
+            <div><dt className="text-sm text-muted">Email</dt><dd>{details.email || '—'}</dd></div>
+            <div><dt className="text-sm text-muted">Адрес</dt><dd>{details.address || '—'}</dd></div>
+            <div><dt className="text-sm text-muted">Баланс</dt><dd className="num">{Number(details.balance).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽</dd></div>
+            <div><dt className="text-sm text-muted">Заказов</dt><dd>{details.orders_count}</dd></div>
+            {details.note && <div className="sm:col-span-2"><dt className="text-sm text-muted">Примечание</dt><dd className="whitespace-pre-wrap">{details.note}</dd></div>}
+          </dl>
+
+          <nav className="mt-4 flex gap-1 border-b border-line">
+            {([['orders', 'Заказы'], ['sales', 'Продажи'], ['transactions', 'Платежи']] as [HistoryTab, string][]).map(([key, label]) => (
+              <button key={key} className={`border-b-2 px-3 py-2 ${tab === key ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab(key)}>
+                {label}
+              </button>
+            ))}
+          </nav>
+
+          {tab === 'orders' && (
+            history.orders.length === 0 ? <p className="py-3 text-sm text-muted">Заказов нет.</p> : (
+              <ul className="divide-y divide-line">
+                {history.orders.map((order) => (
+                  <li key={order.id} className="py-2 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <Link className="font-medium text-accent hover:underline" to={`/orders/${order.id}`}>{order.number}</Link>
+                      <span className="whitespace-nowrap rounded-full px-2 py-1 text-xs" style={{ color: order.status_color ?? undefined }}>{order.status_name ?? '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 text-muted">
+                      <span>{order.device || '—'} · {formatDateTime(order.created_at)}</span>
+                      <span className="num">{money(order.total_price)}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )
+          )}
+
+          {tab === 'sales' && (
+            history.sales.length === 0 ? <p className="py-3 text-sm text-muted">Продаж нет.</p> : (
+              <ul className="divide-y divide-line">
+                {history.sales.map((sale) => (
+                  <li key={sale.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                    <span className="font-medium">{sale.number}</span>
+                    <span className="text-muted">{formatDateTime(sale.date)}</span>
+                    <span className="num">{money(sale.total_price)}</span>
+                  </li>
+                ))}
+              </ul>
+            )
+          )}
+
+          {tab === 'transactions' && (
+            history.transactions.length === 0 ? <p className="py-3 text-sm text-muted">Платежей нет.</p> : (
+              <ul className="divide-y divide-line">
+                {history.transactions.map((tx) => (
+                  <li key={tx.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                    <span>{tx.cash_item_name ?? '—'}</span>
+                    <span className="text-muted">{formatDateTime(tx.date)}</span>
+                    <span className={`num ${tx.is_income ? 'text-success' : 'text-danger'}`}>{tx.is_income ? '+' : '−'}{money(tx.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            )
+          )}
+        </>
       )}
     </Modal>
   )

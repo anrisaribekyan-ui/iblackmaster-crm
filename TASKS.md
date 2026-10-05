@@ -403,7 +403,7 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 
 ## Блок 10. Клиенты и печать
 
-### [ ] T-48. История клиента
+### [x] T-48. История клиента
 `GET /counteragents/{id}/history` в `backend/app/api/counteragents.py` (право как у `GET /counteragents/{id}`):
 {orders: [{id, number, created_at, status_name, status_color, device (тип+бренд+модель), total_price, paid}], sales: [{id, number, date, total_price}], transactions: [{id, date, amount, is_income, cash_item_name, note}]} — последние 100 каждого вида, новые сверху; заказы с учётом `scope_of(me, "orders")` так же, как в списке заказов.
 Фронт: в карточке контрагента (`CounteragentsPage.tsx`) вкладки «Заказы», «Продажи», «Платежи»; номер заказа — ссылка. Тест на эндпоинт.
