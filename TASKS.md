@@ -322,7 +322,8 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 
 ## Блок 6. Перед боевым запуском (после ревью Claude)
 
-### [ ] T-40. Alembic и PostgreSQL
+### [R] T-40. Alembic и PostgreSQL — сделал Claude: миграции в backend/alembic, запуск на сервере — deploy/README.md.
+Новую модель/поле теперь добавляет только Claude: `alembic revision --autogenerate`.
 - `docker-compose.yml` в корне с postgres:16 (порт 5432, том, пароль из .env).
 - Alembic в `backend/alembic/` с env.py, читающим `settings.database_url` и `Base.metadata`;
   первая миграция autogenerate по текущим моделям против Postgres.

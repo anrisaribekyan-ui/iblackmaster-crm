@@ -1,0 +1,73 @@
+# Запуск: cd deploy && cp .env.example .env && (заполнить .env) && docker compose up -d --build
+name: iblackmaster-crm
+
+services:
+  db:
+    image: ${REGISTRY:-docker.io/library}/postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: crm
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Задайте DB_PASSWORD в .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm -d crm"]
+      interval: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../backend
+      args:
+        REGISTRY: ${REGISTRY:-docker.io/library}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://crm:${DB_PASSWORD}@db:5432/crm
+      JWT_SECRET: ${JWT_SECRET:?Задайте JWT_SECRET в .env}
+    volumes:
+      - uploads:/app/uploads
+
+  web:
+    build:
+      context: ../frontend
+      args:
+        REGISTRY: ${REGISTRY:-docker.io/library}
+    restart: unless-stopped
+    depends_on: [backend]
+    environment:
+      DOMAIN: ${DOMAIN:?Задайте DOMAIN в .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+  # Ежедневный бэкап БД в ./backups, хранятся последние 14 дней
+  backup:
+    image: ${REGISTRY:-docker.io/library}/postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    entrypoint: >
+      sh -c 'while true; do
+        f=/backups/crm-$$(date +%F_%H%M).sql.gz;
+        pg_dump -h db -U crm crm | gzip > $$f && echo "backup ok $$f";
+        find /backups -name "crm-*.sql.gz" -mtime +14 -delete;
+        sleep 86400;
+      done'
+
+volumes:
+  pgdata:
+  uploads:
+  caddy_data:
+  caddy_config:

@@ -27,6 +27,7 @@ from app.api import (
     transactions,
     stores,
 )
+from app.config import settings
 from app.db import Base, engine
 from app.errors import BusinessError
 
@@ -35,8 +36,12 @@ STATUS_BY_CODE = {"not_found": 404, "forbidden": 403, "unauthorized": 401, "bad_
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    # Этап 1: таблицы создаются автоматически. Перед боевым запуском переходим на Alembic (задача T-40).
-    Base.metadata.create_all(engine)
+    # SQLite (разработка) — таблицы создаются сами. PostgreSQL (сервер) — только через миграции:
+    # alembic upgrade head (делает entrypoint контейнера).
+    if engine.dialect.name == "sqlite":
+        Base.metadata.create_all(engine)
+    elif settings.jwt_secret == "change-me-in-production" or len(settings.jwt_secret) < 32:
+        raise RuntimeError("Задайте JWT_SECRET длиной от 32 символов (openssl rand -hex 32)")
     yield
 
 

@@ -20,3 +20,5 @@ frontend/dist/
 Thumbs.db
 .idea/
 *.log
+backups/
+deploy/.env
