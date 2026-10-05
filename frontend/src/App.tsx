@@ -18,6 +18,8 @@ import OrdersPage from './pages/OrdersPage'
 import OrderCreatePage from './pages/OrderCreatePage'
 import OrderDetailPage from './pages/OrderDetailPage'
 import TasksPage from './pages/TasksPage'
+import BoardsPage from './pages/BoardsPage'
+import BoardPage from './pages/BoardPage'
 import DashboardPage from './pages/DashboardPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import FinanceLayout from './pages/finance/FinanceLayout'
@@ -78,6 +80,8 @@ export default function App() {
               <Route path="inventory" element={<InventoryPage />} />
             </Route>
             <Route path="tasks" element={<TasksPage />} />
+            <Route path="boards" element={<BoardsPage />} />
+            <Route path="boards/:spaceId" element={<BoardPage />} />
             <Route path="finance" element={<FinanceLayout />}>
               <Route index element={<Navigate to="cashes" replace />} />
               <Route path="cashes" element={<FinanceCashesPage />} />

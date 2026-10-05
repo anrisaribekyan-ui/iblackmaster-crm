@@ -10,6 +10,7 @@ export const MENU: { to: string; label: string; permission?: string }[] = [
   { to: '/sales', label: 'Продажи' },
   { to: '/store/remains', label: 'Склад', permission: 'remainAccess' },
   { to: '/tasks', label: 'Задачи' },
+  { to: '/boards', label: 'Доски' },
   { to: '/finance/cashes', label: 'Финансы' },
   { to: '/analytics', label: 'Аналитика', permission: 'reportAccess' },
   { to: '/compendiums/how-knows', label: 'Справочники' },
