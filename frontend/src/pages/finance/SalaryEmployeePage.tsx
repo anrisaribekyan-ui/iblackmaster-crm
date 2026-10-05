@@ -4,11 +4,12 @@ import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
 import { formatDateTime, inputClass, money } from '../shared'
+import SalarySettings from './SalarySettings'
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 const buttonClass = 'rounded-md border border-line bg-surface px-3 py-2 text-sm hover:bg-canvas'
 
-type TabKey = 'accruals' | 'payouts'
+type TabKey = 'accruals' | 'payouts' | 'settings'
 type ManualKind = 'bonus' | 'penalty'
 
 
@@ -176,6 +177,7 @@ export default function SalaryEmployeePage() {
   const canManual = can('bonusPenaltyRevenueSalaryAccess')
   const canChange = can('changeSalaryAccess')
   const canPayout = can('cashSalaryAccess')
+  const canSettings = can('salarySettingAccess')
 
   return (
     <div>
@@ -192,12 +194,15 @@ export default function SalaryEmployeePage() {
       <nav className="mb-4 flex gap-1 border-b border-line">
         <button className={`border-b-2 px-3 py-2 ${tab === 'accruals' ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab('accruals')}>Начисления</button>
         <button className={`border-b-2 px-3 py-2 ${tab === 'payouts' ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab('payouts')}>Выплаты</button>
+        {canSettings && <button className={`border-b-2 px-3 py-2 ${tab === 'settings' ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab('settings')}>Настройки</button>}
       </nav>
 
       {error && <p className="mb-3 text-danger">{error}</p>}
 
       {loading ? (
         <p className="text-muted">Загрузка…</p>
+      ) : tab === 'settings' ? (
+        <SalarySettings employeeId={id} />
       ) : tab === 'accruals' ? (
         months === null ? null : months.length === 0 ? (
           <p className="text-muted">Начислений пока нет.</p>
