@@ -330,3 +330,96 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 - В `app/main.py` убрать create_all (только если DATABASE_URL — postgres; для SQLite в разработке оставить).
 - README: как поднять Postgres и применить миграции.
 Проверка: `alembic upgrade head` на чистом Postgres + `python -m app.seed --demo` + тесты (тесты остаются на SQLite).
+
+---
+
+# Этап 2 — работаем как в LiveSklad каждый день
+
+Модели и миграции этого этапа уже сделал Claude (`app/models/task.py`, миграция `063225e2be35_tasks`).
+Новые таблицы/поля НЕ добавляй — если без них никак, пометь `[?] Вопрос`.
+Деньги — целые рубли: на фронте суммы через `money()` из `src/pages/shared.ts`, поля сумм `step="1"`.
+Отчёты считают на бэкенде (SQL-агрегаты `func.sum/count`), фронт только показывает.
+
+## Блок 7. Задачи
+
+### [ ] T-41. API задач
+Файл `backend/app/api/tasks.py`, префикс `/tasks`, модель `Task`.
+Видимость по `scope_of(me, "tasks")`: `none` → 403 на всё; `all` → все задачи (с учётом `location_ids(me)`, если у задачи есть location_id);
+`own` → где `author_id == me.id` или `assignee_id == me.id`. Удалённые (`is_deleted`) не показывать.
+- `GET /tasks?status=open|done|overdue|all&assignee_id=&order_id=&page=` — по 50, сортировка: открытые по `deadline` (NULL в конце), выполненные по `done_at desc`.
+  overdue = не выполнена и `deadline < utcnow()`. В ответе: `{total, items: [{id, title, text, location_id, order_id, order_number, author_name, assignee_id, assignee_name, deadline, is_done, done_at, created_at}]}`.
+- `POST /tasks` — право `createTaskAccess`. Поля: title (1..300, обяз.), text, assignee_id, deadline (UTC с поясом), order_id, location_id.
+  Если указан order_id — проверь, что заказ существует и `check_location` по его локации; location_id тогда берётся из заказа.
+- `PUT /tasks/{id}` — автор может всегда; чужую — только с `changeAllTaskAccess`.
+- `POST /tasks/{id}/done` и `POST /tasks/{id}/reopen` — автор или исполнитель; иначе `changeAllTaskAccess`. done ставит `is_done, done_at=utcnow(), done_by_id`.
+- `DELETE /tasks/{id}` — мягко (`is_deleted=True`); автор или `deleteAllTaskAccess`.
+- Если задача привязана к заказу — при создании и выполнении пиши в историю заказа через `order_service.add_history(db, order, "comment", me, text="Задача: ...")` (посмотри сигнатуру в services/orders.py, сам файл не меняй).
+Тесты `backend/tests/test_tasks.py`: создание, список own vs all, просрочка, done/reopen, 403 без createTaskAccess, чужую нельзя править без changeAllTaskAccess.
+
+### [ ] T-42. Страница «Задачи»
+`/tasks` (заменить заглушку в App.tsx). Вкладки: «Открытые», «Просроченные», «Выполненные», «Все». Фильтр «Исполнитель» (список из `/staff`).
+Строка: чекбокс «выполнено» (done/reopen), заголовок, исполнитель, срок (красным `text-danger`, если просрочено), ссылка на заказ `/orders/{id}` если есть.
+Кнопка «Новая задача» (если `can('createTaskAccess')`) → модалка: заголовок, текст, исполнитель, срок (`datetime-local` → `localInputToIso`), заказ (необязательно, номер вводить не нужно — только из карточки заказа, см. T-43).
+Клик по строке — модалка редактирования; «Удалить» с подтверждением.
+
+### [ ] T-43. Задачи в карточке заказа
+В `OrderDetailPage.tsx` в правой колонке (над «Историей») блок «Задачи»: список `GET /tasks?order_id=...&status=all`, чекбокс done/reopen,
+кнопка «+ Задача» (createTaskAccess) — та же форма, order_id подставляется. Вынеси форму задачи в `src/components/TaskForm.tsx`, используй её и в T-42.
+
+## Блок 8. Главная
+
+### [ ] T-44. API главной
+Файл `backend/app/api/dashboard.py`, `GET /dashboard?location_id=&date_from=&date_to=` (даты — UTC ISO; по умолчанию — сегодня по Москве, посчитай границы суток в Europe/Moscow и переведи в UTC).
+Локации: если location_id указан — `check_location`, иначе все из `location_ids(me)`. Каждый блок отдаётся только при праве, иначе `null`:
+- `orders`: всегда — {created: заказов создано за период, in_work: сейчас не в группе closed, ready: в группе ready (см. StatusGroup), closed: выдано за период (`closed_at` в периоде)}.
+  `closed` — только при `dashboardOrderClosedAccess`, иначе null. Если нет `dashboardOrderPeriodAccess` — период принудительно «сегодня».
+- `overdue` (dashboardDeadlineAccess): до 20 заказов, где deadline < сейчас и статус не closed: [{id, number, deadline, status_name, status_color, master_name}].
+- `finance` (dashboardFinanceAccess): {income: сумма приходов по транзакциям с order_id или sale_id за период (без `is_deleted`), expense: сумма расходов, cash_registers: [{id, name, cash_balance, bank_balance}]} — только кассы доступных локаций.
+- `how_know` (dashboardHowKnowAccess): [{name, count}] — заказы за период по `how_know_id`, по убыванию.
+- `masters`: [{employee_id, name, orders_in_work}] — у кого сколько незакрытых заказов (`master_id`).
+Тесты: пустой день, заказ попадает в created, просрочка, блок finance = null без права.
+
+### [ ] T-45. Страница «Главная»
+`/` (заменить заглушку). Сверху: выбор локации (Все / каждая), период: Сегодня / Вчера / 7 дней / Месяц / свой (две даты) — период показывать, только если блок orders пришёл с правом периода (если нет права — без выбора).
+Плитки: Создано, В работе, Готово, Выдано (если не null). Ниже карточки: «Просроченные» (список со ссылками на заказы), «Кассы» (остатки нал/безнал, итог), «Приход / расход за период», «Источники рекламы» (горизонтальные полосы div-ами по доле, без библиотек), «Загрузка мастеров».
+Каждая карточка рисуется, только если её данные не null.
+
+## Блок 9. Аналитика
+
+### [ ] T-46. API отчётов
+Файл `backend/app/api/reports.py`, префикс `/reports`, все эндпоинты — право `reportAccess`. Параметры у всех: `date_from, date_to` (UTC ISO, обяз.), `location_id` (необяз., `check_location`; без него — `location_ids(me)`).
+- `GET /reports/orders?group_by=master|manager|order_type|status|how_know|day` — по заказам, ВЫДАННЫМ в периоде (`closed_at`): [{key, name, count, revenue: sum(total_price), cost: sum(total_purchase), profit: revenue-cost}].
+  `cost` и `profit` отдавать только при `marginPriceAccess`, иначе null. day — ключ «YYYY-MM-DD» по Москве.
+- `GET /reports/works?group_by=performer|nomenclature` — по позициям выданных заказов: [{key, name, quantity, revenue: sum(sold_price*quantity), cost, profit}] (то же правило для cost/profit). Работы и запчасти раздельно: параметр `is_work=true|false`.
+- `GET /reports/sales?group_by=seller|day|nomenclature` — по чекам за период (без удалённых): [{key, name, count, revenue, cost, profit}].
+- `GET /reports/cashflow?group_by=cash_item|cash_register|day` — транзакции за период: [{key, name, income, expense}].
+- `GET /reports/stock-value` — по складам доступных локаций: [{store_id, store_name, positions, quantity, value: sum(quantity*avg_purchase_price)}], value только при `purchasePriceAccess`.
+Везде в конце строка не нужна — итоги считает фронт. Тесты: по одному на каждый эндпоинт + 403 без reportAccess + cost=null без marginPriceAccess.
+
+### [ ] T-47. Страница «Аналитика»
+`/analytics` (заменить заглушку `analytics/*`). Вкладки: Заказы, Работы и запчасти, Продажи, Деньги, Склад. Общая панель: период (как на главной) + локация.
+Каждая вкладка: селект «Группировать по», таблица с колонками из ответа и строкой «Итого» внизу, кнопка «Скачать CSV» (генерировать на фронте: `;` разделитель, BOM `﻿` для Excel, имя файла `отчёт-заказы-2026-10-01-2026-10-31.csv`).
+Если cost/profit null — колонки не показывать. Если нет `can('reportAccess')` — текст «Нет доступа к отчётам».
+
+## Блок 10. Клиенты и печать
+
+### [ ] T-48. История клиента
+`GET /counteragents/{id}/history` в `backend/app/api/counteragents.py` (право как у `GET /counteragents/{id}`):
+{orders: [{id, number, created_at, status_name, status_color, device (тип+бренд+модель), total_price, paid}], sales: [{id, number, date, total_price}], transactions: [{id, date, amount, is_income, cash_item_name, note}]} — последние 100 каждого вида, новые сверху; заказы с учётом `scope_of(me, "orders")` так же, как в списке заказов.
+Фронт: в карточке контрагента (`CounteragentsPage.tsx`) вкладки «Заказы», «Продажи», «Платежи»; номер заказа — ссылка. Тест на эндпоинт.
+
+### [ ] T-49. Печать: акт выдачи и товарный чек
+Посмотри, как сделана `printReceipt` в `OrderDetailPage.tsx`, и сделай так же (окно печати с HTML, без библиотек):
+- Вынеси общее в `src/print.ts`: `openPrint(title, bodyHtml)` + функция `escapeHtml`. Существующую квитанцию переведи на неё без изменения вида.
+- «Акт выполненных работ» в карточке заказа (кнопка «Печать» становится меню: Квитанция о приёме / Акт выдачи): реквизиты локации (название, адрес, телефоны), номер заказа, клиент, устройство, SN/IMEI, таблица позиций (название, кол-во, цена, сумма, гарантия дней), итог, оплачено, строка «Претензий к качеству и срокам не имею», подписи клиента и мастера, дата.
+- «Товарный чек» в карточке чека на `/sales`: номер, дата, позиции, итог, продавец.
+
+## Блок 11. Удобство
+
+### [ ] T-50. Быстрый поиск в шапке
+В `src/components/Layout.tsx` поле поиска в шапке: Enter → если похоже на номер заказа (буква + цифры, например A15843) — `GET /orders?q=...` и при единственном результате сразу открыть заказ; иначе перейти на `/orders?q=...` (страница заказов должна подхватить параметр `q` из URL в фильтр — доработай OrdersPage).
+Проверь, что `GET /orders` уже ищет по номеру, телефону, имени клиента и SN; если нет какого-то поля — добавь в фильтр роутера `backend/app/api/orders.py` (только фильтр, без изменения остальной логики) и тест.
+
+### [ ] T-51. Экспорт в CSV
+Кнопка «Скачать CSV» на страницах: Заказы (текущий фильтр, все страницы — запрашивай постранично до конца), Финансы → Транзакции, Склад → Остатки, Контрагенты.
+Общая функция `downloadCsv(filename, headers, rows)` в `src/csv.ts` (тот же формат, что в T-47 — используй её и там).

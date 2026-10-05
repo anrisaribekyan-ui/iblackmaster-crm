@@ -31,6 +31,7 @@ from app.models.order import (
 )
 from app.models.salary import AccrualKind, SalaryEvent, SalaryRule
 from app.models.staff import Employee, Role, employee_location
+from app.models.task import Task
 from app.models.stock import (
     STOCK_DOC_TITLES,
     Sale,
