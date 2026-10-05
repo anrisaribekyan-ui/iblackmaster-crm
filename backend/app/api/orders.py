@@ -1,10 +1,12 @@
+from datetime import date, datetime, time, timezone
 from decimal import Decimal
+from typing import Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import or_, select
 
-from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, require, scope_of
+from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids, require, scope_of
 from app.errors import BusinessError, Forbidden, NotFound
 from app.models import (
     CashRegister,
@@ -101,6 +103,12 @@ class OrderDetailOut(BaseModel):
     history: list[dict]
     transactions: list[dict]
     debt: Decimal
+
+
+class OrderListOut(BaseModel):
+    items: list[dict]
+    total: int
+    counts: dict[str, int]
 
 
 def normalized_phones(raw: str | None) -> str | None:
@@ -204,6 +212,125 @@ def assert_order_access(order: Order, employee: CurrentEmployee) -> None:
 
 def model_values(item) -> dict:
     return {column.name: getattr(item, column.name) for column in item.__table__.columns}
+
+
+@router.get("", response_model=OrderListOut)
+def list_orders(
+    db: DbSession,
+    me: CurrentEmployee,
+    location_id: int | None = None,
+    tab: Literal["new", "inWork", "wait", "finish", "closed", "all"] = "all",
+    status_id: int | None = None,
+    order_type_id: int | None = None,
+    master_id: int | None = None,
+    manager_id: int | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    urgent: bool | None = None,
+    overdue: bool | None = None,
+    q: str | None = None,
+    page: int = Query(default=1, ge=1),
+    deleted: bool = False,
+):
+    scope = scope_of(me, "orders")
+    if scope == "none":
+        raise Forbidden("Нет доступа к заказам")
+    if deleted and not has_permission(me, "viewDeleteOrderAccess"):
+        raise Forbidden("Нет права видеть удалённые заказы")
+
+    query = select(Order, OrderStatus, Counteragent).join(OrderStatus).join(Counteragent)
+    if deleted:
+        query = query.where(Order.is_deleted.is_(True))
+    else:
+        query = query.where(Order.is_deleted.is_(False))
+
+    allowed = location_ids(me)
+    if allowed:
+        query = query.where(Order.location_id.in_(allowed))
+    if location_id is not None:
+        check_location(me, location_id)
+        query = query.where(Order.location_id == location_id)
+    if scope == "own":
+        query = query.where(
+            or_(Order.master_id == me.id, Order.manager_id == me.id, Order.created_by_id == me.id)
+        )
+    if status_id is not None:
+        query = query.where(Order.status_id == status_id)
+    if order_type_id is not None:
+        query = query.where(Order.order_type_id == order_type_id)
+    if master_id is not None:
+        query = query.where(Order.master_id == master_id)
+    if manager_id is not None:
+        query = query.where(Order.manager_id == manager_id)
+    if date_from is not None:
+        query = query.where(Order.created_at >= datetime.combine(date_from, time.min, tzinfo=timezone.utc))
+    if date_to is not None:
+        query = query.where(Order.created_at < datetime.combine(date_to, time.max, tzinfo=timezone.utc))
+    if urgent is not None:
+        query = query.where(Order.is_urgent.is_(urgent))
+    if overdue is True:
+        query = query.where(
+            Order.deadline.is_not(None),
+            Order.deadline < datetime.now(timezone.utc),
+            OrderStatus.group != StatusGroup.CLOSED,
+        )
+    elif overdue is False:
+        query = query.where(
+            or_(Order.deadline.is_(None), Order.deadline >= datetime.now(timezone.utc), OrderStatus.group == StatusGroup.CLOSED)
+        )
+
+    rows = db.execute(query.order_by(Order.created_at.desc(), Order.id.desc())).all()
+    if q:
+        term = q.strip().casefold()
+        normalized = normalize_phone(q)
+        raw_digits = "".join(char for char in q if char.isdecimal())
+
+        def matches(row) -> bool:
+            order, _, counteragent = row
+            if term in order.number.casefold() or term in (order.serial or "").casefold() or term in (order.model or "").casefold():
+                return True
+            if term in counteragent.name.casefold():
+                return True
+            phones = [phone.strip() for phone in (counteragent.phones or "").split(",")]
+            if normalized:
+                return any(phone == normalized for phone in phones)
+            return len(raw_digits) >= 3 and any(raw_digits in phone for phone in phones)
+
+        rows = [row for row in rows if matches(row)]
+
+    counts = {group.value: 0 for group in StatusGroup}
+    for _, status, _ in rows:
+        counts[StatusGroup(status.group).value] += 1
+
+    if tab != "all":
+        rows = [row for row in rows if StatusGroup(row[1].group).value == tab]
+    total = len(rows)
+    rows = rows[(page - 1) * 50 : page * 50]
+
+    items = []
+    for order, status, counteragent in rows:
+        manager = db.get(Employee, order.manager_id) if order.manager_id else None
+        items.append(
+            {
+                "id": order.id,
+                "number": order.number,
+                "status": {"id": status.id, "group": status.group, "name": status.name, "color": status.color},
+                "deadline": order.deadline,
+                "manager": manager.short_name if manager else None,
+                "created_at": order.created_at,
+                "order_type_id": order.order_type_id,
+                "device_type": order.device_type,
+                "brand": order.brand,
+                "model": order.model,
+                "serial": order.serial,
+                "problems": order.problems,
+                "counteragent": {"id": counteragent.id, "name": counteragent.name, "phones": counteragent.phones},
+                "total_price": order.total_price,
+                "paid": order.paid,
+                "is_urgent": order.is_urgent,
+            }
+        )
+    return OrderListOut(items=items, total=total, counts=counts)
 
 
 @router.post("", response_model=OrderCreateOut, dependencies=[Depends(require("createOrderAccess"))])

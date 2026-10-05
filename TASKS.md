@@ -174,7 +174,7 @@ CRUD с правом brandModelDeviceAccess. Плюс `GET /devices/suggest?q=` 
   Доступ: check_location + scope orders («own» — только если me мастер/менеджер/создатель).
 Тесты: создание с новым клиентом, с существующим, номер A15843, обязательное поле, чужая локация → 403.
 
-### [ ] T-21. API: список заказов
+### [x] T-21. API: список заказов
 `GET /orders` в том же файле. Параметры: location_id, tab (new|inWork|wait|finish|closed|all), status_id,
 order_type_id, master_id, manager_id, date_from, date_to, urgent, overdue, q, page (по 50).
 Сортировка: новые сверху. Ответ: {items, total, counts: {new, inWork, wait, finish, closed}}.
