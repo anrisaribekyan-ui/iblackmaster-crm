@@ -10,6 +10,7 @@ const links = [
   { to: 'products', label: 'Товары' },
   { to: 'works', label: 'Работы' },
   { to: 'counteragents', label: 'Контрагенты' },
+  { to: 'cash-items', label: 'Статьи денег' },
 ]
 
 export default function CompendiumsLayout() {

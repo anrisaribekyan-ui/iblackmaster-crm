@@ -17,6 +17,10 @@ import DictionaryPage from './components/DictionaryPage'
 import OrdersPage from './pages/OrdersPage'
 import OrderCreatePage from './pages/OrderCreatePage'
 import OrderDetailPage from './pages/OrderDetailPage'
+import FinanceLayout from './pages/finance/FinanceLayout'
+import FinanceCashesPage from './pages/finance/FinanceCashesPage'
+import FinanceTransactionsPage from './pages/finance/FinanceTransactionsPage'
+import CashItemsPage from './pages/compendiums/CashItemsPage'
 
 function Protected({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -57,7 +61,11 @@ export default function App() {
             <Route path="sales/*" element={<Stub title="Продажи" task="T-30" />} />
             <Route path="store/*" element={<Stub title="Склад" task="T-28, T-29" />} />
             <Route path="tasks/*" element={<Stub title="Задачи" task="этап 2" />} />
-            <Route path="finance/*" element={<Stub title="Финансы" task="T-31, T-32" />} />
+            <Route path="finance" element={<FinanceLayout />}>
+              <Route index element={<Navigate to="cashes" replace />} />
+              <Route path="cashes" element={<FinanceCashesPage />} />
+              <Route path="transactions" element={<FinanceTransactionsPage />} />
+            </Route>
             <Route path="analytics/*" element={<Stub title="Аналитика" task="этап 2" />} />
             <Route path="compendiums" element={<CompendiumsLayout />}>
               <Route index element={<Navigate to="how-knows" replace />} />
@@ -70,6 +78,7 @@ export default function App() {
               <Route path="products" element={<NomenclaturePage isWork={false} />} />
               <Route path="works" element={<NomenclaturePage isWork />} />
               <Route path="counteragents" element={<CounteragentsPage />} />
+              <Route path="cash-items" element={<CashItemsPage />} />
             </Route>
             <Route path="compendiums/*" element={<Stub title="Справочники" task="T-14" />} />
             <Route path="settings" element={<SettingsLayout />}>
