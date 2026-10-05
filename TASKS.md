@@ -270,7 +270,7 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 - Страница: слева поиск товара/работы и корзина чека, справа итог и оплата; ниже — история чеков.
 Тесты: продажа списывает остаток, оплата в кассу, возврат, нельзя вернуть больше проданного.
 
-### [ ] T-31. API финансов: журнал и операции
+### [x] T-31. API финансов: журнал и операции
 Роутер `/transactions`:
 - `GET /transactions?cash_register_id=&location_id=&cash_item_id=&date_from=&date_to=&deleted=&page=` — transactionAccess.
 - `POST /transactions` — ручной приход/расход по статье без системного type (operationCashRegisterAccess);
