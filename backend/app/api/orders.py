@@ -13,6 +13,7 @@ from app.models import (
     Counteragent,
     Employee,
     FormField,
+    HISTORY_TYPES,
     Nomenclature,
     NomenclaturePrice,
     Order,
@@ -118,6 +119,15 @@ class OrderDiscount(BaseModel):
         if (self.discount_percent is None) == (self.discount_sum is None):
             raise ValueError("Укажите discount_percent или discount_sum")
         return self
+
+
+class OrderStatusChange(BaseModel):
+    status_id: int
+    comment: str | None = None
+
+
+class OrderComment(BaseModel):
+    text: str = Field(min_length=1)
 
 
 class OrderCreateOut(BaseModel):
@@ -702,3 +712,58 @@ def update_order_discount(order_id: int, data: OrderDiscount, db: DbSession, me:
         "discount_sum": order.discount_sum,
         "total_price": order.total_price,
     }
+
+
+@router.post("/{order_id}/status")
+def change_order_status(order_id: int, data: OrderStatusChange, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me)
+    status = db.get(OrderStatus, data.status_id)
+    if status is None:
+        raise NotFound("Статус заказа")
+    order_service.change_status(db, order, status, me, data.comment)
+    db.commit()
+    return {"id": order.id, "status_id": order.status_id}
+
+
+@router.post("/{order_id}/comments")
+def add_order_comment(order_id: int, data: OrderComment, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me)
+    text = data.text.strip()
+    if not text:
+        raise BusinessError("Комментарий не может быть пустым")
+    order_service.add_history(db, order, "comment", me, text=text)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/{order_id}/history")
+def get_order_history(order_id: int, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me)
+    history = db.scalars(
+        select(OrderHistory)
+        .where(OrderHistory.order_id == order.id)
+        .order_by(OrderHistory.created_at.desc(), OrderHistory.id.desc())
+    ).all()
+    employee_ids = {item.employee_id for item in history if item.employee_id is not None}
+    employees = db.scalars(select(Employee).where(Employee.id.in_(employee_ids))).all() if employee_ids else []
+    employee_names = {employee.id: employee.short_name for employee in employees}
+    result = []
+    for item in history:
+        status = db.get(OrderStatus, item.status_id) if item.status_id is not None else None
+        result.append(
+            {
+                "id": item.id,
+                "type": item.type,
+                "title": HISTORY_TYPES.get(item.type, item.type),
+                "text": item.text,
+                "data": item.data,
+                "created_at": item.created_at,
+                "employee_name": employee_names.get(item.employee_id),
+                "status": (
+                    {"id": status.id, "name": status.name, "color": status.color}
+                    if status is not None
+                    else None
+                ),
+            }
+        )
+    return result

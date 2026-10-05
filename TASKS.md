@@ -199,7 +199,7 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 - `PUT /orders/{id}/discount` — {discount_percent | discount_sum} (discountSaleAccess), затем `orders.recalc_totals`.
 Тесты: списание со склада, возврат при удалении, запрет ниже минимальной цены, скидка.
 
-### [ ] T-24. API: статус и комментарии
+### [x] T-24. API: статус и комментарии
 - `POST /orders/{id}/status` — {status_id, comment} → `orders.change_status`.
 - `POST /orders/{id}/comments` — {text} → история `comment`.
 - `GET /orders/{id}/history` — лента с именем сотрудника, названием и цветом статуса.

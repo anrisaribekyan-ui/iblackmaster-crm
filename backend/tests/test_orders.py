@@ -449,3 +449,81 @@ def test_order_discount_recalculates_total(client, auth_headers, db, owner):
 
     assert response.status_code == 200
     assert Decimal(str(response.json()["total_price"])) == Decimal("900.00")
+
+
+def test_order_status_required_comment_and_history(client, auth_headers, db, owner):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    current_status = db.scalars(select(OrderStatus).where(OrderStatus.group == StatusGroup.NEW)).first()
+    customer = Counteragent(name="История")
+    next_status = OrderStatus(
+        group=StatusGroup.WAIT,
+        name="Ждём клиента",
+        color="#112233",
+        sort=999,
+        comment_mode="required",
+    )
+    db.add_all([customer, next_status])
+    db.flush()
+    order = add_order(
+        db,
+        owner=owner,
+        location=location,
+        order_type=order_type,
+        counteragent=customer,
+        status=current_status,
+        number="STATUS-HISTORY",
+    )
+
+    rejected = client.post(
+        f"/api/orders/{order.id}/status",
+        json={"status_id": next_status.id},
+        headers=auth_headers,
+    )
+    assert rejected.status_code == 400
+
+    changed = client.post(
+        f"/api/orders/{order.id}/status",
+        json={"status_id": next_status.id, "comment": "Свяжитесь с клиентом"},
+        headers=auth_headers,
+    )
+    assert changed.status_code == 200
+    client.post(f"/api/orders/{order.id}/comments", json={"text": "Позвонили"}, headers=auth_headers)
+    history = client.get(f"/api/orders/{order.id}/history", headers=auth_headers)
+
+    assert history.status_code == 200
+    assert history.json()[0]["type"] == "comment"
+    assert history.json()[0]["employee_name"] == owner.short_name
+    status_event = next(item for item in history.json() if item["type"] == "status")
+    assert status_event["status"]["color"] == "#112233"
+
+
+def test_cannot_close_unpaid_order(client, auth_headers, db, owner):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    current_status = db.scalars(select(OrderStatus).where(OrderStatus.group == StatusGroup.NEW)).first()
+    closed_status = db.scalars(
+        select(OrderStatus).where(OrderStatus.group == StatusGroup.CLOSED, OrderStatus.pay_required.is_(True))
+    ).first()
+    customer = Counteragent(name="Неоплаченный")
+    db.add(customer)
+    db.flush()
+    order = add_order(
+        db,
+        owner=owner,
+        location=location,
+        order_type=order_type,
+        counteragent=customer,
+        status=current_status,
+        number="UNPAID-CLOSE",
+        total_price=Decimal("100.00"),
+    )
+
+    response = client.post(
+        f"/api/orders/{order.id}/status",
+        json={"status_id": closed_status.id},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 400
+    assert "Заказ не оплачен" in response.json()["message"]
