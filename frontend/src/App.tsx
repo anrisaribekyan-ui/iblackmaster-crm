@@ -18,6 +18,7 @@ import OrdersPage from './pages/OrdersPage'
 import OrderCreatePage from './pages/OrderCreatePage'
 import OrderDetailPage from './pages/OrderDetailPage'
 import TasksPage from './pages/TasksPage'
+import DashboardPage from './pages/DashboardPage'
 import FinanceLayout from './pages/finance/FinanceLayout'
 import FinanceCashesPage from './pages/finance/FinanceCashesPage'
 import FinanceTransactionsPage from './pages/finance/FinanceTransactionsPage'
@@ -58,7 +59,7 @@ export default function App() {
               </Protected>
             }
           >
-            <Route index element={<Stub title="Главная" task="этап 2" />} />
+            <Route index element={<DashboardPage />} />
             <Route path="orders">
               <Route index element={<OrdersPage />} />
               <Route path="new" element={<OrderCreatePage />} />
