@@ -19,6 +19,7 @@ import OrderCreatePage from './pages/OrderCreatePage'
 import OrderDetailPage from './pages/OrderDetailPage'
 import TasksPage from './pages/TasksPage'
 import DashboardPage from './pages/DashboardPage'
+import AnalyticsPage from './pages/AnalyticsPage'
 import FinanceLayout from './pages/finance/FinanceLayout'
 import FinanceCashesPage from './pages/finance/FinanceCashesPage'
 import FinanceTransactionsPage from './pages/finance/FinanceTransactionsPage'
@@ -80,7 +81,7 @@ export default function App() {
               <Route path="cashes" element={<FinanceCashesPage />} />
               <Route path="transactions" element={<FinanceTransactionsPage />} />
             </Route>
-            <Route path="analytics/*" element={<Stub title="Аналитика" task="этап 2" />} />
+            <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="compendiums" element={<CompendiumsLayout />}>
               <Route index element={<Navigate to="how-knows" replace />} />
               <Route path="how-knows" element={<HowKnowsPage />} />
