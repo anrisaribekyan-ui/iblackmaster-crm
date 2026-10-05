@@ -11,6 +11,7 @@ from app.api import (
     complete_sets,
     counteragents,
     counteragent_types,
+    dashboard,
     devices,
     how_knows,
     locations,
@@ -86,6 +87,7 @@ app.include_router(counteragent_types.router, prefix="/api")
 app.include_router(devices.router, prefix="/api")
 app.include_router(nomenclature.router, prefix="/api")
 app.include_router(counteragents.router, prefix="/api")
+app.include_router(dashboard.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(stock_documents.router, prefix="/api")
 app.include_router(stock_remains.router, prefix="/api")

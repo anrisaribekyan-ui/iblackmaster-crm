@@ -368,7 +368,7 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 
 ## Блок 8. Главная
 
-### [ ] T-44. API главной
+### [x] T-44. API главной
 Файл `backend/app/api/dashboard.py`, `GET /dashboard?location_id=&date_from=&date_to=` (даты — UTC ISO; по умолчанию — сегодня по Москве, посчитай границы суток в Europe/Moscow и переведи в UTC).
 Локации: если location_id указан — `check_location`, иначе все из `location_ids(me)`. Каждый блок отдаётся только при праве, иначе `null`:
 - `orders`: всегда — {created: заказов создано за период, in_work: сейчас не в группе closed, ready: в группе ready (см. StatusGroup), closed: выдано за период (`closed_at` в периоде)}.
