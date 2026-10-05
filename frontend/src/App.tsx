@@ -24,6 +24,7 @@ import FinanceLayout from './pages/finance/FinanceLayout'
 import FinanceCashesPage from './pages/finance/FinanceCashesPage'
 import FinanceTransactionsPage from './pages/finance/FinanceTransactionsPage'
 import SalaryPage from './pages/finance/SalaryPage'
+import SalaryEmployeePage from './pages/finance/SalaryEmployeePage'
 import CashItemsPage from './pages/compendiums/CashItemsPage'
 import SalesPage from './pages/SalesPage'
 import StoreLayout from './pages/store/StoreLayout'
@@ -82,6 +83,7 @@ export default function App() {
               <Route path="cashes" element={<FinanceCashesPage />} />
               <Route path="transactions" element={<FinanceTransactionsPage />} />
               <Route path="salary" element={<SalaryPage />} />
+              <Route path="salary/:employeeId" element={<SalaryEmployeePage />} />
             </Route>
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="compendiums" element={<CompendiumsLayout />}>
