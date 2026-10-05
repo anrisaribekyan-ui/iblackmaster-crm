@@ -2,10 +2,12 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../../auth'
 
 export default function FinanceLayout() {
-  const { can } = useAuth()
+  const { can, me } = useAuth()
+  const hasSalary = me?.is_owner || (me?.scopes?.salary && me.scopes.salary !== 'none')
   const links = [
     { to: 'cashes', label: 'Кассы' },
     ...(can('transactionAccess') ? [{ to: 'transactions', label: 'Журнал операций' }] : []),
+    ...(hasSalary ? [{ to: 'salary', label: 'Зарплата' }] : []),
   ]
 
   return (

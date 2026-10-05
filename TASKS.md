@@ -433,7 +433,7 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 Смотри `backend/app/api/salary.py` и тесты `backend/tests/test_salary_api.py` — там видно форму запросов и ответов.
 `backend/app/services/salary.py` и `backend/app/api/salary.py` НЕ менять — если чего-то не хватает, `[?] Вопрос`.
 
-### [ ] T-52. Страница «Зарплата»
+### [x] T-52. Страница «Зарплата»
 Вкладка «Зарплата» в `FinanceLayout` (`/finance/salary`, маршрут в App.tsx).
 - Сверху: выбор месяца (‹ Октябрь 2026 ›) и локации (Все / каждая).
 - Таблица `GET /salary/summary`: Сотрудник, Начислено (`total`), Выплачено, К выплате (красным, если < 0). Строка «Итого».
