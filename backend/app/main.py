@@ -14,6 +14,7 @@ from app.api import (
     how_knows,
     locations,
     measures,
+    nomenclature,
     order_types,
     problems,
     staff,
@@ -69,3 +70,4 @@ app.include_router(complete_sets.router, prefix="/api")
 app.include_router(measures.router, prefix="/api")
 app.include_router(counteragent_types.router, prefix="/api")
 app.include_router(devices.router, prefix="/api")
+app.include_router(nomenclature.router, prefix="/api")

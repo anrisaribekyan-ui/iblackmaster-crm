@@ -129,7 +129,7 @@ CRUD с правом brandModelDeviceAccess. Плюс `GET /devices/suggest?q=` 
 автодополнения в форме заказа (ищет по brand.name и device_model.name).
 Тесты: дерево и подсказки.
 
-### [ ] T-12. API номенклатуры
+### [x] T-12. API номенклатуры
 Файл `backend/app/api/nomenclature.py`.
 - `GET /nomenclature?q=&is_work=&group_id=&location_id=&page=` — по 50; поиск по name/article/code;
   в ответе цены (по типам цен), для товаров — остаток на складах выбранной локации (сумма StockBalance.quantity).
