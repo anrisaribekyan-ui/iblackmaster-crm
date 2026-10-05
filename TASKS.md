@@ -251,7 +251,7 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 - Права: purchaseAccess/createPurchaseDocumentAccess и т.д. (см. permissions.py, раздел «Склад»).
 Тесты: остатки после каждого типа документа, откат при удалении, оплата поставщику.
 
-### [ ] T-29. Остатки и инвентаризация + фронтенд склада
+### [!] T-29. Остатки и инвентаризация + фронтенд склада — не указан endpoint для сохранения фактического `quantity` перед `/finish`; реализованы только остатки.
 - `GET /stock/remains?location_id=&store_id=&q=&only_positive=` — remainAccess; кол-во, средняя цена
   (при purchasePriceAccess), сумма.
 - Инвентаризация: создать документ (заполнить позиции текущими остатками: quantity_accounted), ввести факт
