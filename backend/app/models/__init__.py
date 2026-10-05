@@ -1,5 +1,6 @@
 """Все модели импортируются здесь, чтобы Base.metadata знала о каждой таблице."""
 
+from app.models.board import Board, BoardColumn, BoardSpace, Card, CardComment
 from app.models.catalog import (
     Brand,
     CompleteSet,
