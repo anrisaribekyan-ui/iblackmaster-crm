@@ -169,6 +169,7 @@ export default function OrderDetailPage() {
   const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null)
   const [quantity, setQuantity] = useState('1')
   const [positionPrice, setPositionPrice] = useState('0')
+  const [positionCost, setPositionCost] = useState('')
   const [storeId, setStoreId] = useState('')
   const [discountKind, setDiscountKind] = useState<'percent' | 'sum'>('percent')
   const [discountValue, setDiscountValue] = useState('')
@@ -258,6 +259,8 @@ export default function OrderDetailPage() {
   }
 
   const isClosed = detail?.status.group === 'closed'
+  // Себестоимость видна с правом просмотра закупочных цен, редактируется с правом orderPurchasePriceAccess
+  const canSeeCost = can('purchasePriceAccess') || can('orderPurchasePriceAccess')
 
   const getFirstClosedStatus = () =>
     statusGroups.find((group) => group.group === 'closed')?.statuses[0]
@@ -364,7 +367,7 @@ export default function OrderDetailPage() {
       setError('Укажите название работы')
       return
     }
-    const payload = manual
+    const base = manual
       ? { name: selectedItem.name.trim(), is_work: true, quantity, price: positionPrice }
       : {
           nomenclature_id: selectedItem.id,
@@ -373,6 +376,8 @@ export default function OrderDetailPage() {
           is_work: selectedItem.is_work,
           store_id: selectedItem.is_work ? null : Number(storeId),
         }
+    // Пустая себестоимость — берётся из справочника / средней цены склада
+    const payload = can('orderPurchasePriceAccess') && positionCost !== '' ? { ...base, purchase_price: positionCost } : base
     const success = await run(
       () => api.post(`/orders/${detail.order.id}/positions`, payload),
       'Не удалось добавить позицию',
@@ -381,6 +386,7 @@ export default function OrderDetailPage() {
     setSelectedItem(null)
     setSearchResults([])
     setSearch('')
+    setPositionCost('')
   }
 
   const saveDiscount = async () => {
@@ -407,6 +413,14 @@ export default function OrderDetailPage() {
     await run(
       () => api.put(`/orders/${detail.order.id}/positions/${position.id}`, { price }),
       'Не удалось обновить цену позиции',
+    )
+  }
+
+  const editPositionCost = async (position: Position, purchasePrice: string) => {
+    if (!detail) return
+    await run(
+      () => api.put(`/orders/${detail.order.id}/positions/${position.id}`, { purchase_price: purchasePrice || '0' }),
+      'Не удалось обновить себестоимость',
     )
   }
 
@@ -502,7 +516,7 @@ export default function OrderDetailPage() {
               ) : (
                 <div className="mb-4 overflow-x-auto">
                   <table className="w-full min-w-[740px] text-left text-sm">
-                    <thead className="bg-canvas text-muted"><tr>{['Позиция', 'Тип', 'Количество', 'Цена', 'Итого', ...(can('marginPriceAccess') ? ['Прибыль'] : []), ''].map((item) => <th key={item} className="px-2 py-2 font-medium">{item}</th>)}</tr></thead>
+                    <thead className="bg-canvas text-muted"><tr>{['Позиция', 'Тип', 'Количество', 'Цена', ...(canSeeCost ? ['Себестоимость'] : []), 'Итого', ...(can('marginPriceAccess') ? ['Прибыль'] : []), ''].map((item) => <th key={item} className="px-2 py-2 font-medium">{item}</th>)}</tr></thead>
                     <tbody>
                       {detail.positions.map((position) => (
                         <PositionRow
@@ -510,7 +524,10 @@ export default function OrderDetailPage() {
                           position={position}
                           canEdit={can('changeOrderPositionAccess') && !isClosed}
                           canViewMargin={can('marginPriceAccess')}
+                          canViewCost={canSeeCost}
+                          canEditCost={can('changeOrderPositionAccess') && can('orderPurchasePriceAccess') && !isClosed}
                           onSavePrice={(price) => void editPositionPrice(position, price)}
+                          onSaveCost={(cost) => void editPositionCost(position, cost)}
                           onDelete={() => void removePosition(position)}
                         />
                       ))}
@@ -529,6 +546,7 @@ export default function OrderDetailPage() {
                       onClick={() => {
                         setSelectedItem({ id: 0, name: search.trim(), is_work: true })
                         setPositionPrice('')
+                        setPositionCost('')
                         setQuantity('1')
                         setSearchResults([])
                       }}
@@ -543,6 +561,7 @@ export default function OrderDetailPage() {
                           <button className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-canvas" onClick={() => {
                             setSelectedItem(item)
                             setPositionPrice(item.prices?.[0]?.price ?? '0')
+                            setPositionCost('')
                             setSearchResults([])
                           }}>
                             <span>{item.name}<small className="ml-2 text-muted">{item.article}</small></span>
@@ -563,8 +582,13 @@ export default function OrderDetailPage() {
                       )}
                       <label className="grid gap-1 text-xs text-muted">Количество<input className={inputClass} type="number" min="0.001" step="0.001" required value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label>
                       <label className="grid gap-1 text-xs text-muted">Цена<input className={inputClass} type="number" min="0" step="0.01" required value={positionPrice} onChange={(event) => setPositionPrice(event.target.value)} /></label>
+                      {can('orderPurchasePriceAccess') && (
+                        <label className="grid gap-1 text-xs text-muted">Себестоимость
+                          <input className={inputClass} type="number" min="0" step="0.01" value={positionCost} onChange={(event) => setPositionCost(event.target.value)} placeholder={selectedItem.id === 0 ? '0' : 'Из справочника'} />
+                        </label>
+                      )}
                       {!selectedItem.is_work && (
-                        <label className="grid gap-1 text-xs text-muted sm:col-span-2">Склад
+                        <label className="grid gap-1 text-xs text-muted">Склад
                           <select className={inputClass} required value={storeId} onChange={(event) => setStoreId(event.target.value)}>
                             <option value="">Выберите склад</option>{stores.map((store) => <option key={store.id} value={store.id}>{store.name}</option>)}
                           </select>
@@ -714,23 +738,36 @@ function PositionRow({
   position,
   canEdit,
   canViewMargin,
+  canViewCost,
+  canEditCost,
   onSavePrice,
+  onSaveCost,
   onDelete,
 }: {
   position: Position
   canEdit: boolean
   canViewMargin: boolean
+  canViewCost: boolean
+  canEditCost: boolean
   onSavePrice: (price: string) => void
+  onSaveCost: (cost: string) => void
   onDelete: () => void
 }) {
   const [price, setPrice] = useState(position.price)
   useEffect(() => setPrice(position.price), [position.price])
+  const [cost, setCost] = useState(position.purchase_price ?? '')
+  useEffect(() => setCost(position.purchase_price ?? ''), [position.purchase_price])
   return (
     <tr className="border-t border-line">
       <td className="px-2 py-2">{position.name}</td>
       <td className="px-2 py-2">{position.is_work ? 'Работа' : 'Материал'}</td>
       <td className="px-2 py-2 num">{Number(position.quantity).toLocaleString('ru-RU')}</td>
       <td className="px-2 py-2">{canEdit ? <input className={`${inputClass} w-28 text-right num`} type="number" min="0" step="0.01" value={price} onChange={(event) => setPrice(event.target.value)} onBlur={() => { if (price !== position.price) onSavePrice(price) }} /> : <span className="num">{formatMoney(position.sold_price)}</span>}</td>
+      {canViewCost && (
+        <td className="px-2 py-2">{canEditCost
+          ? <input className={`${inputClass} w-28 text-right num`} type="number" min="0" step="0.01" value={cost} title="Себестоимость за единицу" onChange={(event) => setCost(event.target.value)} onBlur={() => { if (cost !== (position.purchase_price ?? '')) onSaveCost(cost) }} />
+          : <span className="num">{position.purchase_price === null ? '—' : formatMoney(position.purchase_price)}</span>}</td>
+      )}
       <td className="px-2 py-2 num">{formatMoney(position.total)}</td>
       {canViewMargin && <td className="px-2 py-2 num">{position.margin === null ? '—' : formatMoney(position.margin)}</td>}
       <td className="px-2 py-2">{canEdit && <button className="text-danger" onClick={onDelete}>Удалить</button>}</td>

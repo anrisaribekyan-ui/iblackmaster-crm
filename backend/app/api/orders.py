@@ -109,11 +109,13 @@ class OrderPositionCreate(BaseModel):
     performer_id: int | None = None
     store_id: int | None = None
     guarantee_days: int | None = None
+    purchase_price: Decimal | None = None
 
 
 class OrderPositionPrice(BaseModel):
     price: Decimal | None = None
     sold_price: Decimal | None = None
+    purchase_price: Decimal | None = None
 
 
 class OrderDiscount(BaseModel):
@@ -682,6 +684,8 @@ def add_order_position(order_id: int, data: OrderPositionCreate, db: DbSession, 
     if not is_work and not any(position.is_work for position in order.positions):
         if not has_permission(me, "createOrderProductAccess"):
             raise Forbidden("Сначала добавьте работу в заказ")
+    if data.purchase_price is not None and not has_permission(me, "orderPurchasePriceAccess"):
+        raise Forbidden("Нет права менять себестоимость")
     unit_price = data.price if data.price is not None else Decimal("0")
     minimum = check_minimum_price(db, me, data.nomenclature_id, order.location_id, unit_price)
     position = order_service.add_position(
@@ -696,6 +700,7 @@ def add_order_position(order_id: int, data: OrderPositionCreate, db: DbSession, 
         performer_id=data.performer_id,
         store_id=data.store_id,
         guarantee_days=data.guarantee_days,
+        purchase_price=data.purchase_price,
     )
     position.min_price = minimum
     db.commit()
@@ -722,10 +727,14 @@ def update_order_position_price(
     position = db.get(OrderPosition, position_id)
     if position is None or position.order_id != order.id:
         raise NotFound("Позиция заказа")
-    if data.price is None and data.sold_price is None:
+    if data.price is None and data.sold_price is None and data.purchase_price is None:
         raise BusinessError("Укажите цену для изменения")
-    target_price = data.sold_price if data.sold_price is not None else data.price
-    minimum = check_minimum_price(db, me, position.nomenclature_id, order.location_id, target_price)
+    if data.purchase_price is not None and not has_permission(me, "orderPurchasePriceAccess"):
+        raise Forbidden("Нет права менять себестоимость")
+    minimum = position.min_price
+    if data.price is not None or data.sold_price is not None:
+        target_price = data.sold_price if data.sold_price is not None else data.price
+        minimum = check_minimum_price(db, me, position.nomenclature_id, order.location_id, target_price)
     order_service.update_position_price(
         db,
         order,
@@ -733,10 +742,14 @@ def update_order_position_price(
         me,
         price=data.price,
         sold_price=data.sold_price,
+        purchase_price=data.purchase_price,
     )
     position.min_price = minimum
     db.commit()
-    return model_values(position)
+    values = model_values(position)
+    if not has_permission(me, "purchasePriceAccess"):
+        values["purchase_price"] = None
+    return values
 
 
 @router.delete(

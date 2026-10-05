@@ -32,7 +32,12 @@ def owner(db) -> Employee:
 @pytest.fixture()
 def client(db):
     def _get_db():
-        yield db
+        # Как в бою: ошибка запроса откатывает всё, что он успел записать в сессию.
+        try:
+            yield db
+        except Exception:
+            db.rollback()
+            raise
 
     fastapi_app.dependency_overrides[get_db] = _get_db
     with TestClient(fastapi_app) as c:

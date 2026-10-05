@@ -661,3 +661,58 @@ def test_order_payment_rejects_cash_register_from_foreign_location(client, db):
     )
 
     assert response.status_code == 403
+
+def test_manual_work_purchase_price(client, auth_headers, db, owner):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    status = db.scalars(select(OrderStatus).where(OrderStatus.group == StatusGroup.NEW)).first()
+    customer = Counteragent(name="Себестоимость")
+    role = Role(name="Без себестоимости", permissions=["changeOrderPositionAccess"], scopes={"orders": "all"})
+    employee = Employee(
+        name="Мастер без себестоимости",
+        short_name="Мастер",
+        email="no-cost@example.test",
+        password_hash=hash_password("password123", rounds=4),
+        role=role,
+        locations=[location],
+    )
+    db.add_all([customer, employee])
+    db.flush()
+    order = add_order(
+        db, owner=owner, location=location, order_type=order_type,
+        counteragent=customer, status=status, number="COST",
+    )
+    db.commit()
+
+    created = client.post(
+        f"/api/orders/{order.id}/positions",
+        json={"name": "Замена дисплея", "is_work": True, "price": "3000", "purchase_price": "1200"},
+        headers=auth_headers,
+    )
+    assert created.status_code == 200, created.text
+    position_id = created.json()["id"]
+    assert Decimal(str(created.json()["purchase_price"])) == Decimal("1200.00")
+
+    updated = client.put(
+        f"/api/orders/{order.id}/positions/{position_id}",
+        json={"purchase_price": "1500"},
+        headers=auth_headers,
+    )
+    assert updated.status_code == 200, updated.text
+    assert Decimal(str(updated.json()["purchase_price"])) == Decimal("1500.00")
+
+    negative = client.put(
+        f"/api/orders/{order.id}/positions/{position_id}",
+        json={"purchase_price": "-1"},
+        headers=auth_headers,
+    )
+    assert negative.status_code == 400
+
+    login = client.post("/api/auth/login", json={"email": employee.email, "password": "password123"})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    forbidden = client.put(
+        f"/api/orders/{order.id}/positions/{position_id}",
+        json={"purchase_price": "1"},
+        headers=headers,
+    )
+    assert forbidden.status_code == 403

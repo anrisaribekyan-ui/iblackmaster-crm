@@ -104,8 +104,13 @@ def add_position(
     performer_id: int | None = None,
     store_id: int | None = None,
     guarantee_days: int | None = None,
+    purchase_price=None,
 ) -> OrderPosition:
-    """Добавляет работу или запчасть. Запчасть со склада списывается сразу (store_id обязателен)."""
+    """Добавляет работу или запчасть. Запчасть со склада списывается сразу (store_id обязателен).
+
+    purchase_price — себестоимость единицы, заданная вручную (право orderPurchasePriceAccess проверяет роутер).
+    Для запчасти со склада по умолчанию берётся средняя цена склада.
+    """
     _ensure_editable(order)
     qty = stock.to_qty(quantity)
     nom = db.get(Nomenclature, nomenclature_id) if nomenclature_id else None
@@ -116,6 +121,12 @@ def add_position(
     work = nom.is_work if nom else bool(is_work)
     unit_price = money.to_money(price if price is not None else "0")
 
+    manual_cost = None
+    if purchase_price is not None:
+        manual_cost = money.to_money(purchase_price)
+        if manual_cost < 0:
+            raise BusinessError("Себестоимость не может быть отрицательной")
+
     purchase_price = Decimal("0")
     if nom is not None and not nom.is_work:
         if store_id is None:
@@ -123,6 +134,8 @@ def add_position(
         purchase_price = stock.write_off(db, store_id, nom.id, qty)
     elif nom is not None:
         purchase_price = nom.purchase_price
+    if manual_cost is not None:
+        purchase_price = manual_cost
 
     pos = OrderPosition(
         order_id=order.id,
@@ -163,10 +176,15 @@ def remove_position(db: Session, order: Order, position: OrderPosition, employee
 
 
 def update_position_price(
-    db: Session, order: Order, position: OrderPosition, employee: Employee, *, price=None, sold_price=None
+    db: Session, order: Order, position: OrderPosition, employee: Employee, *, price=None, sold_price=None, purchase_price=None
 ) -> None:
-    """Меняет цену/цену со скидкой. Ниже минимальной — только с правом minPriceAccess (проверяет роутер)."""
+    """Меняет цену / цену со скидкой / себестоимость. Права (minPriceAccess, orderPurchasePriceAccess) проверяет роутер."""
     _ensure_editable(order)
+    if purchase_price is not None:
+        value = money.to_money(purchase_price)
+        if value < 0:
+            raise BusinessError("Себестоимость не может быть отрицательной")
+        position.purchase_price = value
     if price is not None:
         position.price = money.to_money(price)
         position.sold_price = position.price
@@ -175,7 +193,7 @@ def update_position_price(
     recalc_totals(order)
     add_history(
         db, order, "change_work" if position.is_work else "change_product", employee,
-        text=f"{position.name}: цена {position.sold_price}",
+        text=f"{position.name}: цена {position.sold_price}, себестоимость {position.purchase_price}",
     )
 
 
