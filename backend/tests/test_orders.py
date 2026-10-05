@@ -67,6 +67,32 @@ def test_create_order_with_new_counteragent_and_read_card(client, auth_headers, 
     assert detail.json()["debt"] == "0.00"
 
 
+def test_print_receipt_contains_order_details_and_escapes_html(client, auth_headers, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    payload = order_payload(location.id, order_type.id, {"name": "<script>alert(1)</script>"})
+
+    created = client.post("/api/orders", json=payload, headers=auth_headers)
+    assert created.status_code == 200, created.text
+    order_id = created.json()["id"]
+
+    response = client.get(f"/api/orders/{order_id}/print/receipt", headers=auth_headers)
+
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"].startswith("text/html")
+    assert "Квитанция о приёме заказа" in response.text
+    assert created.json()["number"] in response.text
+    assert location.name in response.text
+    assert location.address in response.text
+    assert "SN-123" in response.text
+    assert "Не включается" in response.text
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in response.text
+    assert "<script>alert(1)</script>" not in response.text
+
+    unauthorized = client.get(f"/api/orders/{order_id}/print/receipt")
+    assert unauthorized.status_code == 401
+
+
 def test_create_order_with_existing_counteragent(client, auth_headers, db):
     location = db.scalars(select(Location).order_by(Location.sort)).first()
     order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()

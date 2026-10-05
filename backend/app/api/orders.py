@@ -1,15 +1,19 @@
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
+from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids, require, scope_of
 from app.errors import BusinessError, Forbidden, NotFound
 from app.models import (
     CashRegister,
+    Company,
     Counteragent,
     Employee,
     FormField,
@@ -22,6 +26,7 @@ from app.models import (
     OrderStatus,
     OrderType,
     PriceType,
+    Location,
     Store,
     StatusGroup,
     Transaction,
@@ -30,6 +35,7 @@ from app.services import orders as order_service
 from app.utils.phone import normalize_phone
 
 router = APIRouter(prefix="/orders", tags=["Заказы"])
+templates = Jinja2Templates(directory=Path(__file__).resolve().parents[1] / "templates")
 
 
 class CounteragentRefIn(BaseModel):
@@ -512,6 +518,31 @@ def get_order(order_id: int, db: DbSession, me: CurrentEmployee):
         history=history_values,
         transactions=[model_values(transaction) for transaction in transactions],
         debt=order.debt,
+    )
+
+
+@router.get("/{order_id}/print/receipt", response_class=HTMLResponse)
+def print_order_receipt(order_id: int, request: Request, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me)
+    company = db.scalars(select(Company).order_by(Company.id)).first()
+    if company is None:
+        raise NotFound("Компания")
+    location = db.get(Location, order.location_id)
+    if location is None:
+        raise NotFound("Локация")
+    counteragent = db.get(Counteragent, order.counteragent_id)
+    master = db.get(Employee, order.master_id) if order.master_id else None
+
+    return templates.TemplateResponse(
+        request=request,
+        name="receipt.html",
+        context={
+            "company": company,
+            "location": location,
+            "order": order,
+            "counteragent": counteragent,
+            "master": master,
+        },
     )
 
 

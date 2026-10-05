@@ -60,8 +60,29 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return data as T
 }
 
+async function requestHtml(path: string): Promise<string> {
+  const headers: Record<string, string> = {}
+  const token = getToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const res = await fetch(`/api${path}`, { headers })
+  if (res.status === 401) {
+    setToken(null)
+    if (!location.pathname.startsWith('/login')) location.href = '/login'
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    if (res.status === 422) {
+      throw new ApiError(422, 'validation', 'Проверьте правильность заполнения полей')
+    }
+    throw new ApiError(res.status, data.error ?? 'error', data.message ?? 'Ошибка сервера')
+  }
+  return res.text()
+}
+
 export const api = {
   get: <T>(path: string) => request<T>('GET', path),
+  getHtml: requestHtml,
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body ?? {}),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body ?? {}),
   del: <T = void>(path: string) => request<T>('DELETE', path),

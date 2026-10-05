@@ -395,6 +395,26 @@ export default function OrderDetailPage() {
     )
   }
 
+  const printReceipt = async () => {
+    if (!detail) return
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      setError('Разрешите всплывающие окна для печати квитанции')
+      return
+    }
+    try {
+      const html = await api.getHtml(`/orders/${detail.order.id}/print/receipt`)
+      printWindow.document.open()
+      printWindow.document.write(html)
+      printWindow.document.close()
+      printWindow.focus()
+      printWindow.setTimeout(() => printWindow.print(), 100)
+    } catch (err) {
+      printWindow.close()
+      setError(err instanceof ApiError ? err.message : 'Не удалось открыть квитанцию')
+    }
+  }
+
   const removePosition = async (position: Position) => {
     if (!detail || !confirm(`Удалить «${position.name}» из заказа?`)) return
     await run(() => api.del(`/orders/${detail.order.id}/positions/${position.id}`), 'Не удалось удалить позицию')
@@ -429,7 +449,7 @@ export default function OrderDetailPage() {
           </select>
         </div>
         <span className="flex gap-2">
-          <button className="rounded-md border border-line bg-surface px-3 py-2" onClick={() => window.open(`/api/orders/${detail.order.id}/print/receipt`, '_blank', 'noopener,noreferrer')}>Печать</button>
+          <button className="rounded-md border border-line bg-surface px-3 py-2" onClick={printReceipt}>Печать</button>
           {detail.status.group !== 'closed' && <button className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" onClick={giveOrder}>Выдать</button>}
         </span>
       </header>

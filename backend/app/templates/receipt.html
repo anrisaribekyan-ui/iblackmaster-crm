@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Квитанция {{ order.number }}</title>
+  <style>
+    @page { size: A4; margin: 16mm; }
+    * { box-sizing: border-box; }
+    body { color: #171717; font: 14px/1.45 Arial, sans-serif; margin: 0 auto; max-width: 178mm; }
+    h1 { font-size: 21px; margin: 0 0 5mm; text-align: center; }
+    h2 { border-bottom: 1px solid #777; font-size: 14px; margin: 6mm 0 3mm; padding-bottom: 1mm; }
+    p { margin: 1.5mm 0; }
+    .muted { color: #555; }
+    .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; }
+    .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 14mm; margin-top: 22mm; }
+    .signature { border-top: 1px solid #333; padding-top: 2mm; text-align: center; }
+    @media screen {
+      body { margin: 12mm auto; padding: 12mm; border: 1px solid #ccc; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Квитанция о приёме заказа № {{ order.number }}</h1>
+  <div class="columns">
+    <section>
+      <h2>Компания</h2>
+      <p><strong>{{ company.name }}</strong></p>
+      {% if company.inn %}<p>ИНН: {{ company.inn }}</p>{% endif %}
+      {% if company.kpp %}<p>КПП: {{ company.kpp }}</p>{% endif %}
+      {% if company.ogrn %}<p>ОГРН: {{ company.ogrn }}</p>{% endif %}
+      {% if company.director %}<p>{{ company.position or 'Руководитель' }}: {{ company.director }}</p>{% endif %}
+      {% if company.phone %}<p>Телефон: {{ company.phone }}</p>{% endif %}
+      {% if company.email %}<p>Email: {{ company.email }}</p>{% endif %}
+    </section>
+    <section>
+      <h2>Локация</h2>
+      <p><strong>{{ location.name }}</strong></p>
+      {% if location.address %}<p>{{ location.address }}</p>{% endif %}
+      {% if location.phones %}<p>Телефон: {{ location.phones }}</p>{% endif %}
+      <p>Дата приёма: {{ order.created_at.strftime('%d.%m.%Y') }}</p>
+    </section>
+  </div>
+
+  <h2>Клиент</h2>
+  <p>{{ counteragent.name }}</p>
+  {% if counteragent.phones %}<p>Телефон: {{ counteragent.phones }}</p>{% endif %}
+
+  <h2>Устройство</h2>
+  <p>{{ [order.device_type, order.brand, order.model, order.color] | reject('none') | join(' ') or '—' }}</p>
+  <p>Серийный номер / IMEI: {{ order.serial or '—' }}</p>
+  <p>Неисправность: {{ order.problems | join(', ') or '—' }}</p>
+  <p>Комплектация: {{ order.complete_set | join(', ') or '—' }}</p>
+  <p>Внешний вид: {{ order.appearance | join(', ') or '—' }}</p>
+  <p>Ориентировочная цена: {{ order.approximate_price or '—' }}</p>
+  <p>Предоплата: {% if order.has_prepayment %}Да{% if order.paid %}, {{ '%.2f' | format(order.paid) }} ₽{% endif %}{% else %}Нет{% endif %}</p>
+  <p>Мастер: {{ master.short_name if master else '—' }}</p>
+  {% if order.note %}<p>Примечание: {{ order.note }}</p>{% endif %}
+
+  <div class="signatures">
+    <div class="signature">Заказчик: ____________________</div>
+    <div class="signature">Принял: ____________________</div>
+  </div>
+  <p class="muted" style="margin-top: 8mm">Подтверждаю, что передал(а) устройство и ознакомлен(а) с условиями диагностики и ремонта.</p>
+</body>
+</html>
