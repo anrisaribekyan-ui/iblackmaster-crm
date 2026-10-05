@@ -123,7 +123,7 @@
 удаление физическое допустимо (это подсказки для ввода). GET — всем авторизованным, с параметром `q` (поиск по подстроке, без учёта регистра).
 Тесты на каждый роутер (можно одним параметризованным тестом).
 
-### [ ] T-11. API устройств
+### [x] T-11. API устройств
 Файл `backend/app/api/devices.py`: `/device-types`, `/brands?device_type_id=`, `/device-models?brand_id=`,
 CRUD с правом brandModelDeviceAccess. Плюс `GET /devices/suggest?q=` — до 20 подсказок «Бренд Модель» для
 автодополнения в форме заказа (ищет по brand.name и device_model.name).
