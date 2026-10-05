@@ -189,7 +189,7 @@ manager_id — changeOrderManagerAccess. Только изменившиеся �
 is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — обратно.
 Тесты: история с диффом, 403 на смену мастера без права, удаление/восстановление.
 
-### [ ] T-23. API: работы и запчасти в заказе
+### [x] T-23. API: работы и запчасти в заказе
 - `POST /orders/{id}/positions` — changeOrderPositionAccess. Вход: nomenclature_id или (name, is_work),
   quantity, price, performer_id, store_id (для запчасти), guarantee_days. Запчасть без работы в заказе —
   только с createOrderProductAccess. Цена ниже минимальной (тип цены is_minimal) — только с minPriceAccess.

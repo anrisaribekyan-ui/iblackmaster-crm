@@ -1,10 +1,28 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from sqlalchemy import select
 
 from app.db import utcnow
-from app.models import Counteragent, Employee, Location, Order, OrderHistory, OrderStatus, OrderType, Role, StatusGroup
+from app.models import (
+    Counteragent,
+    Employee,
+    Location,
+    Nomenclature,
+    NomenclaturePrice,
+    Order,
+    OrderHistory,
+    OrderPosition,
+    OrderStatus,
+    OrderType,
+    PriceType,
+    Role,
+    StatusGroup,
+    StockBalance,
+    Store,
+)
 from app.security import hash_password
+from app.services import stock
 
 
 def order_payload(location_id, order_type_id, counteragent):
@@ -299,3 +317,135 @@ def test_order_delete_and_restore(client, auth_headers, db, owner):
     assert client.get(f"/api/orders/{order.id}", headers=auth_headers).status_code == 404
     assert client.post(f"/api/orders/{order.id}/restore", headers=auth_headers).status_code == 200
     assert db.get(Order, order.id).is_deleted is False
+
+
+def test_order_product_stock_writeoff_and_restore(client, auth_headers, db, owner):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    status = db.scalars(select(OrderStatus).where(OrderStatus.group == StatusGroup.NEW)).first()
+    customer = Counteragent(name="Запчасть")
+    store = db.scalars(select(Store).where(Store.location_id == location.id)).first()
+    product = Nomenclature(code=880001, name="Аккумулятор", is_work=False)
+    minimum_type = db.scalars(select(PriceType).where(PriceType.is_minimal.is_(True))).one()
+    db.add_all([customer, product])
+    db.flush()
+    db.add(
+        NomenclaturePrice(
+            nomenclature_id=product.id,
+            price_type_id=minimum_type.id,
+            price=Decimal("100.00"),
+        )
+    )
+    order = add_order(
+        db,
+        owner=owner,
+        location=location,
+        order_type=order_type,
+        counteragent=customer,
+        status=status,
+        number="POSITION-STOCK",
+    )
+    stock.receive(db, store.id, product.id, Decimal("5"), Decimal("40"))
+    db.commit()
+
+    response = client.post(
+        f"/api/orders/{order.id}/positions",
+        json={"nomenclature_id": product.id, "quantity": "2", "price": "150.00", "store_id": store.id},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200, response.text
+    position_id = response.json()["id"]
+    balance = db.scalars(select(StockBalance).where(StockBalance.store_id == store.id)).one()
+    assert balance.quantity == Decimal("3.000")
+
+    update = client.put(
+        f"/api/orders/{order.id}/positions/{position_id}",
+        json={"sold_price": "160.00"},
+        headers=auth_headers,
+    )
+    assert update.status_code == 200
+    assert Decimal(str(update.json()["sold_price"])) == Decimal("160.00")
+
+    response = client.delete(f"/api/orders/{order.id}/positions/{position_id}", headers=auth_headers)
+    assert response.status_code == 204
+    assert db.scalars(select(StockBalance).where(StockBalance.store_id == store.id)).one().quantity == Decimal("5.000")
+
+
+def test_minimum_price_requires_permission(client, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    status = db.scalars(select(OrderStatus).where(OrderStatus.group == StatusGroup.NEW)).first()
+    customer = Counteragent(name="Минимальная цена")
+    role = Role(name="Без минимальной цены", permissions=["changeOrderPositionAccess"], scopes={"orders": "all"})
+    employee = Employee(
+        name="Редактор цены",
+        short_name="Цена",
+        email="price-editor@example.test",
+        password_hash=hash_password("password123", rounds=4),
+        role=role,
+        locations=[location],
+    )
+    product = Nomenclature(code=880002, name="Кабель", is_work=True)
+    minimum_type = db.scalars(select(PriceType).where(PriceType.is_minimal.is_(True))).one()
+    db.add_all([customer, employee, product])
+    db.flush()
+    db.add(
+        NomenclaturePrice(
+            nomenclature_id=product.id,
+            price_type_id=minimum_type.id,
+            price=Decimal("100.00"),
+        )
+    )
+    order = add_order(
+        db,
+        owner=employee,
+        location=location,
+        order_type=order_type,
+        counteragent=customer,
+        status=status,
+        number="MIN-PRICE",
+    )
+    login = client.post("/api/auth/login", json={"email": employee.email, "password": "password123"})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    response = client.post(
+        f"/api/orders/{order.id}/positions",
+        json={"nomenclature_id": product.id, "price": "99.00"},
+        headers=headers,
+    )
+
+    assert response.status_code == 403
+
+
+def test_order_discount_recalculates_total(client, auth_headers, db, owner):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    status = db.scalars(select(OrderStatus).where(OrderStatus.group == StatusGroup.NEW)).first()
+    customer = Counteragent(name="Скидка")
+    db.add(customer)
+    db.flush()
+    order = add_order(
+        db,
+        owner=owner,
+        location=location,
+        order_type=order_type,
+        counteragent=customer,
+        status=status,
+        number="DISCOUNT",
+    )
+    db.add(
+        OrderPosition(
+            order_id=order.id,
+            is_work=True,
+            name="Ремонт",
+            quantity=Decimal("1"),
+            price=Decimal("1000.00"),
+            sold_price=Decimal("1000.00"),
+        )
+    )
+    db.commit()
+
+    response = client.put(f"/api/orders/{order.id}/discount", json={"discount_percent": "10"}, headers=auth_headers)
+
+    assert response.status_code == 200
+    assert Decimal(str(response.json()["total_price"])) == Decimal("900.00")

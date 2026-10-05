@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids, require, scope_of
@@ -13,11 +13,15 @@ from app.models import (
     Counteragent,
     Employee,
     FormField,
+    Nomenclature,
+    NomenclaturePrice,
     Order,
     OrderHistory,
     OrderPosition,
     OrderStatus,
     OrderType,
+    PriceType,
+    Store,
     StatusGroup,
     Transaction,
 )
@@ -87,6 +91,33 @@ class OrderUpdate(BaseModel):
     custom_fields: dict | None = None
     master_id: int | None = None
     manager_id: int | None = None
+
+
+class OrderPositionCreate(BaseModel):
+    nomenclature_id: int | None = None
+    name: str | None = None
+    is_work: bool | None = None
+    quantity: Decimal = Decimal("1")
+    price: Decimal | None = None
+    performer_id: int | None = None
+    store_id: int | None = None
+    guarantee_days: int | None = None
+
+
+class OrderPositionPrice(BaseModel):
+    price: Decimal | None = None
+    sold_price: Decimal | None = None
+
+
+class OrderDiscount(BaseModel):
+    discount_percent: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("100"))
+    discount_sum: Decimal | None = Field(default=None, ge=Decimal("0"))
+
+    @model_validator(mode="after")
+    def one_discount_value(self):
+        if (self.discount_percent is None) == (self.discount_sum is None):
+            raise ValueError("Укажите discount_percent или discount_sum")
+        return self
 
 
 class OrderCreateOut(BaseModel):
@@ -525,3 +556,149 @@ def restore_order(order_id: int, db: DbSession, me: CurrentEmployee):
     order_service.add_history(db, order, "restored", me)
     db.commit()
     return {"ok": True}
+
+
+def order_minimum_price(db: DbSession, nomenclature_id: int, location_id: int) -> Decimal:
+    minimum_type = db.scalars(select(PriceType).where(PriceType.is_minimal.is_(True))).first()
+    if minimum_type is None:
+        return Decimal("0")
+    prices = db.scalars(
+        select(NomenclaturePrice)
+        .where(
+            NomenclaturePrice.nomenclature_id == nomenclature_id,
+            NomenclaturePrice.price_type_id == minimum_type.id,
+            or_(NomenclaturePrice.location_id.is_(None), NomenclaturePrice.location_id == location_id),
+        )
+        .order_by(NomenclaturePrice.location_id.is_(None))
+    ).all()
+    return prices[0].price if prices else Decimal("0")
+
+
+def check_minimum_price(
+    db: DbSession,
+    me: CurrentEmployee,
+    nomenclature_id: int | None,
+    location_id: int,
+    price: Decimal,
+) -> Decimal:
+    if nomenclature_id is None:
+        return Decimal("0")
+    minimum = order_minimum_price(db, nomenclature_id, location_id)
+    if price < minimum and not has_permission(me, "minPriceAccess"):
+        raise Forbidden(f"Цена ниже минимальной ({minimum})")
+    return minimum
+
+
+@router.post(
+    "/{order_id}/positions",
+    dependencies=[Depends(require("changeOrderPositionAccess"))],
+)
+def add_order_position(order_id: int, data: OrderPositionCreate, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me)
+    nomenclature = db.get(Nomenclature, data.nomenclature_id) if data.nomenclature_id else None
+    if data.nomenclature_id and (nomenclature is None or nomenclature.is_deleted):
+        raise NotFound("Номенклатура")
+    is_work = nomenclature.is_work if nomenclature is not None else bool(data.is_work)
+    if nomenclature is not None and not nomenclature.is_work:
+        store = db.get(Store, data.store_id) if data.store_id is not None else None
+        if store is None or not store.is_active:
+            raise NotFound("Склад")
+        if store.location_id != order.location_id:
+            raise Forbidden("Склад находится в другой локации")
+    if not is_work and not any(position.is_work for position in order.positions):
+        if not has_permission(me, "createOrderProductAccess"):
+            raise Forbidden("Сначала добавьте работу в заказ")
+    unit_price = data.price if data.price is not None else Decimal("0")
+    minimum = check_minimum_price(db, me, data.nomenclature_id, order.location_id, unit_price)
+    position = order_service.add_position(
+        db,
+        order,
+        me,
+        nomenclature_id=data.nomenclature_id,
+        name=data.name,
+        is_work=is_work,
+        quantity=data.quantity,
+        price=data.price,
+        performer_id=data.performer_id,
+        store_id=data.store_id,
+        guarantee_days=data.guarantee_days,
+    )
+    position.min_price = minimum
+    db.commit()
+    return {
+        **model_values(position),
+        "total": position.total,
+        "purchase_price": position.purchase_price if has_permission(me, "purchasePriceAccess") else None,
+        "margin": position.margin if has_permission(me, "marginPriceAccess") else None,
+    }
+
+
+@router.put(
+    "/{order_id}/positions/{position_id}",
+    dependencies=[Depends(require("changeOrderPositionAccess"))],
+)
+def update_order_position_price(
+    order_id: int,
+    position_id: int,
+    data: OrderPositionPrice,
+    db: DbSession,
+    me: CurrentEmployee,
+):
+    order = get_order_for_employee(db, order_id, me)
+    position = db.get(OrderPosition, position_id)
+    if position is None or position.order_id != order.id:
+        raise NotFound("Позиция заказа")
+    if data.price is None and data.sold_price is None:
+        raise BusinessError("Укажите цену для изменения")
+    target_price = data.sold_price if data.sold_price is not None else data.price
+    minimum = check_minimum_price(db, me, position.nomenclature_id, order.location_id, target_price)
+    order_service.update_position_price(
+        db,
+        order,
+        position,
+        me,
+        price=data.price,
+        sold_price=data.sold_price,
+    )
+    position.min_price = minimum
+    db.commit()
+    return model_values(position)
+
+
+@router.delete(
+    "/{order_id}/positions/{position_id}",
+    status_code=204,
+    dependencies=[Depends(require("changeOrderPositionAccess"))],
+)
+def delete_order_position(order_id: int, position_id: int, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me)
+    position = db.get(OrderPosition, position_id)
+    if position is None or position.order_id != order.id:
+        raise NotFound("Позиция заказа")
+    order_service.remove_position(db, order, position, me)
+    db.commit()
+
+
+@router.put("/{order_id}/discount", dependencies=[Depends(require("discountSaleAccess"))])
+def update_order_discount(order_id: int, data: OrderDiscount, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me)
+    previous_percent = order.discount_percent
+    previous_sum = order.discount_sum
+    order.discount_percent = data.discount_percent or Decimal("0")
+    order.discount_sum = data.discount_sum or Decimal("0")
+    order_service.recalc_totals(order)
+    if previous_percent != order.discount_percent or previous_sum != order.discount_sum:
+        order_service.add_history(
+            db,
+            order,
+            "info_changed",
+            me,
+            discount_percent=[str(previous_percent), str(order.discount_percent)],
+            discount_sum=[str(previous_sum), str(order.discount_sum)],
+        )
+    db.commit()
+    return {
+        "discount_percent": order.discount_percent,
+        "discount_sum": order.discount_sum,
+        "total_price": order.total_price,
+    }
