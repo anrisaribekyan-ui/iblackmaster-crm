@@ -3,6 +3,7 @@ import { api, ApiError } from '../api/client'
 import { useAuth } from '../auth'
 import CatalogPicker from '../components/CatalogPicker'
 import Modal from '../components/Modal'
+import { escapeHtml, openPrint } from '../print'
 import { formatDateTime, inputClass, money, qty, retailPrice, useLocationsAndRegisters, type CatalogItem } from './shared'
 
 type Line = { item: CatalogItem; quantity: string; price: string }
@@ -283,6 +284,31 @@ function SaleModal({ sale, registers, canReturn, onClose, onReturned }: {
     }
   }
 
+  const printReceipt = () => {
+    const rows = sale.positions
+      .map(
+        (p) => `<tr>
+          <td>${escapeHtml(p.name)}</td>
+          <td class="num">${escapeHtml(p.quantity)}</td>
+          <td class="num">${escapeHtml(money(p.sold_price))}</td>
+          <td class="num">${escapeHtml(money((Number(p.sold_price) * Number(p.quantity)).toFixed(0)))}</td>
+        </tr>`,
+      )
+      .join('')
+    const body = `
+      <h1>Товарный чек № ${escapeHtml(sale.number)}</h1>
+      <p>Дата: ${escapeHtml(formatDateTime(sale.date))}</p>
+      ${sale.counteragent ? `<p>Покупатель: ${escapeHtml(sale.counteragent)}</p>` : ''}
+      <p>Продавец: ${escapeHtml(sale.seller ?? '—')}</p>
+      <table>
+        <thead><tr><th>Наименование</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p style="margin-top: 3mm"><strong>Итого: ${escapeHtml(money(sale.total_price))}</strong></p>
+    `
+    openPrint(`Чек ${sale.number}`, body)
+  }
+
   return (
     <Modal title={`Чек ${sale.number}`} onClose={onClose}>
       <p className="mb-3 text-sm text-muted">{formatDateTime(sale.date)}{sale.counteragent ? ` · ${sale.counteragent}` : ''}</p>
@@ -324,8 +350,11 @@ function SaleModal({ sale, registers, canReturn, onClose, onReturned }: {
             <button className="rounded-md bg-accent px-3 py-2 text-accent-ink" onClick={() => void submit()}>Оформить возврат</button>
           </div>
         </div>
-      ) : canReturn && (
-        <button className="text-danger" onClick={() => setReturning(true)}>Возврат по чеку</button>
+      ) : (
+        <div className="flex items-center justify-between gap-2">
+          {canReturn && <button className="text-danger" onClick={() => setReturning(true)}>Возврат по чеку</button>}
+          <button className="rounded-md border border-line bg-surface px-3 py-2" onClick={printReceipt}>Печать чек</button>
+        </div>
       )}
     </Modal>
   )

@@ -5,6 +5,7 @@ import { formatPhone, isoToLocalInput, localInputToIso } from '../format'
 import { useAuth } from '../auth'
 import Modal from '../components/Modal'
 import TaskForm, { type TaskEmployee, type TaskFormValues } from '../components/TaskForm'
+import { escapeHtml, openPrint } from '../print'
 
 type Status = { id: number; group: string; name: string; color: string; pay_required: boolean; comment_mode: string }
 type StatusGroup = { group: string; title: string; statuses: Status[] }
@@ -91,6 +92,7 @@ type OrderFieldValues = Record<string, unknown>
 type CatalogItem = { id: number; name: string; article?: string | null; prices?: { price: string }[]; is_work: boolean }
 type PaymentMode = 'payment' | 'refund'
 type TaskRow = { id: number; title: string; text: string | null; assignee_name: string | null; deadline: string | null; is_done: boolean }
+type LocationInfo = { id: number; name: string; address: string | null; phones: string | null }
 
 const inputClass = 'w-full rounded-md border border-line bg-surface px-3 py-2'
 const aliasMap: Record<string, string> = {
@@ -181,6 +183,7 @@ export default function OrderDetailPage() {
   const [tasks, setTasks] = useState<TaskRow[]>([])
   const [taskEmployees, setTaskEmployees] = useState<TaskEmployee[]>([])
   const [taskCreating, setTaskCreating] = useState(false)
+  const [locations, setLocations] = useState<LocationInfo[]>([])
 
   const loadDetail = useCallback(async (initial = false) => {
     if (!orderId) return
@@ -218,6 +221,7 @@ export default function OrderDetailPage() {
       setStores(storeData)
       setMasters(masterData)
       setManagers(managerData)
+      api.get<LocationInfo[]>('/locations').then(setLocations).catch(() => setLocations([]))
       if (storeData.length) setStoreId(String(storeData.find((store) => store.is_default)?.id ?? storeData[0].id))
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Не удалось загрузить справочники заказа')
@@ -459,24 +463,99 @@ export default function OrderDetailPage() {
     )
   }
 
-  const printReceipt = async () => {
+  const currentLocation = locations.find((location) => location.id === detail?.order.location_id)
+  const orderFields = (detail?.order ?? {}) as Record<string, unknown>
+  const str = (value: unknown): string => (value == null ? '' : String(value))
+
+  const printReceipt = () => {
     if (!detail) return
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) {
-      setError('Разрешите всплывающие окна для печати квитанции')
-      return
-    }
-    try {
-      const html = await api.getHtml(`/orders/${detail.order.id}/print/receipt`)
-      printWindow.document.open()
-      printWindow.document.write(html)
-      printWindow.document.close()
-      printWindow.focus()
-      printWindow.setTimeout(() => printWindow.print(), 100)
-    } catch (err) {
-      printWindow.close()
-      setError(err instanceof ApiError ? err.message : 'Не удалось открыть квитанцию')
-    }
+    const device = [orderFields.device_type, orderFields.brand, orderFields.model, orderFields.color].filter(Boolean).join(' ')
+    const problems = Array.isArray(orderFields.problems) ? (orderFields.problems as string[]).join(', ') : ''
+    const completeSet = Array.isArray(orderFields.complete_set) ? (orderFields.complete_set as string[]).join(', ') : ''
+    const appearance = Array.isArray(orderFields.appearance) ? (orderFields.appearance as string[]).join(', ') : ''
+    const prepayment = orderFields.has_prepayment
+      ? `Да${detail.order.paid && Number(detail.order.paid) > 0 ? `, ${formatMoney(detail.order.paid)}` : ''}`
+      : 'Нет'
+    const body = `
+      <h1>Квитанция о приёме заказа № ${escapeHtml(detail.order.number)}</h1>
+      <div class="columns">
+        <section>
+          <h2>Локация</h2>
+          <p><strong>${escapeHtml(currentLocation?.name)}</strong></p>
+          ${currentLocation?.address ? `<p>${escapeHtml(currentLocation.address)}</p>` : ''}
+          ${currentLocation?.phones ? `<p>Телефон: ${escapeHtml(currentLocation.phones)}</p>` : ''}
+          <p>Дата приёма: ${escapeHtml(String(orderFields.created_at ?? '').slice(0, 10).split('-').reverse().join('.'))}</p>
+        </section>
+      </div>
+      <h2>Клиент</h2>
+      <p>${escapeHtml(detail.counteragent.name)}</p>
+      ${detail.counteragent.phones ? `<p>Телефон: ${escapeHtml(detail.counteragent.phones)}</p>` : ''}
+      <h2>Устройство</h2>
+      <p>${escapeHtml(device || '—')}</p>
+      <p>Серийный номер / IMEI: ${escapeHtml(str(orderFields.serial) || '—')}</p>
+      <p>Неисправность: ${escapeHtml(problems || '—')}</p>
+      <p>Комплектация: ${escapeHtml(completeSet || '—')}</p>
+      <p>Внешний вид: ${escapeHtml(appearance || '—')}</p>
+      <p>Ориентировочная цена: ${escapeHtml(str(orderFields.approximate_price) || '—')}</p>
+      <p>Предоплата: ${escapeHtml(prepayment)}</p>
+      <p>Мастер: ${escapeHtml(detail.master?.short_name ?? '—')}</p>
+      ${orderFields.note ? `<p>Примечание: ${escapeHtml(String(orderFields.note))}</p>` : ''}
+      <div class="signatures">
+        <div class="signature">Заказчик: ____________________</div>
+        <div class="signature">Принял: ____________________</div>
+      </div>
+      <p class="muted" style="margin-top: 8mm">Подтверждаю, что передал(а) устройство и ознакомлен(а) с условиями диагностики и ремонта.</p>
+    `
+    openPrint(`Квитанция ${detail.order.number}`, body)
+  }
+
+  const printAct = () => {
+    if (!detail) return
+    const device = [orderFields.device_type, orderFields.brand, orderFields.model].filter(Boolean).join(' ')
+    const rows = detail.positions
+      .map(
+        (position) => `<tr>
+          <td>${escapeHtml(position.name)}</td>
+          <td class="num">${escapeHtml(position.quantity)}</td>
+          <td class="num">${escapeHtml(formatMoney(position.sold_price))}</td>
+          <td class="num">${escapeHtml(formatMoney(position.total))}</td>
+          <td class="num">${position.guarantee_days ? `${position.guarantee_days} дн.` : '—'}</td>
+        </tr>`,
+      )
+      .join('')
+    const body = `
+      <h1>Акт выполненных работ № ${escapeHtml(detail.order.number)}</h1>
+      <div class="columns">
+        <section>
+          <h2>Исполнитель</h2>
+          <p><strong>${escapeHtml(currentLocation?.name)}</strong></p>
+          ${currentLocation?.address ? `<p>${escapeHtml(currentLocation.address)}</p>` : ''}
+          ${currentLocation?.phones ? `<p>Телефон: ${escapeHtml(currentLocation.phones)}</p>` : ''}
+        </section>
+        <section>
+          <h2>Клиент</h2>
+          <p><strong>${escapeHtml(detail.counteragent.name)}</strong></p>
+          ${detail.counteragent.phones ? `<p>Телефон: ${escapeHtml(detail.counteragent.phones)}</p>` : ''}
+        </section>
+      </div>
+      <h2>Устройство</h2>
+      <p>${escapeHtml(device || '—')}</p>
+      <p>Серийный номер / IMEI: ${escapeHtml(str(orderFields.serial) || '—')}</p>
+      <h2>Выполненные работы</h2>
+      <table>
+        <thead><tr><th>Наименование</th><th>Кол-во</th><th>Цена</th><th>Сумма</th><th>Гарантия</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p style="margin-top: 3mm"><strong>Итого: ${escapeHtml(formatMoney(detail.order.total_price))}</strong></p>
+      <p>Оплачено: ${escapeHtml(formatMoney(detail.order.paid))}</p>
+      <p style="margin-top: 8mm">Претензий к качеству и срокам не имею.</p>
+      <div class="signatures">
+        <div class="signature">Заказчик: ____________________</div>
+        <div class="signature">Мастер: ____________________</div>
+      </div>
+      <p class="muted">Дата: ${escapeHtml(String(orderFields.created_at ?? '').slice(0, 10).split('-').reverse().join('.'))}</p>
+    `
+    openPrint(`Акт ${detail.order.number}`, body)
   }
 
   const removePosition = async (position: Position) => {
@@ -513,7 +592,13 @@ export default function OrderDetailPage() {
           </select>
         </div>
         <span className="flex gap-2">
-          <button className="rounded-md border border-line bg-surface px-3 py-2" onClick={printReceipt}>Печать</button>
+          <details className="relative">
+            <summary className="cursor-pointer list-none rounded-md border border-line bg-surface px-3 py-2">Печать</summary>
+            <div className="absolute right-0 z-10 mt-1 flex w-52 flex-col rounded-md border border-line bg-surface p-1 shadow-lg">
+              <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={printReceipt}>Квитанция о приёме</button>
+              <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={printAct}>Акт выдачи</button>
+            </div>
+          </details>
           {detail.status.group !== 'closed' && <button className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" onClick={giveOrder}>Выдать</button>}
         </span>
       </header>

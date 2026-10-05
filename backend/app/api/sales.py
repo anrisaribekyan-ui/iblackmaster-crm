@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, require
 from app.db import Rubles
 from app.errors import BusinessError, Forbidden, NotFound
-from app.models import CashRegister, Counteragent, Location, Nomenclature, Sale, SalePosition, Store
+from app.models import CashRegister, Counteragent, Employee, Location, Nomenclature, Sale, SalePosition, Store
 from app.services import sales as sales_service
 
 router = APIRouter(prefix="/sales", tags=["Продажи"])
@@ -182,6 +182,7 @@ def get_sale(sale_id: int, db: DbSession, me: CurrentEmployee):
         raise NotFound("Чек")
     check_location(me, sale.location_id)
     agent = db.get(Counteragent, sale.counteragent_id) if sale.counteragent_id else None
+    seller = db.get(Employee, sale.seller_id) if sale.seller_id else None
     return {
         "id": sale.id,
         "number": sale.number,
@@ -193,6 +194,7 @@ def get_sale(sale_id: int, db: DbSession, me: CurrentEmployee):
         "discount_percent": sale.discount_percent,
         "discount_sum": sale.discount_sum,
         "note": sale.note,
+        "seller": seller.short_name if seller else None,
         "counteragent": agent.name if agent and has_permission(me, "counteragentShopAccess") else None,
         "positions": [
             {
