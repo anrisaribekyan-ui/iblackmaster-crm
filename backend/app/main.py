@@ -20,6 +20,7 @@ from app.api import (
     orders,
     problems,
     staff,
+    stock_documents,
     stores,
 )
 from app.db import Base, engine
@@ -75,3 +76,4 @@ app.include_router(devices.router, prefix="/api")
 app.include_router(nomenclature.router, prefix="/api")
 app.include_router(counteragents.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
+app.include_router(stock_documents.router, prefix="/api")

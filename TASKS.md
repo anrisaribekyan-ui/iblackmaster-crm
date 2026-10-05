@@ -239,7 +239,7 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 
 ## Блок 5. Склад, продажи, финансы
 
-### [ ] T-28. Складские документы: поступление, перемещение, списание
+### [x] T-28. Складские документы: поступление, перемещение, списание
 Новый сервис `backend/app/services/stock_documents.py` (можно создавать) + роутер `/stock-documents`.
 - Создание документа с позициями и сразу проведение: purchase → `stock.receive` по цене позиции;
   move → `stock.move` (store_id → to_store_id); cancellation → `stock.write_off`. total = сумма позиций.
