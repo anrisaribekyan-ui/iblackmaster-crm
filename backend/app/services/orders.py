@@ -23,7 +23,7 @@ from app.models import (
     StatusGroup,
     Transaction,
 )
-from app.services import money, stock
+from app.services import money, salary, stock
 
 CENT = MONEY_STEP  # без копеек
 
@@ -157,6 +157,7 @@ def add_position(
         db, order, "add_work" if work else "add_product", employee,
         text=f"{pos.name} × {qty.normalize()} по {unit_price}", position_id=pos.id,
     )
+    salary.recalc_order(db, order)
     return pos
 
 
@@ -173,6 +174,7 @@ def remove_position(db: Session, order: Order, position: OrderPosition, employee
     order.positions.remove(position)
     db.flush()
     recalc_totals(order)
+    salary.recalc_order(db, order)
 
 
 def update_position_price(
@@ -195,6 +197,7 @@ def update_position_price(
         db, order, "change_work" if position.is_work else "change_product", employee,
         text=f"{position.name}: цена {position.sold_price}, себестоимость {position.purchase_price}",
     )
+    salary.recalc_order(db, order)
 
 
 # --- Статусы -----------------------------------------------------------------------
@@ -247,6 +250,7 @@ def change_status(
     order.status_id = new_status.id
     order.status = new_status
     add_history(db, order, "status", employee, text=comment, status_id=new_status.id, from_status_id=old.id)
+    salary.recalc_order(db, order)
 
 
 # --- Оплаты ------------------------------------------------------------------------

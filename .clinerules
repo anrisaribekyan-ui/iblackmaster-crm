@@ -22,7 +22,7 @@
 - Если в карточке что-то непонятно или противоречит коду — не выдумывай. Пометь `[?] Вопрос: ...` и пропусти.
 
 ## ЗАПРЕЩЕНО (это пишет и проверяет только Claude)
-- Менять файлы: backend/app/services/money.py, backend/app/services/stock.py, backend/app/services/orders.py,
+- Менять файлы: backend/app/services/money.py, backend/app/services/stock.py, backend/app/services/orders.py, backend/app/services/salary.py, backend/app/api/salary.py,
   backend/app/models/*.py, backend/app/permissions.py, backend/app/seed.py, backend/app/seed_data.json,
   backend/tests/test_core_services.py, backend/tests/test_balances.py.
   В app/services/sales.py и app/services/stock_documents.py НЕ менять логику балансов контрагентов (charge_counteragent). Если кажется, что без правки не обойтись — `[?] Вопрос` в TASKS.md.

@@ -15,7 +15,7 @@ from app.models import (
     StockDocument,
     StockDocumentPosition,
 )
-from app.services import money, stock
+from app.services import money, salary, stock
 
 CENT = MONEY_STEP  # без копеек
 
@@ -112,6 +112,8 @@ def create_sale(
     # так что итог = оплачено − сумма чека (0 при полной оплате, минус — долг).
     if counteragent_id is not None:
         money.charge_counteragent(db, counteragent_id, sale.total_price)
+    db.flush()
+    salary.recalc_sale(db, sale)
     return sale
 
 
@@ -186,4 +188,5 @@ def refund_sale(
         money.charge_counteragent(db, sale.counteragent_id, -refund_total)
     document.total = refund_total
     document.paid = transaction.amount
+    salary.recalc_sale(db, sale)
     return document, refund_total

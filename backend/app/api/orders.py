@@ -33,6 +33,7 @@ from app.models import (
     Transaction,
 )
 from app.services import orders as order_service
+from app.services import salary as salary_service
 from app.utils.phone import normalize_phone
 
 router = APIRouter(prefix="/orders", tags=["Заказы"])
@@ -605,6 +606,7 @@ def update_order(order_id: int, data: OrderUpdate, db: DbSession, me: CurrentEmp
         setattr(order, field, value)
     if changes:
         order_service.add_history(db, order, "info_changed", me, **changes)
+        salary_service.recalc_order(db, order)  # тип заказа / менеджер влияют на зарплату
     db.commit()
     return model_values(order)
 
@@ -617,6 +619,7 @@ def soft_delete_order(order_id: int, db: DbSession, me: CurrentEmployee):
     order = get_order_for_employee(db, order_id, me)
     order.is_deleted = True
     order_service.add_history(db, order, "deleted", me)
+    salary_service.recalc_order(db, order)
     db.commit()
     return {"ok": True}
 
@@ -631,6 +634,7 @@ def restore_order(order_id: int, db: DbSession, me: CurrentEmployee):
         raise BusinessError("Заказ не удалён")
     order.is_deleted = False
     order_service.add_history(db, order, "restored", me)
+    salary_service.recalc_order(db, order)
     db.commit()
     return {"ok": True}
 
@@ -775,6 +779,7 @@ def update_order_discount(order_id: int, data: OrderDiscount, db: DbSession, me:
     order.discount_percent = data.discount_percent or Decimal("0")
     order.discount_sum = data.discount_sum or Decimal("0")
     order_service.recalc_totals(order)
+    salary_service.recalc_order(db, order)
     if previous_percent != order.discount_percent or previous_sum != order.discount_sum:
         order_service.add_history(
             db,

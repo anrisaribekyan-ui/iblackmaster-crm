@@ -22,6 +22,7 @@ from app.api import (
     orders,
     problems,
     reports,
+    salary,
     staff,
     stock_remains,
     stock_documents,
@@ -91,6 +92,7 @@ app.include_router(counteragents.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
+app.include_router(salary.router, prefix="/api")
 app.include_router(stock_documents.router, prefix="/api")
 app.include_router(stock_remains.router, prefix="/api")
 app.include_router(sales.router, prefix="/api")
