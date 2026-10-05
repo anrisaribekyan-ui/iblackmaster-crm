@@ -14,6 +14,7 @@ import DevicesPage from './pages/compendiums/DevicesPage'
 import NomenclaturePage from './pages/compendiums/NomenclaturePage'
 import CounteragentsPage from './pages/compendiums/CounteragentsPage'
 import DictionaryPage from './components/DictionaryPage'
+import OrdersPage from './pages/OrdersPage'
 
 function Protected({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -46,7 +47,11 @@ export default function App() {
             }
           >
             <Route index element={<Stub title="Главная" task="этап 2" />} />
-            <Route path="orders/*" element={<Stub title="Заказы" task="T-20…T-27" />} />
+            <Route path="orders">
+              <Route index element={<OrdersPage />} />
+              <Route path="new" element={<Stub title="Создание заказа" task="T-27" />} />
+              <Route path=":orderId" element={<Stub title="Карточка заказа" task="T-27b" />} />
+            </Route>
             <Route path="sales/*" element={<Stub title="Продажи" task="T-30" />} />
             <Route path="store/*" element={<Stub title="Склад" task="T-28, T-29" />} />
             <Route path="tasks/*" element={<Stub title="Задачи" task="этап 2" />} />
