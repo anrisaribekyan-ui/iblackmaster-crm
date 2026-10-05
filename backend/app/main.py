@@ -9,6 +9,7 @@ from app.api import (
     auth,
     cash_registers,
     complete_sets,
+    counteragents,
     counteragent_types,
     devices,
     how_knows,
@@ -71,3 +72,4 @@ app.include_router(measures.router, prefix="/api")
 app.include_router(counteragent_types.router, prefix="/api")
 app.include_router(devices.router, prefix="/api")
 app.include_router(nomenclature.router, prefix="/api")
+app.include_router(counteragents.router, prefix="/api")

@@ -141,7 +141,7 @@ CRUD с правом brandModelDeviceAccess. Плюс `GET /devices/suggest?q=` 
 - `GET /nomenclature/search?q=&location_id=` — быстрый поиск для добавления в заказ/чек: до 20 позиций с ценами и остатком.
 Тесты: автокод, цены, остаток в выдаче, скрытие purchase_price без права.
 
-### [ ] T-13. API контрагентов
+### [x] T-13. API контрагентов
 Файл `backend/app/api/counteragents.py` (право counteragentAccess на запись; читать могут все с доступом к заказам).
 - `GET /counteragents?q=&is_vendor=&page=` — поиск по имени и телефону (телефон нормализуй через T-02). Поставщиков
   (is_vendor) видят только с правом counteragentSellerAccess.
