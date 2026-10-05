@@ -93,7 +93,7 @@ function ruleToDraft(rule: Rule): Draft {
     max_amount: rule.max_amount ?? '',
     subtract_negative_margin: rule.subtract_negative_margin,
     keep_on_return: rule.keep_on_return,
-    options: { isWork: !!rule.options?.isWork, isProduct: !!rule.options?.isProduct },
+    options: { isWork: rule.options?.isWork !== false, isProduct: rule.options?.isProduct !== false },
   }
 }
 
