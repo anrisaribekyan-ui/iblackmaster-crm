@@ -10,6 +10,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids, require, scope_of
+from app.db import Rubles
 from app.errors import BusinessError, Forbidden, NotFound
 from app.models import (
     CashRegister,
@@ -120,7 +121,7 @@ class OrderPositionPrice(BaseModel):
 
 class OrderDiscount(BaseModel):
     discount_percent: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("100"))
-    discount_sum: Decimal | None = Field(default=None, ge=Decimal("0"))
+    discount_sum: Rubles | None = Field(default=None, ge=Decimal("0"))
 
     @model_validator(mode="after")
     def one_discount_value(self):

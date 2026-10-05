@@ -139,7 +139,7 @@ export default function NomenclaturePage({ isWork }: { isWork: boolean }) {
 
   const priceLabel = (priceType: PriceType, item: Item) => {
     const value = item.prices.find((price) => price.price_type_id === priceType.id)?.price
-    return value === undefined ? '—' : `${Number(value).toLocaleString('ru-RU')} ₽`
+    return value === undefined ? '—' : `${Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`
   }
 
   return (
@@ -211,14 +211,14 @@ export default function NomenclaturePage({ isWork }: { isWork: boolean }) {
               <select className={inputClass} name="measure_id" defaultValue={editing?.measure_id ?? ''}><option value="">Не выбрана</option>{measures.map((measure) => <option key={measure.id} value={measure.id}>{measure.name}</option>)}</select>
             </label>
             <label className="grid gap-1 text-sm text-muted">Закупочная цена
-              <input className={inputClass} name="purchase_price" type="number" min="0" step="0.01" defaultValue={editing?.purchase_price ?? '0'} />
+              <input className={inputClass} name="purchase_price" type="number" min="0" step="1" defaultValue={editing?.purchase_price ?? '0'} />
             </label>
             <label className="grid gap-1 text-sm text-muted">Минимальный остаток<input className={inputClass} name="min_count" type="number" min="0" step="0.001" defaultValue={editing?.min_count ?? '0'} /></label>
             {isWork && <label className="grid gap-1 text-sm text-muted">Гарантия, дней<input className={inputClass} name="guarantee_days" type="number" min="0" defaultValue={editing?.guarantee_days ?? 0} /></label>}
             {!isWork && <label className="flex items-center gap-2"><input type="checkbox" name="has_serials" defaultChecked={editing?.has_serials ?? false} />Учитывать серийные номера</label>}
             {priceTypes.map((priceType) => (
               <label key={priceType.id} className="grid gap-1 text-sm text-muted">Цена · {priceType.name}
-                <input className={inputClass} name={`price_${priceType.id}`} type="number" min="0" step="0.01" defaultValue={editing?.prices.find((price) => price.price_type_id === priceType.id)?.price ?? '0'} />
+                <input className={inputClass} name={`price_${priceType.id}`} type="number" min="0" step="1" defaultValue={editing?.prices.find((price) => price.price_type_id === priceType.id)?.price ?? '0'} />
               </label>
             ))}
             <label className="grid gap-1 text-sm text-muted sm:col-span-2">Примечание<textarea className={inputClass} name="note" rows={3} defaultValue={editing?.note ?? ''} /></label>

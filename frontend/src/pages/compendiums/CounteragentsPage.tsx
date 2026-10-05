@@ -187,7 +187,7 @@ export default function CounteragentsPage() {
                     <td className="px-3 py-2"><button className="font-medium text-accent hover:underline" onClick={() => void openCard(item)}>{item.name}</button>{item.is_vendor && <small className="ml-2 text-muted">поставщик</small>}</td>
                     <td className="px-3 py-2">{formatPhoneList(item.phones) || '—'}</td>
                     <td className="px-3 py-2">{typeNames.get(item.type_id ?? -1) ?? '—'}</td>
-                    <td className="px-3 py-2 num">{Number(item.balance).toLocaleString('ru-RU')} ₽</td>
+                    <td className="px-3 py-2 num">{Number(item.balance).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽</td>
                     <td className="px-3 py-2">{canEdit && <span className="flex gap-2 whitespace-nowrap"><button className="text-muted" onClick={() => setEditor(item)}>Изменить</button><button className="text-danger" onClick={() => void remove(item)}>Удалить</button></span>}</td>
                   </tr>
                 ))}
@@ -269,7 +269,7 @@ function CounteragentCard({ item, onClose }: { item: Counteragent; onClose: () =
           <div><dt className="text-sm text-muted">Телефоны</dt><dd>{formatPhoneList(details.phones) || '—'}</dd></div>
           <div><dt className="text-sm text-muted">Email</dt><dd>{details.email || '—'}</dd></div>
           <div><dt className="text-sm text-muted">Адрес</dt><dd>{details.address || '—'}</dd></div>
-          <div><dt className="text-sm text-muted">Баланс</dt><dd className="num">{Number(details.balance).toLocaleString('ru-RU')} ₽</dd></div>
+          <div><dt className="text-sm text-muted">Баланс</dt><dd className="num">{Number(details.balance).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽</dd></div>
           <div><dt className="text-sm text-muted">Заказов</dt><dd>{details.orders_count}</dd></div>
           {details.note && <div className="sm:col-span-2"><dt className="text-sm text-muted">Примечание</dt><dd className="whitespace-pre-wrap">{details.note}</dd></div>}
         </dl>

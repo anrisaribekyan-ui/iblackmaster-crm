@@ -37,7 +37,7 @@ def test_nomenclature_autocode_prices_and_location_stock(client, auth_headers, d
     assert response.status_code == 200
     item_id = response.json()["id"]
     assert response.json()["code"] == previous_code + 1
-    assert response.json()["prices"][0]["price"] == "120.50"
+    assert Decimal(response.json()["prices"][0]["price"]) == Decimal("121")  # копейки округляются
 
     stock.receive(db, store.id, item_id, Decimal("3"), Decimal("60"))
     db.commit()

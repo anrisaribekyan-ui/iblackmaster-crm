@@ -139,7 +139,7 @@ export default function SalesPage() {
                         onChange={(e) => setLines((cur) => cur.map((l, j) => j === i ? { ...l, quantity: e.target.value } : l))} />
                     </td>
                     <td className="py-1.5 text-right">
-                      <input className={`${inputClass} ml-auto w-28 text-right num`} type="number" min="0" step="0.01" value={line.price}
+                      <input className={`${inputClass} ml-auto w-28 text-right num`} type="number" min="0" step="1" value={line.price}
                         disabled={!can('discountSaleAccess') && !can('setPriceAccess')}
                         onChange={(e) => setLines((cur) => cur.map((l, j) => j === i ? { ...l, price: e.target.value } : l))} />
                     </td>
@@ -201,7 +201,7 @@ export default function SalesPage() {
                     ...(r.accepts_bank ? [<option key={`${r.id}b`} value={`${r.id}:bank`}>{r.name} — безнал</option>] : []),
                   ])}
                 </select>
-                <input className={`${inputClass} text-right num`} type="number" min="0" step="0.01" value={p.amount}
+                <input className={`${inputClass} text-right num`} type="number" min="0" step="1" value={p.amount}
                   onChange={(e) => setPayments((cur) => cur.map((x, j) => j === i ? { ...x, amount: e.target.value } : x))} />
                 <button className="px-1 text-danger" onClick={() => setPayments((cur) => cur.filter((_, j) => j !== i))} aria-label="Убрать оплату">×</button>
               </div>

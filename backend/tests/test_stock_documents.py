@@ -54,8 +54,8 @@ def test_purchase_move_cancellation_and_reverse(client, auth_headers, db):
     assert purchase.status_code == 200, purchase.text
     purchase_id = purchase.json()["id"]
     assert purchase.json()["number"] == "П-1"
-    assert purchase.json()["total"] == "200.00"
-    assert purchase.json()["paid"] == "200.00"
+    assert Decimal(purchase.json()["total"]) == Decimal("200")
+    assert Decimal(purchase.json()["paid"]) == Decimal("200")
     assert stock_quantity(db, source.id, product.id) == Decimal("2.000")
     assert db.scalars(select(Transaction).where(Transaction.stock_document_id == purchase_id)).first() is not None
 

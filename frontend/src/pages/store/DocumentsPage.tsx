@@ -288,7 +288,7 @@ function DocumentForm({ type, onDone, onCancel }: { type: DocType; onDone: () =>
                   </td>
                   {type === 'purchase' && (
                     <td className="py-1.5 text-right">
-                      <input className={`${inputClass} ml-auto w-28 text-right num`} type="number" min="0" step="0.01" required value={line.price}
+                      <input className={`${inputClass} ml-auto w-28 text-right num`} type="number" min="0" step="1" required value={line.price}
                         onChange={(e) => setLines((cur) => cur.map((l, j) => j === i ? { ...l, price: e.target.value } : l))} />
                     </td>
                   )}
@@ -311,7 +311,7 @@ function DocumentForm({ type, onDone, onCancel }: { type: DocType; onDone: () =>
             </select>
           </label>
           <label className="grid gap-1 text-xs text-muted">Сумма, ₽
-            <input className={inputClass} type="number" min="0.01" step="0.01" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder={total ? String(total) : ''} disabled={!payRegister} />
+            <input className={inputClass} type="number" min="0.01" step="1" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder={total ? String(total) : ''} disabled={!payRegister} />
           </label>
           <label className="grid gap-1 text-xs text-muted">Способ
             <select className={inputClass} value={payBank ? 'bank' : 'cash'} onChange={(e) => setPayBank(e.target.value === 'bank')} disabled={!payRegister}>

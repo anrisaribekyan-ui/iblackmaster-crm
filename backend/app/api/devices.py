@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from app.api.deps import CurrentEmployee, DbSession, require
+from app.db import Rubles
 from app.errors import NotFound
 from app.models import Brand, DeviceModel, DeviceType
 
@@ -14,7 +15,7 @@ router = APIRouter(tags=["Устройства"])
 class DeviceTypeIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     salary_percent: Decimal | None = None
-    salary_fixed: Decimal | None = None
+    salary_fixed: Rubles | None = None
 
 
 class DeviceTypeOut(BaseModel):

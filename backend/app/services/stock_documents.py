@@ -3,6 +3,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.db import MONEY_STEP
 from app.errors import BusinessError
 from app.models import (
     CashItemType,
@@ -90,7 +91,7 @@ def create_document(
                 serials=item.get("serials", []),
             )
         )
-        total += (quantity * unit_price).quantize(Decimal("0.01"))
+        total += (quantity * unit_price).quantize(MONEY_STEP)
 
     document.total = total
     if doc_type == StockDocType.PURCHASE:

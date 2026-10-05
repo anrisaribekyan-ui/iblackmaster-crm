@@ -19,7 +19,7 @@ type Operation = { kind: 'income' | 'expense' | 'move'; register: CashRegister }
 
 const inputClass = 'w-full rounded-md border border-line bg-surface px-3 py-2'
 const buttonClass = 'rounded-md border border-line bg-surface px-3 py-2 text-sm hover:bg-canvas'
-const money = (value: string | null) => value === null ? '—' : `${Number(value).toLocaleString('ru-RU')} ₽`
+const money = (value: string | null) => value === null ? '—' : `${Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`
 
 export default function FinanceCashesPage() {
   const { can } = useAuth()
@@ -209,7 +209,7 @@ function CashOperationModal({
           </label>
         )}
         <label className="grid gap-1 text-sm text-muted">Сумма
-          <input className={inputClass} name="amount" type="number" min="0.01" step="0.01" required />
+          <input className={inputClass} name="amount" type="number" min="0.01" step="1" required />
         </label>
         <label className="grid gap-1 text-sm text-muted">Тип средств
           <select

@@ -99,3 +99,12 @@ def test_partially_paid_purchase_and_delete(db, owner):
     stock_documents.delete_document(db, doc)
     assert vendor.balance == Decimal("0")
     assert reg.cash_balance == Decimal("5000")
+
+
+def test_money_has_no_kopecks():
+    from decimal import Decimal
+
+    from app.services import money
+
+    assert money.to_money("1499.50") == Decimal("1500")
+    assert money.to_money("1499.49") == Decimal("1499")

@@ -1,6 +1,9 @@
 from collections.abc import Generator
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
+from typing import Annotated
+
+from pydantic import AfterValidator
 
 from sqlalchemy import DateTime, MetaData, Numeric, TypeDecorator, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
@@ -77,6 +80,17 @@ def make_engine(url: str):
 
     return engine
 
+
+# Шаг округления денег: работаем без копеек, все суммы в целых рублях.
+MONEY_STEP = Decimal("1")
+
+
+def round_rubles(value: Decimal) -> Decimal:
+    return value.quantize(MONEY_STEP, rounding=ROUND_HALF_UP)
+
+
+# Тип для денежных полей во входящих запросах: копейки округляются до рубля.
+Rubles = Annotated[Decimal, AfterValidator(round_rubles)]
 
 engine = make_engine(settings.database_url)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, require
+from app.db import Rubles
 from app.errors import BusinessError, Forbidden, NotFound
 from app.models import CashRegister, Counteragent, Location, Nomenclature, Sale, SalePosition, Store
 from app.services import sales as sales_service
@@ -35,7 +36,7 @@ class SaleCreate(BaseModel):
     positions: list[SalePositionIn] = Field(min_length=1)
     payments: list[SalePaymentIn] = Field(default_factory=list)
     discount_percent: Decimal = Field(default=Decimal("0"), ge=Decimal("0"), le=Decimal("100"))
-    discount_sum: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))
+    discount_sum: Rubles = Field(default=Decimal("0"), ge=Decimal("0"))
     counteragent_id: int | None = None
     note: str | None = None
 

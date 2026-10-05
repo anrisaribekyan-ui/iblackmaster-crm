@@ -57,3 +57,5 @@
 - Бэкенд: `cd backend && python -m uvicorn app.main:app --reload` (порт 8000). БД по умолчанию — SQLite crm.db.
 - Первое заполнение: `cd backend && python -m app.seed --demo` (вход anrisar@my.com / demo1234).
 - Фронтенд: `cd frontend && npm run dev` (порт 5173, /api проксируется на 8000).
+
+- Деньги — целые рубли, без копеек. Backend: округление через money.to_money / тип Rubles (app/db.py). Frontend: суммы выводить через money() из pages/shared.ts, поля ввода сумм step="1".

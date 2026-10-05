@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, require
+from app.db import Rubles
 from app.errors import BusinessError, Forbidden, NotFound
 from app.models import (
     Measure,
@@ -21,7 +22,7 @@ router = APIRouter(tags=["Номенклатура"])
 
 class PriceIn(BaseModel):
     price_type_id: int
-    price: Decimal
+    price: Rubles
 
 
 class PriceOut(BaseModel):
@@ -37,13 +38,13 @@ class NomenclatureIn(BaseModel):
     is_work: bool = False
     group_id: int | None = None
     measure_id: int | None = None
-    purchase_price: Decimal = Decimal("0")
+    purchase_price: Rubles = Decimal("0")
     guarantee_days: int = 0
     min_count: Decimal = Decimal("0")
     has_serials: bool = False
     note: str | None = None
     salary_percent: Decimal | None = None
-    salary_fixed: Decimal | None = None
+    salary_fixed: Rubles | None = None
     prices: list[PriceIn] = Field(default_factory=list)
 
 
@@ -76,7 +77,7 @@ class NomenclatureGroupIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     parent_id: int | None = None
     salary_percent: Decimal | None = None
-    salary_fixed: Decimal | None = None
+    salary_fixed: Rubles | None = None
 
 
 class NomenclatureGroupOut(BaseModel):

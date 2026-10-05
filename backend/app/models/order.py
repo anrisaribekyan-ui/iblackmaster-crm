@@ -7,7 +7,7 @@ from decimal import Decimal
 from sqlalchemy import JSON, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db import Base, Quantity, TimestampMixin, utcnow
+from app.db import MONEY_STEP, Base, Quantity, TimestampMixin, utcnow
 
 
 class StatusGroup(str, enum.Enum):
@@ -195,11 +195,11 @@ class OrderPosition(Base, TimestampMixin):
 
     @property
     def total(self) -> Decimal:
-        return (self.sold_price * self.quantity).quantize(Decimal("0.01"))
+        return (self.sold_price * self.quantity).quantize(MONEY_STEP)
 
     @property
     def margin(self) -> Decimal:
-        return ((self.sold_price - self.purchase_price) * self.quantity).quantize(Decimal("0.01"))
+        return ((self.sold_price - self.purchase_price) * self.quantity).quantize(MONEY_STEP)
 
 
 class OrderHistory(Base):

@@ -52,7 +52,7 @@ function formatDate(value: string | null) {
 }
 
 function formatMoney(value: string) {
-  return `${Number(value).toLocaleString('ru-RU')} ₽`
+  return `${Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`
 }
 
 export default function OrdersPage() {

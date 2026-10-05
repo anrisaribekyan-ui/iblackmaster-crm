@@ -200,7 +200,7 @@ export default function DevicesPage() {
             {editor.kind === 'type' && (
               <div className="grid grid-cols-2 gap-3">
                 <label className="grid gap-1 text-sm text-muted">Зарплата, %<input className={inputClass} name="salary_percent" type="number" min="0" step="0.01" defaultValue={editor.item?.salary_percent ?? ''} /></label>
-                <label className="grid gap-1 text-sm text-muted">Зарплата, сумма<input className={inputClass} name="salary_fixed" type="number" min="0" step="0.01" defaultValue={editor.item?.salary_fixed ?? ''} /></label>
+                <label className="grid gap-1 text-sm text-muted">Зарплата, сумма<input className={inputClass} name="salary_fixed" type="number" min="0" step="1" defaultValue={editor.item?.salary_fixed ?? ''} /></label>
               </div>
             )}
             {editor.kind === 'brand' && (

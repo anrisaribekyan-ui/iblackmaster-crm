@@ -19,15 +19,15 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db import utcnow
+from app.db import MONEY_STEP, utcnow
 from app.errors import BusinessError
 from app.models import CashItem, CashItemType, CashRegister, Company, Counteragent, Transaction
 
-CENT = Decimal("0.01")
+CENT = MONEY_STEP  # без копеек
 
 
 def to_money(value) -> Decimal:
-    """Приводит число к деньгам с 2 знаками. Принимает str/int/Decimal. float запрещён."""
+    """Приводит число к деньгам — целые рубли, без копеек. Принимает str/int/Decimal. float запрещён."""
     if isinstance(value, float):
         raise TypeError("Деньги нельзя передавать как float — используйте Decimal или строку")
     return Decimal(value).quantize(CENT, rounding=ROUND_HALF_UP)

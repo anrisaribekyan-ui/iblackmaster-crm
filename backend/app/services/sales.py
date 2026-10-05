@@ -3,6 +3,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.db import MONEY_STEP
 from app.errors import BusinessError
 from app.models import (
     CashItemType,
@@ -16,7 +17,7 @@ from app.models import (
 )
 from app.services import money, stock
 
-CENT = Decimal("0.01")
+CENT = MONEY_STEP  # без копеек
 
 
 def create_sale(

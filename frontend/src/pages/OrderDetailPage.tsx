@@ -107,7 +107,7 @@ const aliasMap: Record<string, string> = {
 }
 
 function formatMoney(value: string | number) {
-  return `${Number(value).toLocaleString('ru-RU')} ₽`
+  return `${Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`
 }
 
 function formatDate(value: string) {
@@ -581,10 +581,10 @@ export default function OrderDetailPage() {
                         <div className="font-medium sm:col-span-4">{selectedItem.name}</div>
                       )}
                       <label className="grid gap-1 text-xs text-muted">Количество<input className={inputClass} type="number" min="0.001" step="0.001" required value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label>
-                      <label className="grid gap-1 text-xs text-muted">Цена<input className={inputClass} type="number" min="0" step="0.01" required value={positionPrice} onChange={(event) => setPositionPrice(event.target.value)} /></label>
+                      <label className="grid gap-1 text-xs text-muted">Цена<input className={inputClass} type="number" min="0" step="1" required value={positionPrice} onChange={(event) => setPositionPrice(event.target.value)} /></label>
                       {can('orderPurchasePriceAccess') && (
                         <label className="grid gap-1 text-xs text-muted">Себестоимость
-                          <input className={inputClass} type="number" min="0" step="0.01" value={positionCost} onChange={(event) => setPositionCost(event.target.value)} placeholder={selectedItem.id === 0 ? '0' : 'Из справочника'} />
+                          <input className={inputClass} type="number" min="0" step="1" value={positionCost} onChange={(event) => setPositionCost(event.target.value)} placeholder={selectedItem.id === 0 ? '0' : 'Из справочника'} />
                         </label>
                       )}
                       {!selectedItem.is_work && (
@@ -613,7 +613,7 @@ export default function OrderDetailPage() {
                       </select>
                     </label>
                     <label className="grid gap-1 text-xs text-muted">{discountKind === 'percent' ? 'Скидка, %' : 'Скидка, ₽'}
-                      <input className={inputClass} type="number" min="0" step="0.01" value={discountValue} onChange={(event) => setDiscountValue(event.target.value)} />
+                      <input className={inputClass} type="number" min="0" step="1" value={discountValue} onChange={(event) => setDiscountValue(event.target.value)} />
                     </label>
                     <button disabled={saving} className="rounded-md border border-line px-3 py-2" onClick={() => void saveDiscount()}>Применить</button>
                   </div>
@@ -707,7 +707,7 @@ export default function OrderDetailPage() {
                   </select>
                 </label>
                 <label className="grid gap-1 text-sm text-muted">Сумма, ₽
-                  <input className={inputClass} name="amount" type="number" min="0.01" step="0.01" required value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
+                  <input className={inputClass} name="amount" type="number" min="0.01" step="1" required value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
                 </label>
                 <label className="grid gap-1 text-sm text-muted">Способ
                   <select className={inputClass} name="method" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as 'cash' | 'bank')}>
@@ -762,10 +762,10 @@ function PositionRow({
       <td className="px-2 py-2">{position.name}</td>
       <td className="px-2 py-2">{position.is_work ? 'Работа' : 'Материал'}</td>
       <td className="px-2 py-2 num">{Number(position.quantity).toLocaleString('ru-RU')}</td>
-      <td className="px-2 py-2">{canEdit ? <input className={`${inputClass} w-28 text-right num`} type="number" min="0" step="0.01" value={price} onChange={(event) => setPrice(event.target.value)} onBlur={() => { if (price !== position.price) onSavePrice(price) }} /> : <span className="num">{formatMoney(position.sold_price)}</span>}</td>
+      <td className="px-2 py-2">{canEdit ? <input className={`${inputClass} w-28 text-right num`} type="number" min="0" step="1" value={price} onChange={(event) => setPrice(event.target.value)} onBlur={() => { if (price !== position.price) onSavePrice(price) }} /> : <span className="num">{formatMoney(position.sold_price)}</span>}</td>
       {canViewCost && (
         <td className="px-2 py-2">{canEditCost
-          ? <input className={`${inputClass} w-28 text-right num`} type="number" min="0" step="0.01" value={cost} title="Себестоимость за единицу" onChange={(event) => setCost(event.target.value)} onBlur={() => { if (cost !== (position.purchase_price ?? '')) onSaveCost(cost) }} />
+          ? <input className={`${inputClass} w-28 text-right num`} type="number" min="0" step="1" value={cost} title="Себестоимость за единицу" onChange={(event) => setCost(event.target.value)} onBlur={() => { if (cost !== (position.purchase_price ?? '')) onSaveCost(cost) }} />
           : <span className="num">{position.purchase_price === null ? '—' : formatMoney(position.purchase_price)}</span>}</td>
       )}
       <td className="px-2 py-2 num">{formatMoney(position.total)}</td>

@@ -33,7 +33,7 @@ const dateFormatter = new Intl.DateTimeFormat('ru-RU', {
   dateStyle: 'short',
   timeStyle: 'short',
 })
-const money = (value: string) => `${Number(value).toLocaleString('ru-RU')} ₽`
+const money = (value: string) => `${Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`
 
 function formatDate(value: string) {
   const date = new Date(value)
