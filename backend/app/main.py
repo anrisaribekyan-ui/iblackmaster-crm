@@ -17,6 +17,7 @@ from app.api import (
     measures,
     nomenclature,
     order_types,
+    orders,
     problems,
     staff,
     stores,
@@ -73,3 +74,4 @@ app.include_router(counteragent_types.router, prefix="/api")
 app.include_router(devices.router, prefix="/api")
 app.include_router(nomenclature.router, prefix="/api")
 app.include_router(counteragents.router, prefix="/api")
+app.include_router(orders.router, prefix="/api")

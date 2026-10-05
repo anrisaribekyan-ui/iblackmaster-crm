@@ -162,7 +162,7 @@ CRUD с правом brandModelDeviceAccess. Плюс `GET /devices/suggest?q=` 
 
 ## Блок 4. Заказы
 
-### [ ] T-20. API: создать заказ и открыть карточку
+### [x] T-20. API: создать заказ и открыть карточку
 Файл `backend/app/api/orders.py`, префикс `/orders`. Логика — SPEC.md §2.2.
 - `POST /orders` — право createOrderAccess + check_location. Вход: location_id, order_type_id,
   counteragent ({id} или {name, phones, ...} — тогда создать), поля устройства и доп.инфо, custom_fields,
