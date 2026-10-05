@@ -19,7 +19,6 @@ def next_document_number(db: Session, doc_type: StockDocType) -> str:
     numbers = db.scalars(
         select(StockDocument.number).where(
             StockDocument.type == doc_type,
-            StockDocument.is_deleted.is_(False),
         )
     ).all()
     suffixes = []
@@ -65,8 +64,8 @@ def create_document(
 
     total = Decimal("0")
     for item in positions:
-        quantity = Decimal(item["quantity"])
-        unit_price = Decimal(item["price"])
+        quantity = stock.to_qty(item["quantity"])
+        unit_price = money.to_money(item["price"])
         if doc_type == StockDocType.PURCHASE:
             stock.receive(db, store_id, item["nomenclature_id"], quantity, unit_price)
         elif doc_type == StockDocType.MOVE:
@@ -86,6 +85,10 @@ def create_document(
 
     document.total = total
     if doc_type == StockDocType.PURCHASE:
+        # Поставка = наш долг поставщику на всю сумму (его баланс растёт),
+        # оплата (статья PURCHASE, расход) этот долг уменьшает.
+        if counteragent_id is not None:
+            money.charge_counteragent(db, counteragent_id, -total)
         if cash_register_id is not None and amount is not None:
             transaction = money.create_transaction(
                 db,
@@ -98,8 +101,6 @@ def create_document(
                 stock_document_id=document.id,
             )
             document.paid = transaction.amount
-        elif counteragent_id is not None:
-            money.charge_counteragent(db, counteragent_id, -total)
     return document
 
 
@@ -141,6 +142,6 @@ def delete_document(db: Session, document: StockDocument) -> None:
     ).all()
     for transaction in transactions:
         money.delete_transaction(db, transaction)
-    if document.type == StockDocType.PURCHASE and document.counteragent_id and not transactions:
+    if document.type == StockDocType.PURCHASE and document.counteragent_id:
         money.charge_counteragent(db, document.counteragent_id, document.total)
     document.is_deleted = True

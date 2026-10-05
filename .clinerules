@@ -24,7 +24,8 @@
 ## ЗАПРЕЩЕНО (это пишет и проверяет только Claude)
 - Менять файлы: backend/app/services/money.py, backend/app/services/stock.py, backend/app/services/orders.py,
   backend/app/models/*.py, backend/app/permissions.py, backend/app/seed.py, backend/app/seed_data.json,
-  backend/tests/test_core_services.py. Если кажется, что без правки не обойтись — `[?] Вопрос` в TASKS.md.
+  backend/tests/test_core_services.py, backend/tests/test_balances.py.
+  В app/services/sales.py и app/services/stock_documents.py НЕ менять логику балансов контрагентов (charge_counteragent). Если кажется, что без правки не обойтись — `[?] Вопрос` в TASKS.md.
 - Напрямую менять поля: CashRegister.cash_balance / bank_balance, Counteragent.balance, StockBalance.*,
   Order.paid / total_price / total_purchase. Только через функции app.services.money / stock / orders.
 - Использовать float для денег и количества. Только Decimal (в Pydantic — `Decimal`, в JSON приходит строкой/числом).

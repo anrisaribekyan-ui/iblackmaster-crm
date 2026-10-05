@@ -9,13 +9,13 @@
 
 ## Блок 0. Окружение
 
-### [x] T-01. Проверить, что проект запускается
+### [R] T-01. Проверить, что проект запускается
 Ничего не пиши. Выполни:
 1. `cd backend && pip install -r requirements.txt && python -m pytest -q` — должно быть «20 passed».
 2. `cd frontend && npm install && npm run build` — без ошибок.
 Если всё зелёное — поставь `[x]`, закоммить `T-01: окружение проверено`. Если нет — `[!]` с текстом ошибки.
 
-### [x] T-02. Нормализация телефонов
+### [R] T-02. Нормализация телефонов
 Файл `backend/app/utils/phone.py` (+ пустой `backend/app/utils/__init__.py`):
 - `normalize_phone(raw: str) -> str | None` — оставляет только цифры; 11 цифр на 8 → заменить 8 на 7;
   10 цифр → добавить 7 в начало; меньше 10 цифр → None.
@@ -26,7 +26,7 @@
 
 ## Блок 1. Настройки (бэкенд)
 
-### [x] T-03. API локаций
+### [R] T-03. API локаций
 Файл `backend/app/api/locations.py`, префикс `/locations`. Модель `Location` (+ `stores`).
 - `GET /locations` — активные локации, к которым у сотрудника есть доступ (`location_ids(me)`; пусто = все),
   по `sort`. В ответе: id, name, address, phones, color, sort, stores[{id, name, is_default}].
@@ -36,14 +36,14 @@
 (создай в тесте роль с пустыми permissions и сотрудника с ней, залогинь).
 Подсказка для теста без прав: сделай фикстуру `make_user(db, permissions=[...])` в `tests/conftest.py` — можно, это не запрещённый файл.
 
-### [x] T-04. API складов
+### [R] T-04. API складов
 Файл `backend/app/api/stores.py`, префикс `/stores`.
 - `GET /stores?location_id=` — склады (только доступных локаций).
 - `POST`, `PUT /stores/{id}` — `storeSettingAccess`. Поля: location_id, name, is_default (если True — у остальных складов этой локации сбросить).
 - `DELETE` — мягко; нельзя, если на складе есть остатки (StockBalance.quantity > 0) → BusinessError «На складе есть товар».
 Тесты: создание, is_default переключается, запрет удаления склада с остатком (остаток создай через `stock.receive`).
 
-### [x] T-05. API касс (без операций с деньгами)
+### [R] T-05. API касс (без операций с деньгами)
 Файл `backend/app/api/cash_registers.py`, префикс `/cash-registers`.
 - `GET /cash-registers` — кассы доступных локаций + глобальные. Поля cash_balance/bank_balance отдавать ТОЛЬКО
   при праве `moneyCashRegisterAccess`, иначе null.
@@ -53,16 +53,16 @@
 - `DELETE /{id}` — в архив (is_active=False); нельзя, если остаток ≠ 0.
 Тесты: без права moneyCashRegisterAccess балансы null; нельзя передать cash_balance (поле игнорируется/422); архивирование.
 
-### [?] T-06. API статусов заказа — Вопрос: карточка указывает 13 статусов в сиде, но `backend/app/seed_data.json` содержит 14.
+### [ ] T-06. API статусов заказа
 Файл `backend/app/api/order_statuses.py`, префикс `/order-statuses`.
 - `GET /order-statuses` — все активные, сгруппированные: `[{group, title, statuses:[...]}]` в порядке групп
   new, inWork, wait, finish, closed (заголовки — `STATUS_GROUP_TITLES`), внутри по sort.
 - `POST`, `PUT /{id}` — `settingAccess`. Поля: group, name, client_name, color, sort, pay_required,
   comment_mode (none|optional|required), role_access ({role_id: {view, set, change}}).
 - `DELETE /{id}` — мягко; нельзя, если есть незакрытые заказы в этом статусе, и нельзя удалить последний статус группы.
-Тесты: группировка и порядок (13 статусов из сида), создание, запрет удаления последнего в группе.
+Тесты: группировка и порядок (14 статусов из сида — ответ Claude: в карточке была опечатка, верно 14), создание, запрет удаления последнего в группе.
 
-### [x] T-07. API типов заказов и редактор формы
+### [R] T-07. API типов заказов и редактор формы
 Файл `backend/app/api/order_types.py`, префикс `/order-types`.
 - `GET /order-types` — активные типы по sort.
 - `POST`, `PUT /{id}`, `DELETE /{id}` (мягко) — `settingAccess`. При создании типа скопировать поля формы
@@ -74,7 +74,7 @@
   отсутствующие в списке — is_visible=False. Поле `name` (имя клиента) нельзя сделать необязательным.
 Тесты: копирование полей при создании типа, сохранение формы, запрет снять обязательность с name.
 
-### [x] T-08. API ролей и сотрудников
+### [R] T-08. API ролей и сотрудников
 Файл `backend/app/api/staff.py`.
 - `GET /permissions` — каталог прав из `app.permissions` (PERMISSIONS сгруппировать по section + SCOPES).
 - `GET /roles`, `POST /roles`, `PUT /roles/{id}`, `DELETE /roles/{id}` — `settingAccess`. Проверять, что все коды
@@ -116,20 +116,20 @@
 
 ## Блок 3. Справочники
 
-### [x] T-10. API простых справочников
+### [R] T-10. API простых справочников
 По образцу `how_knows.py` сделай 4 роутера: `/problems` (Problem, право problemAccess),
 `/complete-sets` (CompleteSet, completeSetAccess), `/measures` (Measure, measureAccess; поле is_float),
 `/counteragent-types` (CounteragentType, counteragentAccess). У Problem/CompleteSet нет is_active —
 удаление физическое допустимо (это подсказки для ввода). GET — всем авторизованным, с параметром `q` (поиск по подстроке, без учёта регистра).
 Тесты на каждый роутер (можно одним параметризованным тестом).
 
-### [x] T-11. API устройств
+### [R] T-11. API устройств
 Файл `backend/app/api/devices.py`: `/device-types`, `/brands?device_type_id=`, `/device-models?brand_id=`,
 CRUD с правом brandModelDeviceAccess. Плюс `GET /devices/suggest?q=` — до 20 подсказок «Бренд Модель» для
 автодополнения в форме заказа (ищет по brand.name и device_model.name).
 Тесты: дерево и подсказки.
 
-### [x] T-12. API номенклатуры
+### [R] T-12. API номенклатуры
 Файл `backend/app/api/nomenclature.py`.
 - `GET /nomenclature?q=&is_work=&group_id=&location_id=&page=` — по 50; поиск по name/article/code;
   в ответе цены (по типам цен), для товаров — остаток на складах выбранной локации (сумма StockBalance.quantity).
@@ -141,7 +141,7 @@ CRUD с правом brandModelDeviceAccess. Плюс `GET /devices/suggest?q=` 
 - `GET /nomenclature/search?q=&location_id=` — быстрый поиск для добавления в заказ/чек: до 20 позиций с ценами и остатком.
 Тесты: автокод, цены, остаток в выдаче, скрытие purchase_price без права.
 
-### [x] T-13. API контрагентов
+### [R] T-13. API контрагентов
 Файл `backend/app/api/counteragents.py` (право counteragentAccess на запись; читать могут все с доступом к заказам).
 - `GET /counteragents?q=&is_vendor=&page=` — поиск по имени и телефону (телефон нормализуй через T-02). Поставщиков
   (is_vendor) видят только с правом counteragentSellerAccess.
@@ -162,7 +162,7 @@ CRUD с правом brandModelDeviceAccess. Плюс `GET /devices/suggest?q=` 
 
 ## Блок 4. Заказы
 
-### [x] T-20. API: создать заказ и открыть карточку
+### [R] T-20. API: создать заказ и открыть карточку
 Файл `backend/app/api/orders.py`, префикс `/orders`. Логика — SPEC.md §2.2.
 - `POST /orders` — право createOrderAccess + check_location. Вход: location_id, order_type_id,
   counteragent ({id} или {name, phones, ...} — тогда создать), поля устройства и доп.инфо, custom_fields,
@@ -174,7 +174,7 @@ CRUD с правом brandModelDeviceAccess. Плюс `GET /devices/suggest?q=` 
   Доступ: check_location + scope orders («own» — только если me мастер/менеджер/создатель).
 Тесты: создание с новым клиентом, с существующим, номер A15843, обязательное поле, чужая локация → 403.
 
-### [x] T-21. API: список заказов
+### [R] T-21. API: список заказов
 `GET /orders` в том же файле. Параметры: location_id, tab (new|inWork|wait|finish|closed|all), status_id,
 order_type_id, master_id, manager_id, date_from, date_to, urgent, overdue, q, page (по 50).
 Сортировка: новые сверху. Ответ: {items, total, counts: {new, inWork, wait, finish, closed}}.
@@ -182,14 +182,14 @@ order_type_id, master_id, manager_id, date_from, date_to, urgent, overdue, q, pa
 (кроме `deleted=1` при праве viewDeleteOrderAccess). Учитывать scope orders (none → 403, own → только свои).
 Тесты: вкладки и счётчики, поиск по телефону, overdue, own-скоуп.
 
-### [x] T-22. API: изменить информацию о заказе
+### [R] T-22. API: изменить информацию о заказе
 `PUT /orders/{id}` — право changeOrderInfoAccess; смена master_id — changeOrderMasterAccess,
 manager_id — changeOrderManagerAccess. Только изменившиеся поля → история `info_changed` с data
 {поле: [было, стало]}. Нельзя менять location_id и number. `DELETE /orders/{id}` (deleteOrderAccess) —
 is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — обратно.
 Тесты: история с диффом, 403 на смену мастера без права, удаление/восстановление.
 
-### [x] T-23. API: работы и запчасти в заказе
+### [R] T-23. API: работы и запчасти в заказе
 - `POST /orders/{id}/positions` — changeOrderPositionAccess. Вход: nomenclature_id или (name, is_work),
   quantity, price, performer_id, store_id (для запчасти), guarantee_days. Запчасть без работы в заказе —
   только с createOrderProductAccess. Цена ниже минимальной (тип цены is_minimal) — только с minPriceAccess.
@@ -199,13 +199,13 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 - `PUT /orders/{id}/discount` — {discount_percent | discount_sum} (discountSaleAccess), затем `orders.recalc_totals`.
 Тесты: списание со склада, возврат при удалении, запрет ниже минимальной цены, скидка.
 
-### [x] T-24. API: статус и комментарии
+### [R] T-24. API: статус и комментарии
 - `POST /orders/{id}/status` — {status_id, comment} → `orders.change_status`.
 - `POST /orders/{id}/comments` — {text} → история `comment`.
 - `GET /orders/{id}/history` — лента с именем сотрудника, названием и цветом статуса.
 Тесты: смена статуса пишет историю, required-комментарий, закрытие неоплаченного → 400.
 
-### [x] T-25. API: оплаты заказа
+### [R] T-25. API: оплаты заказа
 - `POST /orders/{id}/payments` — {cash_register_id, amount, is_bank, note} → `orders.pay`
   (право operationCashRegisterAccess; касса — доступной локации или глобальная).
 - `POST /orders/{id}/refunds` — returnOrderProductAccess → `orders.refund`.
@@ -239,7 +239,7 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 
 ## Блок 5. Склад, продажи, финансы
 
-### [x] T-28. Складские документы: поступление, перемещение, списание
+### [R] T-28. Складские документы: поступление, перемещение, списание
 Новый сервис `backend/app/services/stock_documents.py` (можно создавать) + роутер `/stock-documents`.
 - Создание документа с позициями и сразу проведение: purchase → `stock.receive` по цене позиции;
   move → `stock.move` (store_id → to_store_id); cancellation → `stock.write_off`. total = сумма позиций.
@@ -251,7 +251,19 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 - Права: purchaseAccess/createPurchaseDocumentAccess и т.д. (см. permissions.py, раздел «Склад»).
 Тесты: остатки после каждого типа документа, откат при удалении, оплата поставщику.
 
-### [!] T-29. Остатки и инвентаризация + фронтенд склада — не указан endpoint для сохранения фактического `quantity` перед `/finish`; реализованы только остатки.
+### [ ] T-29a. Инвентаризация (бэкенд). Остатки уже сделаны в T-29.
+Ответ Claude на [!]: эндпоинты такие (роутер stock_documents.py, сервис stock_documents.py):
+- `POST /stock-documents/inventory` — {location_id, store_id, note} → документ type=inventory, is_posted=False,
+  позиции = все товары с ненулевым остатком склада: quantity_accounted = текущий остаток, quantity = он же, price = средняя цена.
+- `PUT /stock-documents/{id}/positions` — {positions: [{nomenclature_id, quantity}]} — сохранить факт; новые товары
+  (которых не было в учёте) добавить с quantity_accounted=0. Только для непроведённой инвентаризации.
+- `POST /stock-documents/{id}/finish` — для каждой позиции разница = quantity − quantity_accounted:
+  > 0 → stock.receive(разница, по средней цене), < 0 → stock.write_off(−разница); is_posted=True.
+  Права: inventoryAccess / createInventoryDocumentAccess / changeInventoryDocumentAccess.
+Тесты: излишек увеличивает остаток, недостача уменьшает, повторный finish → 400, правка проведённой → 400.
+Фронтенд склада — отдельной задачей позже.
+
+### [R] T-29. Остатки (бэкенд) — сделано, инвентаризация вынесена в T-29a.
 - `GET /stock/remains?location_id=&store_id=&q=&only_positive=` — remainAccess; кол-во, средняя цена
   (при purchasePriceAccess), сумма.
 - Инвентаризация: создать документ (заполнить позиции текущими остатками: quantity_accounted), ввести факт
@@ -260,7 +272,7 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 - Фронтенд `/store/*`: подменю Остатки, Поступления, Перемещения, Списания, Инвентаризация; списки документов
   и форма документа (поиск товара, таблица позиций, итог).
 
-### [x] T-30. Продажи (чеки, backend)
+### [R] T-30. Продажи (чеки, backend)
 Новый сервис `backend/app/services/sales.py` + роутер `/sales` + страница `/sales`.
 - Чек: локация, склад, позиции (товары — write_off, себестоимость в purchase_price; работы — без склада),
   скидка, клиент (необязательно), оплата одной или несколькими транзакциями статьи SALE. Номер `Ч-<n>`
@@ -270,7 +282,7 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 - Страница: слева поиск товара/работы и корзина чека, справа итог и оплата; ниже — история чеков.
 Тесты: продажа списывает остаток, оплата в кассу, возврат, нельзя вернуть больше проданного.
 
-### [x] T-31. API финансов: журнал и операции
+### [R] T-31. API финансов: журнал и операции
 Роутер `/transactions`:
 - `GET /transactions?cash_register_id=&location_id=&cash_item_id=&date_from=&date_to=&deleted=&page=` — transactionAccess.
 - `POST /transactions` — ручной приход/расход по статье без системного type (operationCashRegisterAccess);

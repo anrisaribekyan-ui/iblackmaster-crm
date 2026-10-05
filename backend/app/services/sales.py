@@ -107,8 +107,10 @@ def create_sale(
             note=item.get("note"),
         )
         sale.paid += transaction.amount
-    if sale.paid < sale.total_price and counteragent_id is not None:
-        money.charge_counteragent(db, counteragent_id, sale.total_price - sale.paid)
+    # Начисляем клиенту ВСЮ сумму чека: оплаты (статья SALE) уже подняли его баланс,
+    # так что итог = оплачено − сумма чека (0 при полной оплате, минус — долг).
+    if counteragent_id is not None:
+        money.charge_counteragent(db, counteragent_id, sale.total_price)
     return sale
 
 
@@ -178,6 +180,9 @@ def refund_sale(
         note=note,
     )
     sale.paid -= transaction.amount
+    # Возврат денег (статья SALE_RETURN) опустил баланс клиента — снимаем и начисление за возвращённое
+    if sale.counteragent_id is not None:
+        money.charge_counteragent(db, sale.counteragent_id, -refund_total)
     document.total = refund_total
     document.paid = transaction.amount
     return document, refund_total
