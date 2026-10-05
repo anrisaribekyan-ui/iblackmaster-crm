@@ -4,6 +4,7 @@ import { api, ApiError } from '../api/client'
 import { formatPhone, isoToLocalInput, localInputToIso } from '../format'
 import { useAuth } from '../auth'
 import Modal from '../components/Modal'
+import TaskForm, { type TaskEmployee, type TaskFormValues } from '../components/TaskForm'
 
 type Status = { id: number; group: string; name: string; color: string; pay_required: boolean; comment_mode: string }
 type StatusGroup = { group: string; title: string; statuses: Status[] }
@@ -89,6 +90,7 @@ type OrderDetail = {
 type OrderFieldValues = Record<string, unknown>
 type CatalogItem = { id: number; name: string; article?: string | null; prices?: { price: string }[]; is_work: boolean }
 type PaymentMode = 'payment' | 'refund'
+type TaskRow = { id: number; title: string; text: string | null; assignee_name: string | null; deadline: string | null; is_done: boolean }
 
 const inputClass = 'w-full rounded-md border border-line bg-surface px-3 py-2'
 const aliasMap: Record<string, string> = {
@@ -176,6 +178,9 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [tasks, setTasks] = useState<TaskRow[]>([])
+  const [taskEmployees, setTaskEmployees] = useState<TaskEmployee[]>([])
+  const [taskCreating, setTaskCreating] = useState(false)
 
   const loadDetail = useCallback(async (initial = false) => {
     if (!orderId) return
@@ -226,6 +231,36 @@ export default function OrderDetailPage() {
   useEffect(() => {
     if (detail) void loadReferences(detail)
   }, [detail?.order.id, detail?.order.order_type_id, detail?.order.location_id, loadReferences])
+
+  const loadTasks = useCallback(async () => {
+    if (!orderId) return
+    try {
+      const result = await api.get<{ items: TaskRow[] }>(`/tasks?order_id=${orderId}&status=all`)
+      setTasks(result.items)
+    } catch {
+      setTasks([])
+    }
+  }, [orderId])
+
+  useEffect(() => {
+    void loadTasks()
+    api.get<TaskEmployee[]>('/employees/short').then(setTaskEmployees).catch(() => setTaskEmployees([]))
+  }, [loadTasks])
+
+  const toggleTask = async (task: TaskRow) => {
+    setError('')
+    try {
+      await api.post(`/tasks/${task.id}/${task.is_done ? 'reopen' : 'done'}`)
+      await loadTasks()
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Не удалось изменить задачу')
+    }
+  }
+
+  const createTask = async (values: TaskFormValues) => {
+    await api.post('/tasks', values)
+    await loadTasks()
+  }
 
   const run = async (action: () => Promise<unknown>, fallback: string): Promise<boolean> => {
     setSaving(true)
@@ -645,6 +680,28 @@ export default function OrderDetailPage() {
             )}
           </section>
           <section className="rounded-xl border border-line bg-surface p-4">
+            <header className="mb-3 flex items-center justify-between">
+              <h2 className="font-semibold">Задачи</h2>
+              {can('createTaskAccess') && <button className="text-sm text-accent" onClick={() => setTaskCreating(true)}>+ Задача</button>}
+            </header>
+            {tasks.length === 0 ? (
+              <p className="text-sm text-muted">Задач по заказу нет.</p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {tasks.map((task) => (
+                  <li key={task.id} className="flex items-start gap-2 py-2 text-sm">
+                    <input type="checkbox" className="mt-0.5" checked={task.is_done} onChange={() => void toggleTask(task)} aria-label="Выполнено" />
+                    <span className={task.is_done ? 'text-muted line-through' : ''}>
+                      {task.title}
+                      {task.assignee_name && <small className="block text-muted">{task.assignee_name}</small>}
+                      {task.deadline && <small className="block text-muted">{formatDate(task.deadline)}</small>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          <section className="rounded-xl border border-line bg-surface p-4">
             <h2 className="mb-3 font-semibold">История</h2>
             <form onSubmit={(event) => void sendComment(event)} className="mb-3 grid gap-2">
               <textarea className={inputClass} rows={2} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Комментарий к заказу" />
@@ -668,6 +725,9 @@ export default function OrderDetailPage() {
         </aside>
       </div>
 
+      {taskCreating && (
+        <TaskForm employees={taskEmployees} orderId={Number(orderId)} onSave={createTask} onClose={() => setTaskCreating(false)} />
+      )}
       {editingInfo && (
         <OrderInfoEditor
           detail={detail}
