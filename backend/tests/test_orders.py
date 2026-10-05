@@ -208,3 +208,94 @@ def test_order_list_own_scope(client, db):
 
     assert response.status_code == 200
     assert [item["id"] for item in response.json()["items"]] == [own_order.id]
+
+
+def test_order_update_records_only_changed_fields(client, auth_headers, db, owner):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    status = db.scalars(select(OrderStatus).where(OrderStatus.group == StatusGroup.NEW)).first()
+    customer = Counteragent(name="Информация")
+    db.add(customer)
+    db.flush()
+    order = add_order(
+        db,
+        owner=owner,
+        location=location,
+        order_type=order_type,
+        counteragent=customer,
+        status=status,
+        number="INFO-CHANGE",
+    )
+
+    response = client.put(f"/api/orders/{order.id}", json={"note": "Обновлено", "brand": None}, headers=auth_headers)
+
+    assert response.status_code == 200
+    history = db.scalars(
+        select(OrderHistory).where(OrderHistory.order_id == order.id, OrderHistory.type == "info_changed")
+    ).one()
+    assert history.data == {"note": [None, "Обновлено"]}
+
+
+def test_changing_master_requires_specific_permission(client, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    status = db.scalars(select(OrderStatus).where(OrderStatus.group == StatusGroup.NEW)).first()
+    customer = Counteragent(name="Мастер теста")
+    role = Role(name="Только общие изменения", permissions=["changeOrderInfoAccess"], scopes={"orders": "all"})
+    employee = Employee(
+        name="Редактор",
+        short_name="Редактор",
+        email="order-editor@example.test",
+        password_hash=hash_password("password123", rounds=4),
+        role=role,
+        locations=[location],
+    )
+    new_master = Employee(
+        name="Другой мастер",
+        short_name="Мастер 2",
+        email="second-master@example.test",
+        password_hash=hash_password("password123", rounds=4),
+        role=role,
+        locations=[location],
+    )
+    db.add_all([customer, employee, new_master])
+    db.flush()
+    order = add_order(
+        db,
+        owner=employee,
+        location=location,
+        order_type=order_type,
+        counteragent=customer,
+        status=status,
+        number="MASTER-CHANGE",
+    )
+    login = client.post("/api/auth/login", json={"email": employee.email, "password": "password123"})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    response = client.put(f"/api/orders/{order.id}", json={"master_id": new_master.id}, headers=headers)
+
+    assert response.status_code == 403
+
+
+def test_order_delete_and_restore(client, auth_headers, db, owner):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    status = db.scalars(select(OrderStatus).where(OrderStatus.group == StatusGroup.NEW)).first()
+    customer = Counteragent(name="Удаление")
+    db.add(customer)
+    db.flush()
+    order = add_order(
+        db,
+        owner=owner,
+        location=location,
+        order_type=order_type,
+        counteragent=customer,
+        status=status,
+        number="DELETE-RESTORE",
+    )
+
+    assert client.delete(f"/api/orders/{order.id}", headers=auth_headers).status_code == 200
+    assert db.get(Order, order.id).is_deleted is True
+    assert client.get(f"/api/orders/{order.id}", headers=auth_headers).status_code == 404
+    assert client.post(f"/api/orders/{order.id}/restore", headers=auth_headers).status_code == 200
+    assert db.get(Order, order.id).is_deleted is False

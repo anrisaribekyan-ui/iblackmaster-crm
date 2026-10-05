@@ -63,6 +63,32 @@ class OrderCreate(BaseModel):
     manager_id: int | None = None
 
 
+class OrderUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    order_type_id: int | None = None
+    counteragent_id: int | None = None
+    device_type: str | None = None
+    brand: str | None = None
+    model: str | None = None
+    serial: str | None = None
+    problems: list[str] | None = None
+    complete_set: list[str] | None = None
+    appearance: list[str] | None = None
+    color: str | None = None
+    device_password: str | None = None
+    note: str | None = None
+    approximate_price: str | None = None
+    has_prepayment: bool | None = None
+    deadline: str | None = None
+    is_urgent: bool | None = None
+    how_know_id: int | None = None
+    verdict: str | None = None
+    custom_fields: dict | None = None
+    master_id: int | None = None
+    manager_id: int | None = None
+
+
 class OrderCreateOut(BaseModel):
     id: int
     number: str
@@ -208,6 +234,20 @@ def assert_order_access(order: Order, employee: CurrentEmployee) -> None:
         raise Forbidden("Нет доступа к заказам")
     if scope == "own" and employee.id not in {order.master_id, order.manager_id, order.created_by_id}:
         raise Forbidden("Нет доступа к этому заказу")
+
+
+def get_order_for_employee(db: DbSession, order_id: int, employee: CurrentEmployee, include_deleted: bool = False):
+    order = db.get(Order, order_id)
+    if order is None or (order.is_deleted and not include_deleted):
+        raise NotFound("Заказ")
+    assert_order_access(order, employee)
+    return order
+
+
+def history_value(value):
+    if isinstance(value, (Decimal, date, datetime)):
+        return str(value)
+    return value
 
 
 def model_values(item) -> dict:
@@ -378,10 +418,7 @@ def create_order(data: OrderCreate, db: DbSession, me: CurrentEmployee):
 
 @router.get("/{order_id}", response_model=OrderDetailOut)
 def get_order(order_id: int, db: DbSession, me: CurrentEmployee):
-    order = db.get(Order, order_id)
-    if order is None or order.is_deleted:
-        raise NotFound("Заказ")
-    assert_order_access(order, me)
+    order = get_order_for_employee(db, order_id, me)
 
     status = db.get(OrderStatus, order.status_id)
     order_type = db.get(OrderType, order.order_type_id)
@@ -428,3 +465,63 @@ def get_order(order_id: int, db: DbSession, me: CurrentEmployee):
         transactions=[model_values(transaction) for transaction in transactions],
         debt=order.debt,
     )
+
+
+@router.put(
+    "/{order_id}",
+    dependencies=[Depends(require("changeOrderInfoAccess"))],
+)
+def update_order(order_id: int, data: OrderUpdate, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me)
+    values = data.model_dump(exclude_unset=True)
+    changes = {}
+    for field, value in values.items():
+        previous = getattr(order, field)
+        if previous == value:
+            continue
+        if field == "master_id":
+            if not has_permission(me, "changeOrderMasterAccess"):
+                raise Forbidden("Нет права менять мастера заказа")
+            get_employee(db, value, "Мастер")
+        elif field == "manager_id":
+            if not has_permission(me, "changeOrderManagerAccess"):
+                raise Forbidden("Нет права менять менеджера заказа")
+            get_employee(db, value, "Менеджер")
+        elif field == "order_type_id" and value is not None:
+            get_order_type(db, value)
+        elif field == "counteragent_id" and value is not None:
+            counteragent = db.get(Counteragent, value)
+            if counteragent is None or counteragent.is_deleted:
+                raise NotFound("Контрагент")
+        changes[field] = [history_value(previous), history_value(value)]
+        setattr(order, field, value)
+    if changes:
+        order_service.add_history(db, order, "info_changed", me, **changes)
+    db.commit()
+    return model_values(order)
+
+
+@router.delete(
+    "/{order_id}",
+    dependencies=[Depends(require("deleteOrderAccess"))],
+)
+def soft_delete_order(order_id: int, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me)
+    order.is_deleted = True
+    order_service.add_history(db, order, "deleted", me)
+    db.commit()
+    return {"ok": True}
+
+
+@router.post(
+    "/{order_id}/restore",
+    dependencies=[Depends(require("deleteOrderAccess"))],
+)
+def restore_order(order_id: int, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me, include_deleted=True)
+    if not order.is_deleted:
+        raise BusinessError("Заказ не удалён")
+    order.is_deleted = False
+    order_service.add_history(db, order, "restored", me)
+    db.commit()
+    return {"ok": True}

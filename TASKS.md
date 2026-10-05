@@ -182,7 +182,7 @@ order_type_id, master_id, manager_id, date_from, date_to, urgent, overdue, q, pa
 (кроме `deleted=1` при праве viewDeleteOrderAccess). Учитывать scope orders (none → 403, own → только свои).
 Тесты: вкладки и счётчики, поиск по телефону, overdue, own-скоуп.
 
-### [ ] T-22. API: изменить информацию о заказе
+### [x] T-22. API: изменить информацию о заказе
 `PUT /orders/{id}` — право changeOrderInfoAccess; смена master_id — changeOrderMasterAccess,
 manager_id — changeOrderManagerAccess. Только изменившиеся поля → история `info_changed` с data
 {поле: [было, стало]}. Нельзя менять location_id и number. `DELETE /orders/{id}` (deleteOrderAccess) —
