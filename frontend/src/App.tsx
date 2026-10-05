@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage'
 import SettingsLayout from './pages/settings/SettingsLayout'
 import LocationsPage from './pages/settings/LocationsPage'
 import StatusesPage from './pages/settings/StatusesPage'
+import StaffPage from './pages/settings/StaffPage'
 
 function Protected({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -52,7 +53,7 @@ export default function App() {
               <Route path="locations" element={<LocationsPage />} />
               <Route path="statuses" element={<StatusesPage />} />
               <Route path="order-types" element={<Stub title="Типы заказов" task="T-09d" />} />
-              <Route path="staff" element={<Stub title="Сотрудники и роли" task="T-09c" />} />
+              <Route path="staff" element={<StaffPage />} />
             </Route>
             <Route path="*" element={<Stub title="Страница не найдена" task="—" />} />
           </Route>
