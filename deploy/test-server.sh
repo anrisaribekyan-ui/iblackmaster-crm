@@ -4,6 +4,17 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh
+# Docker без модуля compose (бывает после установки Marzban) — доставляем модуль
+if ! docker compose version >/dev/null 2>&1; then
+  apt-get update -qq || true
+  apt-get install -y docker-compose-plugin >/dev/null 2>&1 || apt-get install -y docker-compose-v2 >/dev/null 2>&1 || {
+    mkdir -p /usr/local/lib/docker/cli-plugins
+    curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" \
+      -o /usr/local/lib/docker/cli-plugins/docker-compose
+    chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+  }
+fi
+docker compose version
 if [ ! -f .env ]; then
   cat > .env <<ENV
 DOMAIN=:80
