@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from './auth'
 import Layout from './components/Layout'
 import HowKnowsPage from './pages/HowKnowsPage'
 import LoginPage from './pages/LoginPage'
+import SettingsLayout from './pages/settings/SettingsLayout'
+import LocationsPage from './pages/settings/LocationsPage'
 
 function Protected({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -44,7 +46,13 @@ export default function App() {
             <Route path="analytics/*" element={<Stub title="Аналитика" task="этап 2" />} />
             <Route path="compendiums/how-knows" element={<HowKnowsPage />} />
             <Route path="compendiums/*" element={<Stub title="Справочники" task="T-10…T-14" />} />
-            <Route path="settings/*" element={<Stub title="Настройки" task="T-03…T-08" />} />
+            <Route path="settings" element={<SettingsLayout />}>
+              <Route index element={<Navigate to="locations" replace />} />
+              <Route path="locations" element={<LocationsPage />} />
+              <Route path="statuses" element={<Stub title="Статусы заказа" task="T-09b" />} />
+              <Route path="order-types" element={<Stub title="Типы заказов" task="T-09d" />} />
+              <Route path="staff" element={<Stub title="Сотрудники и роли" task="T-09c" />} />
+            </Route>
             <Route path="*" element={<Stub title="Страница не найдена" task="—" />} />
           </Route>
         </Routes>
