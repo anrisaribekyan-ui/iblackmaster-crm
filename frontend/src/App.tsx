@@ -21,6 +21,11 @@ import FinanceLayout from './pages/finance/FinanceLayout'
 import FinanceCashesPage from './pages/finance/FinanceCashesPage'
 import FinanceTransactionsPage from './pages/finance/FinanceTransactionsPage'
 import CashItemsPage from './pages/compendiums/CashItemsPage'
+import SalesPage from './pages/SalesPage'
+import StoreLayout from './pages/store/StoreLayout'
+import RemainsPage from './pages/store/RemainsPage'
+import DocumentsPage from './pages/store/DocumentsPage'
+import InventoryPage from './pages/store/InventoryPage'
 
 function Protected({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -58,8 +63,15 @@ export default function App() {
               <Route path="new" element={<OrderCreatePage />} />
               <Route path=":orderId" element={<OrderDetailPage />} />
             </Route>
-            <Route path="sales/*" element={<Stub title="Продажи" task="T-30" />} />
-            <Route path="store/*" element={<Stub title="Склад" task="T-28, T-29" />} />
+            <Route path="sales" element={<SalesPage />} />
+            <Route path="store" element={<StoreLayout />}>
+              <Route index element={<Navigate to="remains" replace />} />
+              <Route path="remains" element={<RemainsPage />} />
+              <Route path="purchase" element={<DocumentsPage key="purchase" type="purchase" />} />
+              <Route path="move" element={<DocumentsPage key="move" type="move" />} />
+              <Route path="cancellation" element={<DocumentsPage key="cancellation" type="cancellation" />} />
+              <Route path="inventory" element={<InventoryPage />} />
+            </Route>
             <Route path="tasks/*" element={<Stub title="Задачи" task="этап 2" />} />
             <Route path="finance" element={<FinanceLayout />}>
               <Route index element={<Navigate to="cashes" replace />} />

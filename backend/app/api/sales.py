@@ -133,3 +133,76 @@ def return_sale(sale_id: int, data: SaleReturnIn, db: DbSession, me: CurrentEmpl
     )
     db.commit()
     return {"document_id": document.id, "amount": amount, "paid": sale.paid}
+
+# --- Просмотр чеков --------------------------------------------------------------------
+
+
+@router.get("")
+def list_sales(db: DbSession, me: CurrentEmployee, location_id: int | None = None, page: int = 1):
+    from sqlalchemy import func
+
+    from app.api.deps import location_ids
+    from app.models import Employee
+
+    allowed = location_ids(me)
+    q = select(Sale).where(Sale.is_deleted.is_(False))
+    if location_id is not None:
+        check_location(me, location_id)
+        q = q.where(Sale.location_id == location_id)
+    elif allowed:
+        q = q.where(Sale.location_id.in_(allowed))
+    total = db.scalar(select(func.count()).select_from(q.subquery())) or 0
+    rows = db.scalars(q.order_by(Sale.date.desc(), Sale.id.desc()).offset((max(page, 1) - 1) * 50).limit(50)).all()
+    can_see_buyer = has_permission(me, "counteragentShopAccess")
+    agents = {c.id: c.name for c in db.scalars(select(Counteragent).where(Counteragent.id.in_({r.counteragent_id for r in rows if r.counteragent_id} or {0})))}
+    sellers = {e.id: e.short_name for e in db.scalars(select(Employee).where(Employee.id.in_({r.seller_id for r in rows} or {0})))}
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": r.id,
+                "number": r.number,
+                "date": r.date,
+                "location_id": r.location_id,
+                "total_price": r.total_price,
+                "paid": r.paid,
+                "counteragent": agents.get(r.counteragent_id) if can_see_buyer and r.counteragent_id else None,
+                "seller": sellers.get(r.seller_id),
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/{sale_id}")
+def get_sale(sale_id: int, db: DbSession, me: CurrentEmployee):
+    sale = db.get(Sale, sale_id)
+    if sale is None or sale.is_deleted:
+        raise NotFound("Чек")
+    check_location(me, sale.location_id)
+    agent = db.get(Counteragent, sale.counteragent_id) if sale.counteragent_id else None
+    return {
+        "id": sale.id,
+        "number": sale.number,
+        "date": sale.date,
+        "location_id": sale.location_id,
+        "store_id": sale.store_id,
+        "total_price": sale.total_price,
+        "paid": sale.paid,
+        "discount_percent": sale.discount_percent,
+        "discount_sum": sale.discount_sum,
+        "note": sale.note,
+        "counteragent": agent.name if agent and has_permission(me, "counteragentShopAccess") else None,
+        "positions": [
+            {
+                "id": p.id,
+                "name": p.name,
+                "is_work": p.is_work,
+                "quantity": p.quantity,
+                "price": p.price,
+                "sold_price": p.sold_price,
+                "returned_quantity": p.returned_quantity,
+            }
+            for p in sale.positions
+        ],
+    }

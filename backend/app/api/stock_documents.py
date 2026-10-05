@@ -3,9 +3,9 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 
-from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, require
+from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids, require
 from app.errors import BusinessError, Forbidden, NotFound
 from app.models import (
     CashRegister,
@@ -266,3 +266,104 @@ def delete_stock_document(document_id: int, db: DbSession, me: CurrentEmployee):
     stock_documents.delete_document(db, document)
     db.commit()
     return Response(status_code=204)
+
+# --- Просмотр документов (для экранов склада) ------------------------------------------
+
+VIEW_PERMISSIONS = {
+    StockDocType.PURCHASE: "purchaseAccess",
+    StockDocType.MOVE: "moveAccess",
+    StockDocType.CANCELLATION: "cancellationAccess",
+    StockDocType.INVENTORY: "inventoryAccess",
+    StockDocType.SALE_RETURN: "saleReturnAccess",
+    StockDocType.PURCHASE_RETURN: "purchaseReturnAccess",
+}
+
+
+def _names(db: DbSession, model, ids: set[int]) -> dict[int, str]:
+    if not ids:
+        return {}
+    return {item.id: item.name for item in db.scalars(select(model).where(model.id.in_(ids)))}
+
+
+@router.get("")
+def list_documents(
+    db: DbSession,
+    me: CurrentEmployee,
+    type: StockDocType,
+    location_id: int | None = None,
+    page: int = 1,
+):
+    require_document_permissions(me, (VIEW_PERMISSIONS[type],))
+    allowed = location_ids(me)
+    q = select(StockDocument).where(StockDocument.type == type, StockDocument.is_deleted.is_(False))
+    if location_id is not None:
+        check_location(me, location_id)
+        q = q.where(StockDocument.location_id == location_id)
+    elif allowed:
+        q = q.where(StockDocument.location_id.in_(allowed))
+    total = db.scalar(select(func.count()).select_from(q.subquery())) or 0
+    docs = db.scalars(q.order_by(StockDocument.date.desc(), StockDocument.id.desc()).offset((max(page, 1) - 1) * 50).limit(50)).all()
+    stores = _names(db, Store, {d.store_id for d in docs} | {d.to_store_id for d in docs if d.to_store_id})
+    agents = _names(db, Counteragent, {d.counteragent_id for d in docs if d.counteragent_id})
+    return {
+        "total": total,
+        "items": [
+            {
+                "id": d.id,
+                "number": d.number,
+                "date": d.date,
+                "type": d.type,
+                "location_id": d.location_id,
+                "store": stores.get(d.store_id),
+                "to_store": stores.get(d.to_store_id) if d.to_store_id else None,
+                "counteragent": agents.get(d.counteragent_id) if d.counteragent_id else None,
+                "total": d.total,
+                "paid": d.paid,
+                "is_posted": d.is_posted,
+                "note": d.note,
+            }
+            for d in docs
+        ],
+    }
+
+
+@router.get("/{document_id}")
+def get_document(document_id: int, db: DbSession, me: CurrentEmployee):
+    document = db.get(StockDocument, document_id)
+    if document is None or document.is_deleted:
+        raise NotFound("Документ")
+    require_document_permissions(me, (VIEW_PERMISSIONS[StockDocType(document.type)],))
+    check_location(me, document.location_id)
+    positions = db.scalars(
+        select(StockDocumentPosition).where(StockDocumentPosition.document_id == document.id).order_by(StockDocumentPosition.id)
+    ).all()
+    names = {n.id: (n.name, n.code) for n in db.scalars(select(Nomenclature).where(Nomenclature.id.in_({p.nomenclature_id for p in positions} or {0})))}
+    stores = _names(db, Store, {document.store_id} | ({document.to_store_id} if document.to_store_id else set()))
+    show_price = has_permission(me, "purchasePriceAccess")
+    return {
+        "id": document.id,
+        "number": document.number,
+        "date": document.date,
+        "type": document.type,
+        "location_id": document.location_id,
+        "store_id": document.store_id,
+        "store": stores.get(document.store_id),
+        "to_store": stores.get(document.to_store_id) if document.to_store_id else None,
+        "counteragent": db.get(Counteragent, document.counteragent_id).name if document.counteragent_id else None,
+        "total": document.total if show_price else None,
+        "paid": document.paid,
+        "is_posted": document.is_posted,
+        "note": document.note,
+        "positions": [
+            {
+                "id": p.id,
+                "nomenclature_id": p.nomenclature_id,
+                "name": names.get(p.nomenclature_id, ("—", 0))[0],
+                "code": names.get(p.nomenclature_id, ("—", 0))[1],
+                "quantity": p.quantity,
+                "quantity_accounted": p.quantity_accounted,
+                "price": p.price if show_price else None,
+            }
+            for p in positions
+        ],
+    }
