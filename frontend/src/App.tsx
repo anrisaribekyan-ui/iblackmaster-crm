@@ -6,6 +6,7 @@ import HowKnowsPage from './pages/HowKnowsPage'
 import LoginPage from './pages/LoginPage'
 import SettingsLayout from './pages/settings/SettingsLayout'
 import LocationsPage from './pages/settings/LocationsPage'
+import StatusesPage from './pages/settings/StatusesPage'
 
 function Protected({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -49,7 +50,7 @@ export default function App() {
             <Route path="settings" element={<SettingsLayout />}>
               <Route index element={<Navigate to="locations" replace />} />
               <Route path="locations" element={<LocationsPage />} />
-              <Route path="statuses" element={<Stub title="Статусы заказа" task="T-09b" />} />
+              <Route path="statuses" element={<StatusesPage />} />
               <Route path="order-types" element={<Stub title="Типы заказов" task="T-09d" />} />
               <Route path="staff" element={<Stub title="Сотрудники и роли" task="T-09c" />} />
             </Route>
