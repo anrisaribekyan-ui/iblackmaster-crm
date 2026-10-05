@@ -24,6 +24,7 @@ from app.api import (
     stock_remains,
     stock_documents,
     sales,
+    tasks,
     transactions,
     stores,
 )
@@ -89,4 +90,5 @@ app.include_router(orders.router, prefix="/api")
 app.include_router(stock_documents.router, prefix="/api")
 app.include_router(stock_remains.router, prefix="/api")
 app.include_router(sales.router, prefix="/api")
+app.include_router(tasks.router, prefix="/api")
 app.include_router(transactions.router, prefix="/api")

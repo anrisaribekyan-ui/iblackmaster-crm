@@ -342,7 +342,7 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 
 ## Блок 7. Задачи
 
-### [ ] T-41. API задач
+### [x] T-41. API задач
 Файл `backend/app/api/tasks.py`, префикс `/tasks`, модель `Task`.
 Видимость по `scope_of(me, "tasks")`: `none` → 403 на всё; `all` → все задачи (с учётом `location_ids(me)`, если у задачи есть location_id);
 `own` → где `author_id == me.id` или `assignee_id == me.id`. Удалённые (`is_deleted`) не показывать.
