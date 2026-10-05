@@ -1,4 +1,6 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useState, type FormEvent } from 'react'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { api } from '../api/client'
 import { useAuth } from '../auth'
 
 /** Меню как в LiveSklad. permission — право, без которого пункт скрыт (пусто — виден всем). */
@@ -16,6 +18,28 @@ export const MENU: { to: string; label: string; permission?: string }[] = [
 
 export default function Layout() {
   const { me, logout, can } = useAuth()
+  const navigate = useNavigate()
+  const [query, setQuery] = useState('')
+
+  const submitSearch = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const term = query.trim()
+    if (!term) return
+    if (/^[A-Za-z]\d+$/.test(term)) {
+      try {
+        const result = await api.get<{ items: { id: number }[]; total: number }>(`/orders?q=${encodeURIComponent(term)}`)
+        if (result.total === 1 && result.items.length === 1) {
+          navigate(`/orders/${result.items[0].id}`)
+          setQuery('')
+          return
+        }
+      } catch {
+        /* нет доступа — просто перейдём в список */
+      }
+    }
+    navigate(`/orders?q=${encodeURIComponent(term)}`)
+    setQuery('')
+  }
 
   return (
     <div className="flex h-full">
@@ -44,6 +68,16 @@ export default function Layout() {
         </div>
       </aside>
       <main className="min-w-0 flex-1 overflow-auto p-6">
+        <header className="mb-4 flex justify-end">
+          <form onSubmit={(event) => void submitSearch(event)} className="w-full max-w-md">
+            <input
+              className="w-full rounded-md border border-line bg-surface px-3 py-2"
+              placeholder="Поиск по номеру, телефону, имени, серийному номеру…"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </form>
+        </header>
         <Outlet />
       </main>
     </div>
