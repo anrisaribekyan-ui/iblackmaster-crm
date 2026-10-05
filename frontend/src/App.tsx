@@ -9,6 +9,11 @@ import LocationsPage from './pages/settings/LocationsPage'
 import StatusesPage from './pages/settings/StatusesPage'
 import StaffPage from './pages/settings/StaffPage'
 import OrderTypesPage from './pages/settings/OrderTypesPage'
+import CompendiumsLayout from './pages/compendiums/CompendiumsLayout'
+import DevicesPage from './pages/compendiums/DevicesPage'
+import NomenclaturePage from './pages/compendiums/NomenclaturePage'
+import CounteragentsPage from './pages/compendiums/CounteragentsPage'
+import DictionaryPage from './components/DictionaryPage'
 
 function Protected({ children }: { children: ReactNode }) {
   const { me, loading } = useAuth()
@@ -47,8 +52,19 @@ export default function App() {
             <Route path="tasks/*" element={<Stub title="Задачи" task="этап 2" />} />
             <Route path="finance/*" element={<Stub title="Финансы" task="T-31, T-32" />} />
             <Route path="analytics/*" element={<Stub title="Аналитика" task="этап 2" />} />
-            <Route path="compendiums/how-knows" element={<HowKnowsPage />} />
-            <Route path="compendiums/*" element={<Stub title="Справочники" task="T-10…T-14" />} />
+            <Route path="compendiums" element={<CompendiumsLayout />}>
+              <Route index element={<Navigate to="how-knows" replace />} />
+              <Route path="how-knows" element={<HowKnowsPage />} />
+              <Route path="problems" element={<DictionaryPage config={{ title: 'Неисправности', path: '/problems', permission: 'problemAccess' }} />} />
+              <Route path="complete-sets" element={<DictionaryPage config={{ title: 'Комплектация', path: '/complete-sets', permission: 'completeSetAccess' }} />} />
+              <Route path="measures" element={<DictionaryPage config={{ title: 'Единицы измерения', path: '/measures', permission: 'measureAccess', fields: [{ name: 'is_float', label: 'Дробное количество', type: 'checkbox', defaultValue: false }] }} />} />
+              <Route path="counteragent-types" element={<DictionaryPage config={{ title: 'Типы контрагентов', path: '/counteragent-types', permission: 'counteragentAccess', fields: [{ name: 'sort', label: 'Порядок', type: 'number', defaultValue: 0 }] }} />} />
+              <Route path="devices" element={<DevicesPage />} />
+              <Route path="products" element={<NomenclaturePage isWork={false} />} />
+              <Route path="works" element={<NomenclaturePage isWork />} />
+              <Route path="counteragents" element={<CounteragentsPage />} />
+            </Route>
+            <Route path="compendiums/*" element={<Stub title="Справочники" task="T-14" />} />
             <Route path="settings" element={<SettingsLayout />}>
               <Route index element={<Navigate to="locations" replace />} />
               <Route path="locations" element={<LocationsPage />} />
