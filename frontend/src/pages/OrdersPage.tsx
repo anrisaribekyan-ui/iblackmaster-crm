@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
+import { formatPhone } from '../format'
 import { useAuth } from '../auth'
 
 type Tab = 'new' | 'inWork' | 'wait' | 'finish' | 'closed' | 'all'
@@ -20,6 +21,7 @@ type OrderRow = {
   counteragent: { id: number; name: string; phones: string | null }
   total_price: string
   paid: string
+  approximate_price: string | null
   is_urgent: boolean
 }
 type OrderList = { items: OrderRow[]; total: number; counts: Record<Exclude<Tab, 'all'>, number> }
@@ -234,7 +236,7 @@ export default function OrdersPage() {
             <table className="w-full min-w-[1300px] text-left text-sm">
               <thead className="bg-canvas text-xs text-muted">
                 <tr>
-                  {['Заказ', 'Статус', 'Крайний срок', 'Менеджер', 'Создан', 'Тип заказа', 'Тип устройства', 'Устройство', 'Неисправность', 'Контрагент', 'Сумма'].map((heading) => <th key={heading} className="px-3 py-2 font-medium">{heading}</th>)}
+                  {['Заказ', 'Статус', 'Крайний срок', 'Менеджер', 'Создан', 'Тип заказа', 'Устройство', 'Неисправность', 'Контрагент', 'Сумма'].map((heading) => <th key={heading} className="px-3 py-2 font-medium">{heading}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -248,11 +250,12 @@ export default function OrdersPage() {
                       <td className="px-3 py-2">{order.manager ?? '—'}</td>
                       <td className="px-3 py-2 whitespace-nowrap">{formatDate(order.created_at)}</td>
                       <td className="px-3 py-2">{orderTypes.find((type) => type.id === order.order_type_id)?.name ?? '—'}</td>
-                      <td className="px-3 py-2">{order.device_type ?? '—'}</td>
                       <td className="px-3 py-2">{[order.brand, order.model].filter(Boolean).join(' ') || '—'}</td>
                       <td className="px-3 py-2">{order.problems?.join(', ') || '—'}</td>
-                      <td className="px-3 py-2">{order.counteragent.name}<small className="block text-muted">{order.counteragent.phones ?? ''}</small></td>
-                      <td className="px-3 py-2 whitespace-nowrap text-right num">{formatMoney(order.total_price)}<small className="block text-muted">Оплачено {formatMoney(order.paid)}</small></td>
+                      <td className="px-3 py-2">{order.counteragent.name}<small className="block text-muted">{formatPhone(order.counteragent.phones)}</small></td>
+                      <td className="px-3 py-2 whitespace-nowrap text-right num">{Number(order.total_price) > 0
+                        ? <>{formatMoney(order.total_price)}<small className="block text-muted">Оплачено {formatMoney(order.paid)}</small></>
+                        : <span className="text-muted">{order.approximate_price ? `≈ ${order.approximate_price}` : '—'}</span>}</td>
                     </tr>
                   )
                 })}

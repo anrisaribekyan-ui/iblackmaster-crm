@@ -55,8 +55,8 @@ export default function NomenclaturePage({ isWork }: { isWork: boolean }) {
   const loadReferences = useCallback(async () => {
     try {
       const [priceData, groupData, measureData] = await Promise.all([
-        api.get<PriceType[]>('/nomenclature/price-types'),
-        api.get<Group[]>('/nomenclature/nomenclature-groups'),
+        api.get<PriceType[]>('/price-types'),
+        api.get<Group[]>('/nomenclature-groups'),
         api.get<Measure[]>('/measures'),
       ])
       setPriceTypes(priceData)

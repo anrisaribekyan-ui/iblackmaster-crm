@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
+import { formatPhone, isoToLocalInput, localInputToIso } from '../format'
 import { useAuth } from '../auth'
 import Modal from '../components/Modal'
 
@@ -57,6 +58,10 @@ type Transaction = {
   is_bank: boolean
   cash_register_id: number
   note: string | null
+  is_income: boolean
+  cash_item_name: string
+  cash_item_type: string | null
+  cash_register_name: string
 }
 type OrderDetail = {
   order: Record<string, unknown> & {
@@ -252,6 +257,8 @@ export default function OrderDetailPage() {
     void changeStatus(status, commentText)
   }
 
+  const isClosed = detail?.status.group === 'closed'
+
   const getFirstClosedStatus = () =>
     statusGroups.find((group) => group.group === 'closed')?.statuses[0]
 
@@ -351,13 +358,21 @@ export default function OrderDetailPage() {
   const addPosition = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!detail || !selectedItem) return
-    const payload = {
-      nomenclature_id: selectedItem.id,
-      quantity,
-      price: positionPrice,
-      is_work: selectedItem.is_work,
-      store_id: selectedItem.is_work ? null : Number(storeId),
+    // id = 0 — работа, вписанная вручную (без справочника)
+    const manual = selectedItem.id === 0
+    if (manual && !selectedItem.name.trim()) {
+      setError('Укажите название работы')
+      return
     }
+    const payload = manual
+      ? { name: selectedItem.name.trim(), is_work: true, quantity, price: positionPrice }
+      : {
+          nomenclature_id: selectedItem.id,
+          quantity,
+          price: positionPrice,
+          is_work: selectedItem.is_work,
+          store_id: selectedItem.is_work ? null : Number(storeId),
+        }
     const success = await run(
       () => api.post(`/orders/${detail.order.id}/positions`, payload),
       'Не удалось добавить позицию',
@@ -468,7 +483,7 @@ export default function OrderDetailPage() {
               </header>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Info label="Клиент" value={detail.counteragent.name} />
-                <Info label="Телефоны" value={detail.counteragent.phones ?? '—'} />
+                <Info label="Телефоны" value={formatPhone(detail.counteragent.phones) || '—'} />
                 <Info label="Тип заказа" value={detail.order_type.name} />
                 <Info label="Статус" value={detail.status.name} />
                 {fields.filter((field) => field.is_visible && field.key !== 'name' && field.key !== 'phones').map((field) => (
@@ -493,7 +508,7 @@ export default function OrderDetailPage() {
                         <PositionRow
                           key={position.id}
                           position={position}
-                          canEdit={can('changeOrderPositionAccess')}
+                          canEdit={can('changeOrderPositionAccess') && !isClosed}
                           canViewMargin={can('marginPriceAccess')}
                           onSavePrice={(price) => void editPositionPrice(position, price)}
                           onDelete={() => void removePosition(position)}
@@ -503,11 +518,23 @@ export default function OrderDetailPage() {
                   </table>
                 </div>
               )}
-              {can('changeOrderPositionAccess') && (
+              {can('changeOrderPositionAccess') && !isClosed && (
                 <div className="mb-5 rounded-lg border border-line p-3">
                   <form onSubmit={(event) => void searchCatalog(event)} className="flex gap-2">
                     <input className={`${inputClass} min-w-0 flex-1`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Найти товар или работу" />
                     <button className="rounded-md border border-line px-3 py-2">Найти</button>
+                    <button
+                      type="button"
+                      className="rounded-md border border-line px-3 py-2 whitespace-nowrap"
+                      onClick={() => {
+                        setSelectedItem({ id: 0, name: search.trim(), is_work: true })
+                        setPositionPrice('')
+                        setQuantity('1')
+                        setSearchResults([])
+                      }}
+                    >
+                      Работа вручную
+                    </button>
                   </form>
                   {searchResults.length > 0 && (
                     <ul className="mt-2 divide-y divide-line rounded-md border border-line">
@@ -527,7 +554,13 @@ export default function OrderDetailPage() {
                   )}
                   {selectedItem && (
                     <form onSubmit={(event) => void addPosition(event)} className="mt-3 grid gap-2 sm:grid-cols-4">
-                      <div className="font-medium sm:col-span-4">{selectedItem.name}</div>
+                      {selectedItem.id === 0 ? (
+                        <label className="grid gap-1 text-xs text-muted sm:col-span-4">Название работы
+                          <input className={inputClass} required autoFocus value={selectedItem.name} onChange={(event) => setSelectedItem({ ...selectedItem, name: event.target.value })} placeholder="Например, замена дисплея" />
+                        </label>
+                      ) : (
+                        <div className="font-medium sm:col-span-4">{selectedItem.name}</div>
+                      )}
                       <label className="grid gap-1 text-xs text-muted">Количество<input className={inputClass} type="number" min="0.001" step="0.001" required value={quantity} onChange={(event) => setQuantity(event.target.value)} /></label>
                       <label className="grid gap-1 text-xs text-muted">Цена<input className={inputClass} type="number" min="0" step="0.01" required value={positionPrice} onChange={(event) => setPositionPrice(event.target.value)} /></label>
                       {!selectedItem.is_work && (
@@ -548,7 +581,7 @@ export default function OrderDetailPage() {
               <div className="grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
                 <div className="text-sm text-muted">Оплачено <strong className="ml-2 text-ink num">{formatMoney(detail.order.paid)}</strong></div>
                 <div className="text-sm text-muted">Долг <strong className="ml-2 text-ink num">{formatMoney(detail.debt)}</strong></div>
-                {can('discountSaleAccess') && (
+                {can('discountSaleAccess') && !isClosed && (
                   <div className="flex items-end gap-2 sm:col-span-2">
                     <label className="grid gap-1 text-xs text-muted">Скидка
                       <select className={inputClass} value={discountKind} onChange={(event) => setDiscountKind(event.target.value as 'percent' | 'sum')}>
@@ -576,9 +609,12 @@ export default function OrderDetailPage() {
             {detail.transactions.length > 0 && (
               <ul className="mt-4 divide-y divide-line">
                 {detail.transactions.map((transaction) => (
-                  <li key={transaction.id} className="py-2 text-sm">
-                    <div className="flex justify-between gap-2"><span>{transaction.is_bank ? 'Безналичная' : 'Наличная'} оплата</span><strong className="num">{formatMoney(transaction.amount)}</strong></div>
-                    <small className="text-muted">{formatDate(transaction.date)}{transaction.note ? ` · ${transaction.note}` : ''}</small>
+                  <li key={transaction.id} className={`py-2 text-sm ${transaction.cash_item_type === 'bankPercent' ? 'text-muted' : ''}`}>
+                    <div className="flex justify-between gap-2">
+                      <span>{transaction.cash_item_type === 'bankPercent' ? 'Комиссия банка' : `${transaction.is_income ? 'Оплата' : 'Возврат'}, ${transaction.is_bank ? 'безнал' : 'наличные'}`}</span>
+                      <strong className={`num ${transaction.is_income ? '' : 'text-danger'}`}>{transaction.is_income ? '' : '−'}{formatMoney(transaction.amount)}</strong>
+                    </div>
+                    <small className="text-muted">{formatDate(transaction.date)} · {transaction.cash_register_name}{transaction.note ? ` · ${transaction.note}` : ''}</small>
                   </li>
                 ))}
               </ul>
@@ -693,7 +729,7 @@ function PositionRow({
     <tr className="border-t border-line">
       <td className="px-2 py-2">{position.name}</td>
       <td className="px-2 py-2">{position.is_work ? 'Работа' : 'Материал'}</td>
-      <td className="px-2 py-2 num">{position.quantity}</td>
+      <td className="px-2 py-2 num">{Number(position.quantity).toLocaleString('ru-RU')}</td>
       <td className="px-2 py-2">{canEdit ? <input className={`${inputClass} w-28 text-right num`} type="number" min="0" step="0.01" value={price} onChange={(event) => setPrice(event.target.value)} onBlur={() => { if (price !== position.price) onSavePrice(price) }} /> : <span className="num">{formatMoney(position.sold_price)}</span>}</td>
       <td className="px-2 py-2 num">{formatMoney(position.total)}</td>
       {canViewMargin && <td className="px-2 py-2 num">{position.margin === null ? '—' : formatMoney(position.margin)}</td>}
@@ -720,7 +756,10 @@ function OrderInfoEditor({
   onSave: (payload: Record<string, unknown>) => Promise<void>
 }) {
   const [values, setValues] = useState<OrderFieldValues>(() =>
-    Object.fromEntries(fields.map((field) => [field.key, fieldValue(field, detail)])),
+    Object.fromEntries(fields.map((field) => {
+      const raw = fieldValue(field, detail)
+      return [field.key, field.data_type === 'dateTime' ? isoToLocalInput(raw as string | null) : raw]
+    })),
   )
   const [error, setError] = useState('')
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -733,6 +772,7 @@ function OrderInfoEditor({
       let value = values[field.key]
       if (field.data_type === 'multiple' && typeof value === 'string') value = value.split(',').map((item) => item.trim()).filter(Boolean)
       if (['master_id', 'manager_id', 'how_know_id'].includes(key)) value = value ? Number(value) : null
+      if (field.data_type === 'dateTime') value = localInputToIso(value as string | null)
       if (key.startsWith('custom_') || !(key in aliasMap) && !['brand', 'model', 'color', 'appearance'].includes(field.key)) {
         customFields[field.key] = value
       } else {

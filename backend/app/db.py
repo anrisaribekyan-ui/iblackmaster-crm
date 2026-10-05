@@ -2,7 +2,7 @@ from collections.abc import Generator
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import DateTime, MetaData, Numeric, create_engine, event
+from sqlalchemy import DateTime, MetaData, Numeric, TypeDecorator, create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 from app.config import settings
@@ -26,11 +26,32 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class UTCDateTime(TypeDecorator):
+    """Дата-время всегда в UTC и всегда с часовым поясом.
+
+    SQLite теряет часовой пояс при сохранении — без этого API отдаёт «2026-10-05T08:36:00»
+    без Z, и браузер показывает UTC как местное время.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc) if value is not None else None
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
+
+
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING)
     type_annotation_map = {
         Decimal: Money,
-        datetime: DateTime(timezone=True),
+        datetime: UTCDateTime(),
     }
 
 

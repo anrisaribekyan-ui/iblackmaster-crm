@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
+import { localInputToIso } from '../format'
 import { useAuth } from '../auth'
 
 type Location = { id: number; name: string }
@@ -280,7 +281,7 @@ export default function OrderCreatePage() {
         note: values.orderNode ? String(values.orderNode) : null,
         approximate_price: values.approximatePrice ? String(values.approximatePrice) : null,
         has_prepayment: Boolean(values.prepayment),
-        deadline: values.deadline ? String(values.deadline) : null,
+        deadline: localInputToIso(values.deadline as string | null),
         is_urgent: Boolean(values.isUrgent),
         how_know_id: howKnowId,
         custom_fields: customFields,
@@ -407,7 +408,7 @@ function DynamicField({
 }) {
   const label = <span>{field.label}{field.is_required && <span className="ml-1 text-danger">*</span>}</span>
   let control: ReactNode
-  if (field.data_type === 'multiple') {
+  if (field.data_type === 'multiple' && field.key !== 'phones') {
     const selected = Array.isArray(value) ? value.map(String) : []
     const suggestions = choices.map((choice) => 'name' in choice ? choice.name : choice.short_name)
     control = (
@@ -476,8 +477,11 @@ function DynamicField({
     )
   }
 
+  // Поля с кнопками внутри (подсказки, «+») нельзя оборачивать в <label>: клик по кнопке
+  // перехватывается label и значение не добавляется.
+  const Wrapper = field.data_type === 'multiple' && field.key !== 'phones' ? 'div' : 'label'
   return (
-    <label className="grid gap-1 text-sm text-muted">
+    <Wrapper className="grid gap-1 text-sm text-muted">
       {label}
       {control}
       {field.key === 'phones' && counteragentFound && (
@@ -487,7 +491,7 @@ function DynamicField({
         </span>
       )}
       {lookupError && field.key === 'phones' && <span role="alert" className="text-xs text-danger">{lookupError}</span>}
-    </label>
+    </Wrapper>
   )
 }
 
