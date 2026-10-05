@@ -21,6 +21,7 @@ from app.api import (
     order_statuses,
     orders,
     problems,
+    reports,
     staff,
     stock_remains,
     stock_documents,
@@ -89,6 +90,7 @@ app.include_router(nomenclature.router, prefix="/api")
 app.include_router(counteragents.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
+app.include_router(reports.router, prefix="/api")
 app.include_router(stock_documents.router, prefix="/api")
 app.include_router(stock_remains.router, prefix="/api")
 app.include_router(sales.router, prefix="/api")

@@ -386,7 +386,7 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 
 ## Блок 9. Аналитика
 
-### [ ] T-46. API отчётов
+### [x] T-46. API отчётов
 Файл `backend/app/api/reports.py`, префикс `/reports`, все эндпоинты — право `reportAccess`. Параметры у всех: `date_from, date_to` (UTC ISO, обяз.), `location_id` (необяз., `check_location`; без него — `location_ids(me)`).
 - `GET /reports/orders?group_by=master|manager|order_type|status|how_know|day` — по заказам, ВЫДАННЫМ в периоде (`closed_at`): [{key, name, count, revenue: sum(total_price), cost: sum(total_purchase), profit: revenue-cost}].
   `cost` и `profit` отдавать только при `marginPriceAccess`, иначе null. day — ключ «YYYY-MM-DD» по Москве.
