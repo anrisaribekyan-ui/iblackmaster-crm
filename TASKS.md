@@ -53,7 +53,7 @@
 - `DELETE /{id}` — в архив (is_active=False); нельзя, если остаток ≠ 0.
 Тесты: без права moneyCashRegisterAccess балансы null; нельзя передать cash_balance (поле игнорируется/422); архивирование.
 
-### [ ] T-06. API статусов заказа
+### [x] T-06. API статусов заказа
 Файл `backend/app/api/order_statuses.py`, префикс `/order-statuses`.
 - `GET /order-statuses` — все активные, сгруппированные: `[{group, title, statuses:[...]}]` в порядке групп
   new, inWork, wait, finish, closed (заголовки — `STATUS_GROUP_TITLES`), внутри по sort.

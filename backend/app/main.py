@@ -17,6 +17,7 @@ from app.api import (
     measures,
     nomenclature,
     order_types,
+    order_statuses,
     orders,
     problems,
     staff,
@@ -70,6 +71,7 @@ app.include_router(locations.router, prefix="/api")
 app.include_router(stores.router, prefix="/api")
 app.include_router(cash_registers.router, prefix="/api")
 app.include_router(order_types.router, prefix="/api")
+app.include_router(order_statuses.router, prefix="/api")
 app.include_router(staff.router, prefix="/api")
 app.include_router(problems.router, prefix="/api")
 app.include_router(complete_sets.router, prefix="/api")
