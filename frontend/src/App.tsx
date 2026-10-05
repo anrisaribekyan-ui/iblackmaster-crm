@@ -17,6 +17,7 @@ import DictionaryPage from './components/DictionaryPage'
 import OrdersPage from './pages/OrdersPage'
 import OrderCreatePage from './pages/OrderCreatePage'
 import OrderDetailPage from './pages/OrderDetailPage'
+import TasksPage from './pages/TasksPage'
 import FinanceLayout from './pages/finance/FinanceLayout'
 import FinanceCashesPage from './pages/finance/FinanceCashesPage'
 import FinanceTransactionsPage from './pages/finance/FinanceTransactionsPage'
@@ -72,7 +73,7 @@ export default function App() {
               <Route path="cancellation" element={<DocumentsPage key="cancellation" type="cancellation" />} />
               <Route path="inventory" element={<InventoryPage />} />
             </Route>
-            <Route path="tasks/*" element={<Stub title="Задачи" task="этап 2" />} />
+            <Route path="tasks" element={<TasksPage />} />
             <Route path="finance" element={<FinanceLayout />}>
               <Route index element={<Navigate to="cashes" replace />} />
               <Route path="cashes" element={<FinanceCashesPage />} />
