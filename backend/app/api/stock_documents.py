@@ -2,12 +2,21 @@ from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, require
 from app.errors import BusinessError, Forbidden, NotFound
-from app.models import CashRegister, Counteragent, Location, Nomenclature, StockDocType, StockDocument, Store
+from app.models import (
+    CashRegister,
+    Counteragent,
+    Location,
+    Nomenclature,
+    StockDocType,
+    StockDocument,
+    StockDocumentPosition,
+    Store,
+)
 from app.services import stock_documents
 
 router = APIRouter(prefix="/stock-documents", tags=["Склад"])
@@ -17,10 +26,13 @@ CREATE_PERMISSIONS = {
     StockDocType.MOVE: ("moveAccess", "createMoveDocumentAccess"),
     StockDocType.CANCELLATION: ("cancellationAccess", "createCancellationDocumentAccess"),
 }
+CREATE_INVENTORY_PERMISSIONS = ("inventoryAccess", "createInventoryDocumentAccess")
+CHANGE_INVENTORY_PERMISSIONS = ("inventoryAccess", "changeInventoryDocumentAccess")
 DELETE_PERMISSIONS = {
     StockDocType.PURCHASE: ("purchaseAccess", "deletePurchaseDocumentAccess"),
     StockDocType.MOVE: ("moveAccess", "deleteMoveDocumentAccess"),
     StockDocType.CANCELLATION: ("cancellationAccess", "deleteCancellationDocumentAccess"),
+    StockDocType.INVENTORY: ("inventoryAccess", "deleteInventoryDocumentAccess"),
 }
 
 
@@ -45,6 +57,8 @@ class StockDocumentCreate(BaseModel):
 
 
 class StockDocumentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     type: StockDocType
     number: str
@@ -56,6 +70,34 @@ class StockDocumentOut(BaseModel):
     paid: Decimal
     is_posted: bool
     is_deleted: bool
+
+
+class InventoryCreate(BaseModel):
+    location_id: int
+    store_id: int
+    note: str | None = None
+
+
+class InventoryPositionIn(BaseModel):
+    nomenclature_id: int
+    quantity: Decimal = Field(ge=Decimal("0"))
+
+
+class InventoryPositionsIn(BaseModel):
+    positions: list[InventoryPositionIn]
+
+
+class InventoryPositionOut(BaseModel):
+    id: int
+    nomenclature_id: int
+    quantity: Decimal
+    quantity_accounted: Decimal | None
+    price: Decimal
+
+
+class InventoryDocumentOut(StockDocumentOut):
+    note: str | None
+    positions: list[InventoryPositionOut]
 
 
 def get_store(db: DbSession, store_id: int, location_id: int) -> Store:
@@ -71,6 +113,37 @@ def require_document_permissions(employee: CurrentEmployee, codes: tuple[str, ..
     for code in codes:
         if not has_permission(employee, code):
             raise Forbidden(f"Нет права: {code}")
+
+
+def get_inventory_document(db: DbSession, document_id: int) -> StockDocument:
+    document = db.get(StockDocument, document_id)
+    if document is None or document.is_deleted:
+        raise NotFound("Инвентаризация")
+    if document.type != StockDocType.INVENTORY:
+        raise BusinessError("Документ не является инвентаризацией")
+    return document
+
+
+def inventory_out(db: DbSession, document: StockDocument) -> InventoryDocumentOut:
+    positions = db.scalars(
+        select(StockDocumentPosition)
+        .where(StockDocumentPosition.document_id == document.id)
+        .order_by(StockDocumentPosition.id)
+    ).all()
+    return InventoryDocumentOut(
+        **StockDocumentOut.model_validate(document).model_dump(),
+        note=document.note,
+        positions=[
+            InventoryPositionOut(
+                id=position.id,
+                nomenclature_id=position.nomenclature_id,
+                quantity=position.quantity,
+                quantity_accounted=position.quantity_accounted,
+                price=position.price,
+            )
+            for position in positions
+        ],
+    )
 
 
 @router.post("", response_model=StockDocumentOut)
@@ -133,6 +206,54 @@ def create_stock_document(data: StockDocumentCreate, db: DbSession, me: CurrentE
     )
     db.commit()
     return document
+
+
+@router.post("/inventory", response_model=InventoryDocumentOut)
+def create_inventory_document(data: InventoryCreate, db: DbSession, me: CurrentEmployee):
+    require_document_permissions(me, CREATE_INVENTORY_PERMISSIONS)
+    check_location(me, data.location_id)
+    location = db.get(Location, data.location_id)
+    if location is None or not location.is_active:
+        raise NotFound("Локация")
+    get_store(db, data.store_id, data.location_id)
+    document = stock_documents.create_inventory(
+        db,
+        location_id=data.location_id,
+        store_id=data.store_id,
+        responsible_id=me.id,
+        note=data.note,
+    )
+    db.commit()
+    return inventory_out(db, document)
+
+
+@router.put("/{document_id}/positions", response_model=InventoryDocumentOut)
+def update_inventory_document_positions(
+    document_id: int,
+    data: InventoryPositionsIn,
+    db: DbSession,
+    me: CurrentEmployee,
+):
+    document = get_inventory_document(db, document_id)
+    require_document_permissions(me, CHANGE_INVENTORY_PERMISSIONS)
+    check_location(me, document.location_id)
+    stock_documents.update_inventory_positions(
+        db,
+        document,
+        [position.model_dump() for position in data.positions],
+    )
+    db.commit()
+    return inventory_out(db, document)
+
+
+@router.post("/{document_id}/finish", response_model=InventoryDocumentOut)
+def finish_inventory_document(document_id: int, db: DbSession, me: CurrentEmployee):
+    document = get_inventory_document(db, document_id)
+    require_document_permissions(me, CHANGE_INVENTORY_PERMISSIONS)
+    check_location(me, document.location_id)
+    stock_documents.finish_inventory(db, document)
+    db.commit()
+    return inventory_out(db, document)
 
 
 @router.delete("/{document_id}", status_code=204)

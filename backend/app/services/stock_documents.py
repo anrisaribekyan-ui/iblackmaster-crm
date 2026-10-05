@@ -4,13 +4,22 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.errors import BusinessError
-from app.models import CashItemType, StockDocType, StockDocument, StockDocumentPosition, Transaction
+from app.models import (
+    CashItemType,
+    Nomenclature,
+    StockBalance,
+    StockDocType,
+    StockDocument,
+    StockDocumentPosition,
+    Transaction,
+)
 from app.services import money, stock
 
 DOCUMENT_PREFIX = {
     StockDocType.PURCHASE: "П-",
     StockDocType.MOVE: "ПМ-",
     StockDocType.CANCELLATION: "С-",
+    StockDocType.INVENTORY: "И-",
 }
 
 
@@ -104,6 +113,125 @@ def create_document(
     return document
 
 
+def create_inventory(
+    db: Session,
+    *,
+    location_id: int,
+    store_id: int,
+    responsible_id: int,
+    note: str | None,
+) -> StockDocument:
+    document = StockDocument(
+        type=StockDocType.INVENTORY,
+        number=next_document_number(db, StockDocType.INVENTORY),
+        location_id=location_id,
+        store_id=store_id,
+        to_store_id=None,
+        counteragent_id=None,
+        responsible_id=responsible_id,
+        note=note,
+        total=Decimal("0"),
+        paid=Decimal("0"),
+        is_posted=False,
+    )
+    db.add(document)
+    db.flush()
+
+    balances = db.scalars(
+        select(StockBalance).where(
+            StockBalance.store_id == store_id,
+            StockBalance.quantity != 0,
+        )
+    ).all()
+    for balance in balances:
+        db.add(
+            StockDocumentPosition(
+                document_id=document.id,
+                nomenclature_id=balance.nomenclature_id,
+                quantity=balance.quantity,
+                quantity_accounted=balance.quantity,
+                price=balance.avg_purchase_price,
+            )
+        )
+    return document
+
+
+def update_inventory_positions(
+    db: Session,
+    document: StockDocument,
+    positions: list[dict],
+) -> list[StockDocumentPosition]:
+    if document.type != StockDocType.INVENTORY:
+        raise BusinessError("Документ не является инвентаризацией")
+    if document.is_posted:
+        raise BusinessError("Нельзя менять проведённую инвентаризацию")
+
+    current = db.scalars(
+        select(StockDocumentPosition).where(StockDocumentPosition.document_id == document.id)
+    ).all()
+    by_nomenclature = {position.nomenclature_id: position for position in current}
+    submitted_ids: set[int] = set()
+    for item in positions:
+        nomenclature_id = item["nomenclature_id"]
+        if nomenclature_id in submitted_ids:
+            raise BusinessError("Товар указан в инвентаризации несколько раз")
+        submitted_ids.add(nomenclature_id)
+        nomenclature = db.get(Nomenclature, nomenclature_id)
+        if nomenclature is None or nomenclature.is_deleted:
+            raise BusinessError("Товар не найден")
+        if nomenclature.is_work:
+            raise BusinessError("Работа не учитывается на складе")
+        quantity = stock.to_qty(item["quantity"])
+        if quantity < 0:
+            raise BusinessError("Количество не может быть отрицательным")
+
+        position = by_nomenclature.get(nomenclature_id)
+        if position is None:
+            balance = stock.get_balance(db, document.store_id, nomenclature_id)
+            position = StockDocumentPosition(
+                document_id=document.id,
+                nomenclature_id=nomenclature_id,
+                quantity=quantity,
+                quantity_accounted=Decimal("0"),
+                price=balance.avg_purchase_price if balance is not None else Decimal("0"),
+            )
+            db.add(position)
+            by_nomenclature[nomenclature_id] = position
+        else:
+            position.quantity = quantity
+    return list(by_nomenclature.values())
+
+
+def finish_inventory(db: Session, document: StockDocument) -> None:
+    if document.type != StockDocType.INVENTORY:
+        raise BusinessError("Документ не является инвентаризацией")
+    if document.is_posted:
+        raise BusinessError("Инвентаризация уже проведена")
+
+    positions = db.scalars(
+        select(StockDocumentPosition).where(StockDocumentPosition.document_id == document.id)
+    ).all()
+    for position in positions:
+        accounted = position.quantity_accounted or Decimal("0")
+        difference = position.quantity - accounted
+        if difference > 0:
+            stock.receive(
+                db,
+                document.store_id,
+                position.nomenclature_id,
+                difference,
+                position.price,
+            )
+        elif difference < 0:
+            position.price = stock.write_off(
+                db,
+                document.store_id,
+                position.nomenclature_id,
+                -difference,
+            )
+    document.is_posted = True
+
+
 def delete_document(db: Session, document: StockDocument) -> None:
     if document.is_deleted:
         raise BusinessError("Документ уже удалён")
@@ -125,6 +253,19 @@ def delete_document(db: Session, document: StockDocument) -> None:
                 position.nomenclature_id,
                 position.quantity,
             )
+        elif document.type == StockDocType.INVENTORY:
+            accounted = position.quantity_accounted or Decimal("0")
+            difference = position.quantity - accounted
+            if difference > 0:
+                stock.write_off(db, document.store_id, position.nomenclature_id, difference)
+            elif difference < 0:
+                stock.receive(
+                    db,
+                    document.store_id,
+                    position.nomenclature_id,
+                    -difference,
+                    position.price,
+                )
         else:
             stock.receive(
                 db,

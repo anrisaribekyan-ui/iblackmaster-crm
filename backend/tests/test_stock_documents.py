@@ -12,6 +12,7 @@ from app.models import (
     Store,
     Transaction,
 )
+from app.services import stock
 
 
 def stock_quantity(db, store_id, nomenclature_id):
@@ -102,3 +103,65 @@ def test_purchase_move_cancellation_and_reverse(client, auth_headers, db):
     assert client.delete(f"/api/stock-documents/{purchase_id}", headers=auth_headers).status_code == 204
     assert stock_quantity(db, source.id, product.id) == Decimal("0.000")
     assert db.get(StockDocument, purchase_id).is_deleted is True
+
+
+def test_inventory_create_update_and_finish(client, auth_headers, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    store = db.scalars(select(Store).where(Store.location_id == location.id)).first()
+    accounted_item = Nomenclature(code=770201, name="Учтённый товар", is_work=False)
+    shortage_item = Nomenclature(code=770202, name="Товар с недостачей", is_work=False)
+    new_item = Nomenclature(code=770203, name="Неучтённый товар", is_work=False)
+    db.add_all([accounted_item, shortage_item, new_item])
+    db.flush()
+    stock.receive(db, store.id, accounted_item.id, Decimal("5"), Decimal("100.00"))
+    stock.receive(db, store.id, shortage_item.id, Decimal("3"), Decimal("40.00"))
+    db.commit()
+
+    created = client.post(
+        "/api/stock-documents/inventory",
+        json={"location_id": location.id, "store_id": store.id, "note": "Проверка остатков"},
+        headers=auth_headers,
+    )
+    assert created.status_code == 200, created.text
+    document = created.json()
+    assert document["type"] == "inventory"
+    assert document["is_posted"] is False
+    assert {position["nomenclature_id"] for position in document["positions"]} == {
+        accounted_item.id,
+        shortage_item.id,
+    }
+    assert all(position["quantity"] == position["quantity_accounted"] for position in document["positions"])
+
+    updated = client.put(
+        f"/api/stock-documents/{document['id']}/positions",
+        json={
+            "positions": [
+                {"nomenclature_id": accounted_item.id, "quantity": "7"},
+                {"nomenclature_id": shortage_item.id, "quantity": "1"},
+                {"nomenclature_id": new_item.id, "quantity": "2"},
+            ]
+        },
+        headers=auth_headers,
+    )
+    assert updated.status_code == 200, updated.text
+    added = next(position for position in updated.json()["positions"] if position["nomenclature_id"] == new_item.id)
+    assert added["quantity_accounted"] == "0.000"
+
+    finished = client.post(f"/api/stock-documents/{document['id']}/finish", headers=auth_headers)
+    assert finished.status_code == 200, finished.text
+    assert finished.json()["is_posted"] is True
+    assert stock_quantity(db, store.id, accounted_item.id) == Decimal("7.000")
+    assert stock_quantity(db, store.id, shortage_item.id) == Decimal("1.000")
+    assert stock_quantity(db, store.id, new_item.id) == Decimal("2.000")
+
+    repeated = client.post(f"/api/stock-documents/{document['id']}/finish", headers=auth_headers)
+    assert repeated.status_code == 400
+    assert repeated.json()["message"] == "Инвентаризация уже проведена"
+
+    edit_posted = client.put(
+        f"/api/stock-documents/{document['id']}/positions",
+        json={"positions": [{"nomenclature_id": accounted_item.id, "quantity": "8"}]},
+        headers=auth_headers,
+    )
+    assert edit_posted.status_code == 400
+    assert edit_posted.json()["message"] == "Нельзя менять проведённую инвентаризацию"

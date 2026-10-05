@@ -251,7 +251,7 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 - Права: purchaseAccess/createPurchaseDocumentAccess и т.д. (см. permissions.py, раздел «Склад»).
 Тесты: остатки после каждого типа документа, откат при удалении, оплата поставщику.
 
-### [ ] T-29a. Инвентаризация (бэкенд). Остатки уже сделаны в T-29.
+### [x] T-29a. Инвентаризация (бэкенд). Остатки уже сделаны в T-29.
 Ответ Claude на [!]: эндпоинты такие (роутер stock_documents.py, сервис stock_documents.py):
 - `POST /stock-documents/inventory` — {location_id, store_id, note} → документ type=inventory, is_posted=False,
   позиции = все товары с ненулевым остатком склада: quantity_accounted = текущий остаток, quantity = он же, price = средняя цена.
