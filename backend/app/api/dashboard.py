@@ -13,7 +13,7 @@ from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids
 from app.db import utcnow
-from app.models import CashRegister, Employee, HowKnow, Order, OrderStatus, StatusGroup, Transaction
+from app.models import CashItem, CashItemType, CashRegister, Employee, HowKnow, Order, OrderStatus, StatusGroup, Transaction
 
 router = APIRouter(prefix="/dashboard", tags=["Главная"])
 
@@ -112,7 +112,15 @@ def _finance_block(db: DbSession, allowed: set[int], period_from: datetime, peri
         (t.amount for t in transactions if t.is_income and (t.order_id is not None or t.sale_id is not None)),
         Decimal("0"),
     )
-    expense = sum((t.amount for t in transactions if not t.is_income), Decimal("0"))
+    # Перемещения между кассами и инкассация — не расход бизнеса
+    internal = set(
+        db.scalars(
+            select(CashItem.id).where(
+                CashItem.type.in_([CashItemType.MOVE_FROM, CashItemType.PRODUCT_MOVE_FROM, CashItemType.COLLECTION])
+            )
+        )
+    )
+    expense = sum((t.amount for t in transactions if not t.is_income and t.cash_item_id not in internal), Decimal("0"))
 
     return {
         "income": income,

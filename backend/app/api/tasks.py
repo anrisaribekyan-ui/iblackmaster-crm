@@ -84,6 +84,10 @@ def _get_task(db: DbSession, me: CurrentEmployee, task_id: int) -> Task:
     scope = _ensure_scope(me)
     if scope == "own" and task.author_id != me.id and task.assignee_id != me.id:
         raise NotFound("Задача")
+    if scope != "own" and task.location_id is not None:
+        allowed = location_ids(me)
+        if allowed and task.location_id not in allowed and me.id not in (task.author_id, task.assignee_id):
+            raise NotFound("Задача")
     return task
 
 

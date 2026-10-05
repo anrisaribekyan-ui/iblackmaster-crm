@@ -81,3 +81,22 @@ def test_dashboard_finance_null_without_right(client, db):
     assert body["finance"] is None
     assert body["orders"]["closed"] is None
     assert body["overdue"] is None
+
+
+def test_dashboard_money_move_is_not_expense(client, auth_headers, db):
+    from decimal import Decimal
+
+    from app.models import CashRegister
+    from app.services import money
+
+    registers = [r for r in db.scalars(select(CashRegister).where(CashRegister.is_active.is_(True)).order_by(CashRegister.id)) if r.accepts_cash]
+    source, target = registers[0], registers[1]
+    owner = db.scalars(select(Employee).where(Employee.is_owner.is_(True))).one()
+    money.create_transaction(db, cash_register_id=source.id, cash_item=money.get_system_item(db, "order", True), amount=Decimal("1000"), created_by_id=owner.id)
+    db.commit()
+    before = client.get("/api/dashboard", headers=auth_headers).json()["finance"]["expense"]
+    r = client.post("/api/transactions/move", headers=auth_headers, json={
+        "from_register_id": source.id, "to_register_id": target.id, "amount": "100"})
+    assert r.status_code == 200, r.text
+    after = client.get("/api/dashboard", headers=auth_headers).json()["finance"]["expense"]
+    assert Decimal(str(after)) == Decimal(str(before))

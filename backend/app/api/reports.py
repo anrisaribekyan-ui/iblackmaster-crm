@@ -302,7 +302,7 @@ def report_stock_value(
     query = (
         select(StockBalance, Store)
         .join(Store, Store.id == StockBalance.store_id)
-        .where(Store.is_active.is_(True))
+        .where(Store.is_active.is_(True), StockBalance.quantity > 0)
     )
     if allowed:
         query = query.where(Store.location_id.in_(allowed))
