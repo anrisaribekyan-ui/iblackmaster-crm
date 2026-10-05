@@ -130,6 +130,13 @@ class OrderComment(BaseModel):
     text: str = Field(min_length=1)
 
 
+class OrderPayment(BaseModel):
+    cash_register_id: int
+    amount: Decimal = Field(gt=Decimal("0"))
+    is_bank: bool = False
+    note: str | None = None
+
+
 class OrderCreateOut(BaseModel):
     id: int
     number: str
@@ -767,3 +774,68 @@ def get_order_history(order_id: int, db: DbSession, me: CurrentEmployee):
             }
         )
     return result
+
+
+def get_order_cash_register(db: DbSession, me: CurrentEmployee, register_id: int) -> CashRegister:
+    register = db.get(CashRegister, register_id)
+    if register is None or not register.is_active:
+        raise NotFound("Касса")
+    if register.location_id is not None:
+        check_location(me, register.location_id)
+    return register
+
+
+@router.post(
+    "/{order_id}/payments",
+    dependencies=[Depends(require("operationCashRegisterAccess"))],
+)
+def pay_order(order_id: int, data: OrderPayment, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me)
+    register = get_order_cash_register(db, me, data.cash_register_id)
+    if register.location_id is not None:
+        check_location(me, register.location_id)
+    transaction = order_service.pay(
+        db,
+        order,
+        me,
+        cash_register_id=register.id,
+        amount=data.amount,
+        is_bank=data.is_bank,
+        note=data.note,
+    )
+    db.commit()
+    return {"id": transaction.id, "amount": transaction.amount, "debt": order.debt}
+
+
+@router.post(
+    "/{order_id}/refunds",
+    dependencies=[Depends(require("returnOrderProductAccess"))],
+)
+def refund_order(order_id: int, data: OrderPayment, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me)
+    register = get_order_cash_register(db, me, data.cash_register_id)
+    transaction = order_service.refund(
+        db,
+        order,
+        me,
+        cash_register_id=register.id,
+        amount=data.amount,
+        is_bank=data.is_bank,
+        note=data.note,
+    )
+    db.commit()
+    return {"id": transaction.id, "amount": transaction.amount, "debt": order.debt}
+
+
+@router.delete(
+    "/{order_id}/payments/{tx_id}",
+    status_code=204,
+    dependencies=[Depends(require("changeTransactionAccess"))],
+)
+def delete_order_payment(order_id: int, tx_id: int, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me)
+    transaction = db.get(Transaction, tx_id)
+    if transaction is None or transaction.is_deleted or transaction.order_id != order.id:
+        raise NotFound("Оплата заказа")
+    order_service.delete_payment(db, order, transaction, me)
+    db.commit()

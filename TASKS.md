@@ -205,7 +205,7 @@ is_deleted=True + история `deleted`; `POST /orders/{id}/restore` — об
 - `GET /orders/{id}/history` — лента с именем сотрудника, названием и цветом статуса.
 Тесты: смена статуса пишет историю, required-комментарий, закрытие неоплаченного → 400.
 
-### [ ] T-25. API: оплаты заказа
+### [x] T-25. API: оплаты заказа
 - `POST /orders/{id}/payments` — {cash_register_id, amount, is_bank, note} → `orders.pay`
   (право operationCashRegisterAccess; касса — доступной локации или глобальная).
 - `POST /orders/{id}/refunds` — returnOrderProductAccess → `orders.refund`.
