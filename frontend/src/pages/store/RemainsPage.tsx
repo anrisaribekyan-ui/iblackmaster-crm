@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import { inputClass, money, qty, useLocationsAndRegisters } from '../shared'
+import { downloadCsv } from '../../csv'
 
 type Remain = {
   store_id: number
@@ -49,6 +50,18 @@ export default function RemainsPage() {
   const stores = locations.find((l) => String(l.id) === locationId)?.stores ?? []
   const total = (rows ?? []).reduce((sum, r) => sum + Number(r.total ?? 0), 0)
 
+  const exportCsv = () => {
+    if (!rows) return
+    const headers = ['Код', 'Артикул', 'Товар', 'Склад', 'Кол-во']
+    if (showPrice) headers.push('Ср. закуп', 'Сумма')
+    const data = rows.map((r) => {
+      const line: (string | number)[] = [r.code, r.article ?? '', r.name, r.store_name, Number(r.quantity)]
+      if (showPrice) line.push(Number(r.avg_purchase_price ?? 0), Number(r.total ?? 0))
+      return line
+    })
+    downloadCsv('остатки.csv', headers, data)
+  }
+
   return (
     <div>
       <form onSubmit={(e) => void load(e)} className="mb-4 flex flex-wrap items-end gap-2">
@@ -66,6 +79,7 @@ export default function RemainsPage() {
         </label>
         <input className={`${inputClass} min-w-48 flex-1`} placeholder="Товар, артикул или код" value={search} onChange={(e) => setSearch(e.target.value)} />
         <button className="rounded-md border border-line bg-surface px-3 py-2">Найти</button>
+        <button type="button" className="rounded-md border border-line bg-surface px-3 py-2" onClick={exportCsv}>Скачать CSV</button>
         <label className="flex items-center gap-2 px-2 py-2 text-sm">
           <input type="checkbox" checked={onlyPositive} onChange={(e) => setOnlyPositive(e.target.checked)} /> Только в наличии
         </label>

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { formatPhone } from '../format'
 import { useAuth } from '../auth'
+import { downloadCsv } from '../csv'
 
 type Tab = 'new' | 'inWork' | 'wait' | 'finish' | 'closed' | 'all'
 type OrderRow = {
@@ -129,6 +130,41 @@ export default function OrdersPage() {
     void loadOrders()
   }, [loadOrders, searchParams])
 
+  const exportCsv = async () => {
+    setError('')
+    try {
+      const base = new URLSearchParams(queryString)
+      base.delete('page')
+      const all: OrderRow[] = []
+      let page = 1
+      while (true) {
+        base.set('page', String(page))
+        const result = await api.get<OrderList>(`/orders?${base.toString()}`)
+        all.push(...result.items)
+        if (all.length >= result.total || result.items.length === 0) break
+        page += 1
+      }
+      const headers = ['Заказ', 'Статус', 'Крайний срок', 'Менеджер', 'Создан', 'Тип заказа', 'Устройство', 'Неисправность', 'Контрагент', 'Телефон', 'Сумма', 'Оплачено']
+      const rows = all.map((order) => [
+        order.number,
+        order.status.name,
+        order.deadline ? formatDate(order.deadline) : '',
+        order.manager ?? '',
+        formatDate(order.created_at),
+        orderTypes.find((type) => type.id === order.order_type_id)?.name ?? '',
+        [order.brand, order.model].filter(Boolean).join(' '),
+        order.problems?.join(', ') ?? '',
+        order.counteragent.name,
+        formatPhone(order.counteragent.phones),
+        Number(order.total_price) || 0,
+        Number(order.paid) || 0,
+      ])
+      downloadCsv('заказы.csv', headers, rows)
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Не удалось выгрузить заказы')
+    }
+  }
+
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setParam('q', search.trim())
@@ -156,6 +192,7 @@ export default function OrdersPage() {
             {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
           </select>
           {can('createOrderAccess') && <Link className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" to="/orders/new">Создать</Link>}
+          <button className="rounded-md border border-line bg-surface px-3 py-2" onClick={() => void exportCsv()}>Скачать CSV</button>
         </div>
       </header>
       <form onSubmit={submitSearch} className="mb-3 flex gap-2">

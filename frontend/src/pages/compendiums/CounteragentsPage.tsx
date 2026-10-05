@@ -4,6 +4,7 @@ import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
 import { formatDateTime, money } from '../shared'
+import { downloadCsv } from '../../csv'
 
 type Counteragent = {
   id: number
@@ -159,6 +160,36 @@ export default function CounteragentsPage() {
     }
   }
 
+  const exportCsv = async () => {
+    setError('')
+    try {
+      const all: Counteragent[] = []
+      let page = 1
+      while (true) {
+        const params = new URLSearchParams({ page: String(page) })
+        if (search.trim()) params.set('q', search.trim())
+        const result = await api.get<CounteragentPage>(`/counteragents?${params.toString()}`)
+        all.push(...result.items)
+        if (all.length >= result.total || result.items.length === 0) break
+        page += 1
+      }
+      const headers = ['Имя', 'Телефоны', 'Email', 'Адрес', 'Баланс', 'Покупатель', 'Поставщик', 'Примечание']
+      const rows = all.map((item) => [
+        item.name,
+        formatPhoneList(item.phones),
+        item.email ?? '',
+        item.address ?? '',
+        Number(item.balance) || 0,
+        item.is_buyer ? 'да' : 'нет',
+        item.is_vendor ? 'да' : 'нет',
+        item.note ?? '',
+      ])
+      downloadCsv('контрагенты.csv', headers, rows)
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Не удалось выгрузить контрагентов')
+    }
+  }
+
   const typeNames = new Map(types.map((item) => [item.id, item.name]))
 
   return (
@@ -170,6 +201,7 @@ export default function CounteragentsPage() {
       <form className="mb-3 flex gap-2" onSubmit={(event) => { event.preventDefault(); setPage(1); void load(search, 1) }}>
         <input className={`${inputClass} max-w-sm`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Имя или телефон" />
         <button className="rounded-md border border-line bg-surface px-3 py-2">Найти</button>
+        <button type="button" className="rounded-md border border-line bg-surface px-3 py-2" onClick={() => void exportCsv()}>Скачать CSV</button>
       </form>
       {error && <p role="alert" className="mb-3 rounded-md border border-danger p-3 text-danger">{error}</p>}
       {loading ? (

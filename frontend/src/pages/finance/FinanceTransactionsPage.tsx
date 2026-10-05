@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
+import { downloadCsv } from '../../csv'
 
 type Location = { id: number; name: string }
 type CashRegister = { id: number; location_id: number | null; name: string }
@@ -119,6 +120,40 @@ export default function FinanceTransactionsPage() {
     id === null ? 'Общие' : locations.find((location) => location.id === id)?.name ?? '—'
   const pageCount = Math.max(1, Math.ceil((data?.total ?? 0) / 50))
 
+  const exportCsv = async () => {
+    setError('')
+    try {
+      const params = new URLSearchParams()
+      if (filters.locationId) params.set('location_id', filters.locationId)
+      if (filters.registerId) params.set('cash_register_id', filters.registerId)
+      if (filters.itemId) params.set('cash_item_id', filters.itemId)
+      if (filters.dateFrom) params.set('date_from', filters.dateFrom)
+      if (filters.dateTo) params.set('date_to', filters.dateTo)
+      if (filters.deleted && canViewDeleted) params.set('deleted', 'true')
+      const all: Transaction[] = []
+      let page = 1
+      while (true) {
+        params.set('page', String(page))
+        const result = await api.get<TransactionPage>(`/transactions?${params.toString()}`)
+        all.push(...result.items)
+        if (all.length >= result.total || result.items.length === 0) break
+        page += 1
+      }
+      const headers = ['Дата', 'Касса', 'Статья', 'Тип', 'Сумма', 'Комментарий']
+      const rows = all.map((tx) => [
+        formatDate(tx.date),
+        `${locationLabel(tx.location_id)} · ${tx.cash_register_name ?? 'Касса'}`,
+        tx.cash_item_name ?? '',
+        tx.is_bank ? 'Безнал' : 'Наличные',
+        `${tx.is_income ? '' : '-'}${Number(tx.amount)}`,
+        tx.note ?? '',
+      ])
+      downloadCsv('транзакции.csv', headers, rows)
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Не удалось выгрузить транзакции')
+    }
+  }
+
   return (
     <section>
       {!can('transactionAccess') ? (
@@ -203,6 +238,7 @@ export default function FinanceTransactionsPage() {
                 </table>
               </div>
               <footer className="mt-3 flex items-center justify-between gap-3">
+                <button className="rounded-md border border-line bg-surface px-3 py-1.5" onClick={() => void exportCsv()}>Скачать CSV</button>
                 <span className="text-sm text-muted">Всего: {data.total}</span>
                 <div className="flex items-center gap-2">
                   <button disabled={page <= 1} className="rounded-md border border-line bg-surface px-3 py-1.5 disabled:opacity-50" onClick={() => setPage((current) => current - 1)}>Назад</button>
