@@ -120,6 +120,10 @@ class OrderPositionPrice(BaseModel):
     purchase_price: Decimal | None = None
 
 
+class OrderDeleteIn(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+
 class OrderDiscount(BaseModel):
     discount_percent: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("100"))
     discount_sum: Rubles | None = Field(default=None, ge=Decimal("0"))
@@ -362,8 +366,9 @@ def list_orders(
     query = select(Order, OrderStatus, Counteragent).join(OrderStatus).join(Counteragent)
     if deleted:
         query = query.where(Order.is_deleted.is_(True))
-    else:
+    elif not has_permission(me, "viewDeleteOrderAccess"):
         query = query.where(Order.is_deleted.is_(False))
+    # Кто может видеть удалённые — видит их в общем списке перечёркнутыми (след остаётся), но в счётчиках вкладок их нет
 
     allowed = location_ids(me)
     if allowed:
@@ -420,8 +425,9 @@ def list_orders(
         rows = [row for row in rows if matches(row)]
 
     counts = {group.value: 0 for group in StatusGroup}
-    for _, status, _ in rows:
-        counts[StatusGroup(status.group).value] += 1
+    for order_row, status, _ in rows:
+        if not order_row.is_deleted:
+            counts[StatusGroup(status.group).value] += 1
 
     if tab != "all":
         rows = [row for row in rows if StatusGroup(row[1].group).value == tab]
@@ -450,6 +456,7 @@ def list_orders(
                 "paid": order.paid,
                 "approximate_price": order.approximate_price,
                 "is_urgent": order.is_urgent,
+                "is_deleted": order.is_deleted,
             }
         )
     return OrderListOut(items=items, total=total, counts=counts)
@@ -500,7 +507,7 @@ def create_order(data: OrderCreate, db: DbSession, me: CurrentEmployee):
 
 @router.get("/{order_id}", response_model=OrderDetailOut)
 def get_order(order_id: int, db: DbSession, me: CurrentEmployee):
-    order = get_order_for_employee(db, order_id, me)
+    order = get_order_for_employee(db, order_id, me, include_deleted=has_permission(me, "viewDeleteOrderAccess"))
 
     status = db.get(OrderStatus, order.status_id)
     order_type = db.get(OrderType, order.order_type_id)
@@ -615,11 +622,9 @@ def update_order(order_id: int, data: OrderUpdate, db: DbSession, me: CurrentEmp
     "/{order_id}",
     dependencies=[Depends(require("deleteOrderAccess"))],
 )
-def soft_delete_order(order_id: int, db: DbSession, me: CurrentEmployee):
+def soft_delete_order(order_id: int, db: DbSession, me: CurrentEmployee, data: OrderDeleteIn | None = None):
     order = get_order_for_employee(db, order_id, me)
-    order.is_deleted = True
-    order_service.add_history(db, order, "deleted", me)
-    salary_service.recalc_order(db, order)
+    order_service.delete_order(db, order, me, data.reason if data else None)
     db.commit()
     return {"ok": True}
 
@@ -630,11 +635,7 @@ def soft_delete_order(order_id: int, db: DbSession, me: CurrentEmployee):
 )
 def restore_order(order_id: int, db: DbSession, me: CurrentEmployee):
     order = get_order_for_employee(db, order_id, me, include_deleted=True)
-    if not order.is_deleted:
-        raise BusinessError("Заказ не удалён")
-    order.is_deleted = False
-    order_service.add_history(db, order, "restored", me)
-    salary_service.recalc_order(db, order)
+    order_service.restore_order(db, order, me)
     db.commit()
     return {"ok": True}
 

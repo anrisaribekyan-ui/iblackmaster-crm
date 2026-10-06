@@ -77,6 +77,7 @@ type OrderDetail = {
     paid: string
     discount_percent: string
     discount_sum: string
+    is_deleted?: boolean
   }
   status: Status
   order_type: { id: number; name: string }
@@ -158,6 +159,8 @@ export default function OrderDetailPage() {
   const [stores, setStores] = useState<Store[]>([])
   const [masters, setMasters] = useState<Employee[]>([])
   const [howKnows, setHowKnows] = useState<{ id: number; name: string }[]>([])
+  const [deleting, setDeleting] = useState(false)
+  const [deleteReason, setDeleteReason] = useState('')
   useEffect(() => {
     api.get<{ id: number; name: string }[]>('/how-knows').then(setHowKnows).catch(() => setHowKnows([]))
   }, [])
@@ -285,6 +288,19 @@ export default function OrderDetailPage() {
     }
   }
 
+  const deleteOrder = async () => {
+    if (!detail) return
+    if (await run(() => api.del(`/orders/${detail.order.id}`, { reason: deleteReason.trim() || null }), 'Не удалось удалить заказ')) {
+      setDeleting(false)
+      setDeleteReason('')
+    }
+  }
+
+  const restoreOrder = async () => {
+    if (!detail) return
+    await run(() => api.post(`/orders/${detail.order.id}/restore`), 'Не удалось восстановить заказ')
+  }
+
   const changeStatus = async (status: Status, commentText?: string) => {
     if (!detail) return
     await run(
@@ -301,7 +317,8 @@ export default function OrderDetailPage() {
     void changeStatus(status, commentText)
   }
 
-  const isClosed = detail?.status.group === 'closed'
+  // Выданный или удалённый заказ не редактируется
+  const isClosed = detail?.status.group === 'closed' || Boolean(detail?.order.is_deleted)
   // Себестоимость видна с правом просмотра закупочных цен, редактируется с правом orderPurchasePriceAccess
   const canSeeCost = can('purchasePriceAccess') || can('orderPurchasePriceAccess')
 
@@ -575,18 +592,22 @@ export default function OrderDetailPage() {
   const activeRegisters = cashRegisters.filter((register) => register.accepts_cash || register.accepts_bank)
   const selectedRegister = activeRegisters.find((register) => String(register.id) === paymentRegisterId)
 
+  const isDeleted = Boolean(detail.order.is_deleted)
+  const deletedEvent = isDeleted ? [...detail.history].reverse().find((item) => item.title === 'Заказ удалён') : undefined
+
   return (
     <section>
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <Link className="text-muted hover:text-ink" to="/orders">← Заказы</Link>
-          <h1 className="text-xl font-semibold">{detail.order.number}</h1>
+          <h1 className={`text-xl font-semibold ${isDeleted ? 'text-muted line-through decoration-danger decoration-2' : ''}`}>{detail.order.number}</h1>
           <select
             aria-label="Статус заказа"
             className="rounded-full border border-line bg-surface px-3 py-1.5"
             style={{ color: detail.status.color }}
             value={detail.status.id}
             onChange={(event) => selectStatus(event.target.value)}
+            disabled={isDeleted}
           >
             {statusGroups.map((group) => (
               <optgroup key={group.group} label={group.title}>
@@ -603,9 +624,44 @@ export default function OrderDetailPage() {
               <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={printAct}>Акт выдачи</button>
             </div>
           </details>
-          {detail.status.group !== 'closed' && <button className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" onClick={giveOrder}>Выдать</button>}
+          {!isDeleted && detail.status.group !== 'closed' && <button className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" onClick={giveOrder}>Выдать</button>}
+          {!isDeleted && can('deleteOrderAccess') && (
+            <button className="rounded-md border border-line bg-surface px-3 py-2 text-danger" onClick={() => setDeleting(true)}>Удалить</button>
+          )}
         </span>
       </header>
+      {isDeleted && (
+        <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#fecdca] bg-[#fef3f2] px-4 py-3">
+          <div className="text-sm">
+            <p className="font-medium text-danger">Заказ удалён</p>
+            <p className="text-ink">
+              {deletedEvent ? `${deletedEvent.employee_name ?? 'Система'}, ${formatDate(deletedEvent.created_at)}` : ''}
+              {deletedEvent?.text ? ` · Причина: ${deletedEvent.text}` : ''}
+            </p>
+            <p className="text-muted">Заказ сохранён для истории: его нельзя менять, запчасти возвращены на склад, зарплата по нему снята.</p>
+          </div>
+          {can('deleteOrderAccess') && (
+            <button disabled={saving} className="rounded-md border border-line bg-surface px-3 py-2 font-medium" onClick={() => void restoreOrder()}>Восстановить</button>
+          )}
+        </div>
+      )}
+      {deleting && (
+        <Modal title={`Удалить заказ ${detail.order.number}?`} onClose={() => setDeleting(false)}>
+          <div className="grid gap-3">
+            <p className="text-sm text-muted">
+              Заказ не пропадёт: он останется в списке перечёркнутым, с историей и причиной удаления. Запчасти вернутся на склад.
+              Если по заказу были оплаты — сначала оформите возврат денег.
+            </p>
+            <label className="grid gap-1 text-sm text-muted">Причина
+              <textarea className={inputClass} rows={2} value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} placeholder="Например: клиент передумал, дубль заказа" />
+            </label>
+            <div className="flex justify-end gap-2">
+              <button type="button" className="rounded-md border border-line bg-surface px-3 py-2" onClick={() => setDeleting(false)}>Отмена</button>
+              <button type="button" disabled={saving} className="rounded-md bg-danger px-3 py-2 font-medium text-white disabled:opacity-60" onClick={() => void deleteOrder()}>Удалить заказ</button>
+            </div>
+          </div>
+        </Modal>
+      )}
       {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0">
@@ -617,7 +673,7 @@ export default function OrderDetailPage() {
             <section className="rounded-xl border border-line bg-surface p-4">
               <header className="mb-4 flex items-center justify-between gap-3">
                 <h2 className="font-semibold">Информация о заказе</h2>
-                {can('changeOrderInfoAccess') && <button className="text-sm text-accent" onClick={() => setEditingInfo(true)}>Изменить</button>}
+                {can('changeOrderInfoAccess') && !isDeleted && <button className="text-sm text-accent" onClick={() => setEditingInfo(true)}>Изменить</button>}
               </header>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Info label="Клиент" value={detail.counteragent.name} />
@@ -751,8 +807,8 @@ export default function OrderDetailPage() {
             <header className="mb-3 flex items-center justify-between"><h2 className="font-semibold">Оплаты</h2><strong className="num">{formatMoney(detail.order.paid)}</strong></header>
             <p className="mb-3 text-sm text-muted">Долг: <strong className="text-ink num">{formatMoney(detail.debt)}</strong></p>
             <div className="flex flex-wrap gap-2">
-              {can('operationCashRegisterAccess') && <button className="rounded-md bg-accent px-3 py-2 text-sm text-accent-ink" onClick={() => openPayment('payment')}>Принять оплату</button>}
-              {can('returnOrderProductAccess') && <button className="rounded-md border border-line px-3 py-2 text-sm" onClick={() => openPayment('refund')}>Возврат</button>}
+              {can('operationCashRegisterAccess') && !detail.order.is_deleted && <button className="rounded-md bg-accent px-3 py-2 text-sm text-accent-ink" onClick={() => openPayment('payment')}>Принять оплату</button>}
+              {can('returnOrderProductAccess') && !detail.order.is_deleted && <button className="rounded-md border border-line px-3 py-2 text-sm" onClick={() => openPayment('refund')}>Возврат</button>}
             </div>
             {detail.transactions.length > 0 && (
               <ul className="mt-4 divide-y divide-line">

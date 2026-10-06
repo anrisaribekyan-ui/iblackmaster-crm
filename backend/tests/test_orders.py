@@ -342,7 +342,12 @@ def test_order_delete_and_restore(client, auth_headers, db, owner):
 
     assert client.delete(f"/api/orders/{order.id}", headers=auth_headers).status_code == 200
     assert db.get(Order, order.id).is_deleted is True
-    assert client.get(f"/api/orders/{order.id}", headers=auth_headers).status_code == 404
+    # Владелец видит удалённый заказ (след остаётся), в списке — с пометкой, в счётчиках вкладок — нет
+    detail = client.get(f"/api/orders/{order.id}", headers=auth_headers)
+    assert detail.status_code == 200 and detail.json()["order"]["is_deleted"] is True
+    listing = client.get("/api/orders", headers=auth_headers).json()
+    assert [i["is_deleted"] for i in listing["items"] if i["id"] == order.id] == [True]
+    assert sum(listing["counts"].values()) == 0
     assert client.post(f"/api/orders/{order.id}/restore", headers=auth_headers).status_code == 200
     assert db.get(Order, order.id).is_deleted is False
 
@@ -716,3 +721,34 @@ def test_manual_work_purchase_price(client, auth_headers, db, owner):
         headers=headers,
     )
     assert forbidden.status_code == 403
+
+
+def test_order_delete_rules_and_stock(client, auth_headers, db, owner):
+    from app.services import stock as stock_service
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    store = location.stores[0]
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    status = db.scalars(select(OrderStatus).where(OrderStatus.group == StatusGroup.NEW)).first()
+    customer = Counteragent(name="Удаление со складом")
+    product = Nomenclature(code=880077, name="Дисплей", is_work=False)
+    db.add_all([customer, product])
+    db.flush()
+    stock_service.receive(db, store.id, product.id, Decimal("2"), Decimal("1000"))
+    order = add_order(db, owner=owner, location=location, order_type=order_type, counteragent=customer, status=status, number="DEL-STOCK")
+    client.post(f"/api/orders/{order.id}/positions", json={"nomenclature_id": product.id, "price": "3000", "store_id": store.id}, headers=auth_headers)
+    balance = lambda: db.scalars(select(StockBalance).where(StockBalance.store_id == store.id, StockBalance.nomenclature_id == product.id)).one().quantity
+    assert balance() == Decimal("1")
+
+    r = client.request("DELETE", f"/api/orders/{order.id}", json={"reason": "Клиент передумал"}, headers=auth_headers)
+    assert r.status_code == 200, r.text
+    assert balance() == Decimal("2")  # запчасть вернулась на склад
+    history = client.get(f"/api/orders/{order.id}", headers=auth_headers).json()["history"]
+    assert any(h["title"] == "Заказ удалён" and h["text"] == "Клиент передумал" for h in history)
+
+    assert client.post(f"/api/orders/{order.id}/restore", headers=auth_headers).status_code == 200
+    assert balance() == Decimal("1")  # снова списана
+
+    db.get(Order, order.id).paid = Decimal("500")
+    db.commit()
+    blocked = client.delete(f"/api/orders/{order.id}", headers=auth_headers)
+    assert blocked.status_code == 400 and "возврат" in blocked.json()["message"]

@@ -24,6 +24,7 @@ type OrderRow = {
   paid: string
   approximate_price: string | null
   is_urgent: boolean
+  is_deleted?: boolean
 }
 type OrderList = { items: OrderRow[]; total: number; counts: Record<Exclude<Tab, 'all'>, number> }
 type Location = { id: number; name: string }
@@ -289,8 +290,11 @@ export default function OrdersPage() {
                 {data.items.map((order) => {
                   const overdue = order.deadline && new Date(order.deadline).getTime() < Date.now() && order.status.group !== 'closed'
                   return (
-                    <tr key={order.id} className="border-t border-line hover:bg-canvas">
-                      <td className="px-3 py-2"><Link to={`/orders/${order.id}`} className="font-medium text-accent hover:underline">{order.is_urgent && <span aria-label="Срочный заказ" title="Срочный" className="mr-1 text-danger">●</span>}{order.number}</Link></td>
+                    <tr key={order.id} className={`border-t border-line hover:bg-canvas ${order.is_deleted ? 'text-muted line-through decoration-[#98a2b3] [&_td]:opacity-70' : ''}`}>
+                      <td className="px-3 py-2">
+                        <Link to={`/orders/${order.id}`} className={`font-medium hover:underline ${order.is_deleted ? 'text-muted' : 'text-accent'}`}>{order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" title="Срочный" className="mr-1 text-danger">●</span>}{order.number}</Link>
+                        {order.is_deleted && <span className="ml-2 inline-block rounded bg-[#fef3f2] px-1.5 py-0.5 text-xs font-medium text-danger no-underline [text-decoration:none]">удалён</span>}
+                      </td>
                       <td className="px-3 py-2"><span className="whitespace-nowrap rounded-full px-2 py-1 text-xs" style={{ color: order.status.color, backgroundColor: `${order.status.color}22` }}>{order.status.name}</span></td>
                       <td className={`hidden px-3 py-2 whitespace-nowrap md:table-cell ${overdue ? 'font-medium text-danger' : ''}`}>{formatDate(order.deadline)}</td>
                       <td className="hidden px-3 py-2 md:table-cell">{order.manager ?? '—'}</td>

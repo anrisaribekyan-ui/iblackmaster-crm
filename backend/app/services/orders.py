@@ -200,6 +200,38 @@ def update_position_price(
     salary.recalc_order(db, order)
 
 
+# --- Удаление ----------------------------------------------------------------------
+
+
+def delete_order(db: Session, order: Order, employee: Employee, reason: str | None = None) -> None:
+    """Мягкое удаление: заказ остаётся в базе (перечёркнут в списке), запчасти возвращаются на склад,
+    зарплата по нему снимается. Деньги должны быть возвращены заранее — иначе разъедутся кассы."""
+    if order.is_deleted:
+        raise BusinessError("Заказ уже удалён")
+    if order.status.group == StatusGroup.CLOSED:
+        raise BusinessError("Заказ выдан. Сначала верните его в работу")
+    if order.paid != 0:
+        raise BusinessError(f"По заказу есть оплата {order.paid} руб. Сначала оформите возврат денег")
+    for position in order.positions:
+        if position.store_id and position.nomenclature_id and not position.is_work:
+            stock.return_to_stock(db, position.store_id, position.nomenclature_id, position.quantity, position.purchase_price)
+    order.is_deleted = True
+    add_history(db, order, "deleted", employee, text=(reason or "").strip() or None)
+    salary.recalc_order(db, order)
+
+
+def restore_order(db: Session, order: Order, employee: Employee) -> None:
+    """Восстановление: запчасти снова списываются со склада (если их уже нет — ошибка, ничего не меняется)."""
+    if not order.is_deleted:
+        raise BusinessError("Заказ не удалён")
+    for position in order.positions:
+        if position.store_id and position.nomenclature_id and not position.is_work:
+            stock.write_off(db, position.store_id, position.nomenclature_id, position.quantity)
+    order.is_deleted = False
+    add_history(db, order, "restored", employee)
+    salary.recalc_order(db, order)
+
+
 # --- Статусы -----------------------------------------------------------------------
 
 
