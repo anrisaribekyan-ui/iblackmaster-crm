@@ -181,7 +181,7 @@ export default function OrdersPage() {
     <section>
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Заказы</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select
             aria-label="Локация"
             className={filterInput}
@@ -192,7 +192,7 @@ export default function OrdersPage() {
             {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
           </select>
           {can('createOrderAccess') && <Link className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" to="/orders/new">Создать</Link>}
-          <button className="rounded-md border border-line bg-surface px-3 py-2" onClick={() => void exportCsv()}>Скачать CSV</button>
+          <button className="hidden whitespace-nowrap rounded-md border border-line bg-surface px-3 py-2 sm:block" onClick={() => void exportCsv()}>Скачать CSV</button>
         </div>
       </header>
       <form onSubmit={submitSearch} className="mb-3 flex gap-2">

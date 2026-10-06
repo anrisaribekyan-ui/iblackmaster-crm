@@ -136,9 +136,9 @@ function fieldValue(field: FormField, detail: OrderDetail) {
   return value ?? ''
 }
 
-function displayValue(field: FormField, detail: OrderDetail, masters: Employee[], managers: Employee[]) {
+function displayValue(field: FormField, detail: OrderDetail, masters: Employee[], managers: Employee[], howKnows: { id: number; name: string }[] = []) {
   const value = fieldValue(field, detail)
-  if (field.key === 'howKnow') return String(value || '—')
+  if (field.key === 'howKnow') return value ? howKnows.find((item) => item.id === Number(value))?.name ?? '—' : '—'
   if (field.key === 'master') return masters.find((item) => item.id === Number(value))?.short_name ?? '—'
   if (field.key === 'manager') return managers.find((item) => item.id === Number(value))?.short_name ?? '—'
   if (field.key === 'prepayment' || field.key === 'isUrgent') return value ? 'Да' : 'Нет'
@@ -157,6 +157,10 @@ export default function OrderDetailPage() {
   const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([])
   const [stores, setStores] = useState<Store[]>([])
   const [masters, setMasters] = useState<Employee[]>([])
+  const [howKnows, setHowKnows] = useState<{ id: number; name: string }[]>([])
+  useEffect(() => {
+    api.get<{ id: number; name: string }[]>('/how-knows').then(setHowKnows).catch(() => setHowKnows([]))
+  }, [])
   const [managers, setManagers] = useState<Employee[]>([])
   const [tab, setTab] = useState<'info' | 'positions'>('info')
   const [editingInfo, setEditingInfo] = useState(false)
@@ -621,7 +625,7 @@ export default function OrderDetailPage() {
                 <Info label="Тип заказа" value={detail.order_type.name} />
                 <Info label="Статус" value={detail.status.name} />
                 {fields.filter((field) => field.is_visible && field.key !== 'name' && field.key !== 'phones').map((field) => (
-                  <Info key={field.id} label={field.label} value={displayValue(field, detail, masters, managers)} />
+                  <Info key={field.id} label={field.label} value={displayValue(field, detail, masters, managers, howKnows)} />
                 ))}
               </div>
             </section>

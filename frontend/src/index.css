@@ -4,15 +4,23 @@
    вида bg-surface, text-muted, border-line (они объявлены ниже через @theme). */
 @theme {
   --color-surface: #ffffff;
-  --color-canvas: #f4f5f7;
-  --color-ink: #1d1f23;
-  --color-muted: #6b7280;
-  --color-line: #e3e5e8;
-  --color-accent: #e64823; /* фирменный цвет точки Панфиловский */
+  --color-canvas: #eef0f3; /* рабочая область: холодный светло-серый, глаз не устаёт за смену */
+  --color-ink: #16181d;
+  --color-muted: #667085;
+  --color-line: #e2e5ea;
+  --color-accent: #e64823; /* фирменный оранжевый iBlackMaster — только главные действия и активный раздел */
+  --color-accent-hover: #cf3d1b;
+  --color-accent-soft: #fdeee9;
   --color-accent-ink: #ffffff;
   --color-danger: #d92d20;
   --color-success: #12a150;
-  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Графитовая боковая панель — «Black» из названия */
+  --color-rail: #1c1f24;
+  --color-rail-ink: #c9ced6;
+  --color-rail-muted: #7d8590;
+  --color-rail-hover: #272b31;
+  --font-sans: "Onest Variable", "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --radius-md: 0.5rem;
 }
 
 html,
@@ -26,10 +34,99 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Денежные и числовые колонки — моноширинные цифры, чтобы суммы выравнивались */
-.num {
+/* Единый вид всех полей ввода по всей CRM (страницы задают только раскладку) */
+@layer base {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    border-color: var(--color-line);
+    border-radius: 0.5rem;
+    background-color: var(--color-surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select {
+    min-height: 2.5rem;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: #98a2b3;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):hover,
+  select:hover,
+  textarea:hover {
+    border-color: #c5cad3;
+  }
+  input:focus,
+  select:focus,
+  textarea:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgb(230 72 35 / 0.15);
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--color-accent);
+    width: 1rem;
+    height: 1rem;
+  }
+  button {
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  /* Таблицы: тихая шапка, строки с подсветкой при наведении */
+  thead th {
+    font-weight: 500;
+    color: var(--color-muted);
+    letter-spacing: 0.01em;
+  }
+  tbody tr {
+    transition: background-color 0.1s;
+  }
+  tbody tr:hover {
+    background-color: #f8f9fb;
+  }
+  h1 {
+    letter-spacing: -0.015em;
+  }
+}
+
+/* Главная кнопка: темнеет при наведении, на всех страницах сразу */
+.bg-accent:not(:disabled):hover {
+  background-color: var(--color-accent-hover);
+}
+/* Вторичные кнопки с рамкой — чуть подсвечиваются */
+button.border-line:not(:disabled):hover {
+  background-color: #f6f7f9;
+  border-color: #c5cad3;
+}
+/* Карточки-блоки: едва заметная тень, чтобы белое читалось на сером */
+.rounded-xl.border-line.bg-surface {
+  box-shadow: 0 1px 2px rgb(16 24 40 / 0.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Числа: ровные столбцы цифр только в таблицах (в Onest моноширинная «1» широкая — вне таблиц не нужна) */
+td.num,
+th.num,
+td .num {
   font-variant-numeric: tabular-nums;
 }
 

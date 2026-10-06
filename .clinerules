@@ -61,3 +61,7 @@
 - Деньги — целые рубли, без копеек. Backend: округление через money.to_money / тип Rubles (app/db.py). Frontend: суммы выводить через money() из pages/shared.ts, поля ввода сумм step="1".
 
 - Графики — только компонентами из src/components/charts (TimeChart, BarList, StatTile, ChartCard), цвета серий var(--viz-1), var(--viz-2). Свои цвета и библиотеки графиков не добавлять.
+- Дизайн: шрифт и базовый вид полей, кнопок, таблиц задаются в src/index.css — не переопределяй их на страницах.
+  Главная кнопка: `rounded-md bg-accent px-3 py-2 font-medium text-accent-ink`; вторичная: `rounded-md border border-line bg-surface px-3 py-2`.
+  Блок: `rounded-xl border border-line bg-surface p-4`. Оранжевый (accent) — только для главного действия на экране.
+  Всё должно работать на ширине 375px (телефон): flex-wrap, overflow-x-auto у таблиц, модалки на весь экран.
