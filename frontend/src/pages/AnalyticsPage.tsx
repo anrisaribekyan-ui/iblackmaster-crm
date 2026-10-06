@@ -3,6 +3,10 @@ import { api, ApiError } from '../api/client'
 import { useAuth } from '../auth'
 import { downloadCsv } from '../csv'
 import { money, qty } from './shared'
+import BarList from '../components/charts/BarList'
+import ChartCard from '../components/charts/ChartCard'
+import TimeChart from '../components/charts/TimeChart'
+import { compact, count, dayLong, fillDays, rub } from '../components/charts/format'
 
 type TabKey = 'orders' | 'works' | 'sales' | 'cashflow' | 'stock'
 type Period = 'today' | 'yesterday' | 'week' | 'month' | 'custom'
@@ -50,6 +54,14 @@ function periodRange(period: Period, customFrom: string, customTo: string): { fr
   const [ty, tm, td] = customTo.split('-').map(Number)
   return { from: moscowMidnightUtc(fy, fm, fd), to: moscowMidnightUtc(ty, tm, td + 1) }
 }
+
+const PERIODS: [Period, string][] = [
+  ['today', 'Сегодня'],
+  ['yesterday', 'Вчера'],
+  ['week', '7 дней'],
+  ['month', 'Месяц'],
+  ['custom', 'Период'],
+]
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'orders', label: 'Заказы' },
@@ -230,39 +242,35 @@ export default function AnalyticsPage() {
     <section>
       <h1 className="mb-5 text-xl font-semibold">Аналитика</h1>
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <label className="grid gap-1 text-sm text-muted">Локация
-          <select className="rounded-md border border-line bg-surface px-3 py-2" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-            <option value="">Все</option>
-            {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
-          </select>
-        </label>
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="grid gap-1 text-sm text-muted">Период
-            <select className="rounded-md border border-line bg-surface px-3 py-2" value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
-              <option value="today">Сегодня</option>
-              <option value="yesterday">Вчера</option>
-              <option value="week">7 дней</option>
-              <option value="month">Месяц</option>
-              <option value="custom">Свой</option>
-            </select>
-          </label>
-          {period === 'custom' && (
-            <>
-              <label className="grid gap-1 text-sm text-muted">С
-                <input type="date" className="rounded-md border border-line bg-surface px-3 py-2" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
-              </label>
-              <label className="grid gap-1 text-sm text-muted">По
-                <input type="date" className="rounded-md border border-line bg-surface px-3 py-2" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
-              </label>
-            </>
-          )}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <label className="sr-only" htmlFor="an-location">Локация</label>
+        <select id="an-location" className="rounded-md border border-line bg-surface px-3 py-2" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+          <option value="">Все локации</option>
+          {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+        </select>
+        <div className="flex rounded-md border border-line bg-surface p-0.5" role="group" aria-label="Период">
+          {PERIODS.map(([value, title]) => (
+            <button
+              key={value}
+              type="button"
+              className={`rounded px-2.5 py-1.5 text-sm ${period === value ? 'bg-ink text-white' : 'text-muted hover:bg-canvas'}`}
+              onClick={() => setPeriod(value)}
+            >
+              {title}
+            </button>
+          ))}
         </div>
+        {period === 'custom' && (
+          <>
+            <input type="date" aria-label="С" className="rounded-md border border-line bg-surface px-3 py-2" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
+            <input type="date" aria-label="По" className="rounded-md border border-line bg-surface px-3 py-2" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
+          </>
+        )}
       </div>
 
-      <nav className="mb-4 flex gap-1 border-b border-line">
+      <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-line">
         {TABS.map((t) => (
-          <button key={t.key} className={`border-b-2 px-3 py-2 ${tab === t.key ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => changeTab(t.key)}>
+          <button key={t.key} className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-2 ${tab === t.key ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => changeTab(t.key)}>
             {t.label}
           </button>
         ))}
@@ -294,6 +302,8 @@ export default function AnalyticsPage() {
       ) : rows.length === 0 ? (
         <p className="rounded-xl border border-line bg-surface p-5 text-muted">За выбранный период данных нет.</p>
       ) : (
+        <>
+        <ReportChart tab={tab} groupBy={groupBy} rows={rows} />
         <div className="overflow-x-auto rounded-xl border border-line bg-surface">
           <table className="w-full text-left text-sm">
             <thead className="bg-canvas text-xs text-muted">
@@ -304,7 +314,7 @@ export default function AnalyticsPage() {
                 <tr key={i} className="border-t border-line">
                   {columns.map((c) => (
                     <td key={c.field} className={`px-3 py-2 ${c.kind !== 'text' ? 'text-right num' : ''}`}>
-                      {formatCell(row[c.field], c.kind)}
+                      {groupBy === 'day' && c.field === 'name' ? dayLong(String(row.key)) : formatCell(row[c.field], c.kind)}
                     </td>
                   ))}
                 </tr>
@@ -321,6 +331,7 @@ export default function AnalyticsPage() {
             </tfoot>
           </table>
         </div>
+        </>
       )}
 
       {rows && rows.length > 0 && (
@@ -339,3 +350,92 @@ function formatCell(value: unknown, kind: Column['kind']): string {
   return String(value)
 }
 
+
+const num = (v: unknown) => Number(v ?? 0)
+
+/** График над таблицей отчёта: по дням — динамика, по группам — рейтинг полосами. */
+function ReportChart({ tab, groupBy, rows }: { tab: TabKey; groupBy: string; rows: Row[] }) {
+  const hasProfit = rows.some((r) => r.profit !== null && r.profit !== undefined)
+
+  if (tab === 'stock') {
+    const hasValue = rows.some((r) => r.value !== null && r.value !== undefined)
+    return (
+      <ChartCard className="mb-4" title={hasValue ? 'Товар на складах, в закупочных ценах' : 'Товар на складах, штук'}>
+        <BarList
+          share
+          format={hasValue ? rub : count}
+          items={rows.map((r) => ({ key: String(r.store_id), name: String(r.store_name), value: num(hasValue ? r.value : r.quantity) }))}
+        />
+      </ChartCard>
+    )
+  }
+
+  if (groupBy === 'day') {
+    type DayRow = Row & { key: string }
+    const filled = fillDays<DayRow>(
+      rows.map((r) => ({ ...r, key: String(r.key) })),
+      (key) => ({ key, name: key, revenue: 0, profit: 0, income: 0, expense: 0 }) as DayRow,
+    )
+    const days = filled.map((r) => r.key)
+    if (days.length < 2) return null
+    if (tab === 'cashflow') {
+      return (
+        <ChartCard className="mb-4" title="Приход и расход по дням">
+          <TimeChart
+            kind="columns"
+            days={days}
+            label="Приход и расход по дням"
+            format={rub}
+            axisFormat={compact}
+            series={[
+              { name: 'Приход', color: 'var(--viz-1)', values: filled.map((r) => num(r.income)) },
+              { name: 'Расход', color: 'var(--viz-2)', values: filled.map((r) => num(r.expense)) },
+            ]}
+          />
+        </ChartCard>
+      )
+    }
+    return (
+      <ChartCard className="mb-4" title={hasProfit ? 'Выручка и прибыль по дням' : 'Выручка по дням'}>
+        <TimeChart
+          days={days}
+          label="Выручка по дням"
+          format={rub}
+          axisFormat={compact}
+          series={[
+            { name: 'Выручка', color: 'var(--viz-1)', values: filled.map((r) => num(r.revenue)) },
+            ...(hasProfit ? [{ name: 'Прибыль', color: 'var(--viz-2)', values: filled.map((r) => num(r.profit)) }] : []),
+          ]}
+        />
+      </ChartCard>
+    )
+  }
+
+  if (tab === 'cashflow') {
+    const income = rows.filter((r) => num(r.income) > 0)
+    const expense = rows.filter((r) => num(r.expense) > 0)
+    return (
+      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+        <ChartCard title="Приход">
+          {income.length ? <BarList share format={rub} items={income.map((r) => ({ key: String(r.key), name: String(r.name), value: num(r.income) }))} /> : <p className="text-sm text-muted">Прихода нет.</p>}
+        </ChartCard>
+        <ChartCard title="Расход">
+          {expense.length ? <BarList share format={rub} items={expense.map((r) => ({ key: String(r.key), name: String(r.name), value: num(r.expense) }))} /> : <p className="text-sm text-muted">Расхода нет.</p>}
+        </ChartCard>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`mb-4 grid gap-4 ${hasProfit ? 'lg:grid-cols-2' : ''}`}>
+      <ChartCard title="Выручка">
+        <BarList share format={rub} items={rows.map((r) => ({ key: String(r.key), name: String(r.name), value: num(r.revenue) }))} />
+      </ChartCard>
+      {hasProfit && (
+        <ChartCard title="Прибыль" subtitle="Выручка минус себестоимость">
+          <BarList format={rub} items={rows.map((r) => ({ key: String(r.key), name: String(r.name), value: Math.max(0, num(r.profit)) }))} />
+        </ChartCard>
+      )}
+    </div>
+  )
+}

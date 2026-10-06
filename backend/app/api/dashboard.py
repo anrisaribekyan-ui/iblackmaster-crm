@@ -172,6 +172,84 @@ def _masters_block(db: DbSession, allowed: set[int]) -> list[dict]:
     return result
 
 
+def _msk_day(value: datetime) -> str:
+    return _ensure_utc(value).astimezone(MSK).strftime("%Y-%m-%d")
+
+
+def _trend_block(db: DbSession, me: CurrentEmployee, allowed: set[int], days: int = 30) -> list[dict]:
+    """Динамика за последние N дней по Москве: заказы создано/выдано, приход/расход по дням."""
+    _, today_end = _day_bounds_msk()
+    start = today_end - timedelta(days=days)
+    keys = [(start + timedelta(days=i, hours=3)).astimezone(MSK).strftime("%Y-%m-%d") for i in range(days)]
+    rows = {k: {"day": k, "created": 0, "closed": None, "income": None, "expense": None} for k in keys}
+    can_closed = has_permission(me, "dashboardOrderClosedAccess")
+    can_money = has_permission(me, "dashboardFinanceAccess")
+    for row in rows.values():
+        if can_closed:
+            row["closed"] = 0
+        if can_money:
+            row["income"] = Decimal("0")
+            row["expense"] = Decimal("0")
+
+    location_filter = [Order.location_id.in_(allowed)] if allowed else []
+    for (created_at,) in db.execute(
+        select(Order.created_at).where(Order.is_deleted.is_(False), Order.created_at >= start, Order.created_at < today_end, *location_filter)
+    ):
+        key = _msk_day(created_at)
+        if key in rows:
+            rows[key]["created"] += 1
+    if can_closed:
+        for (closed_at,) in db.execute(
+            select(Order.closed_at).where(Order.is_deleted.is_(False), Order.closed_at >= start, Order.closed_at < today_end, *location_filter)
+        ):
+            key = _msk_day(closed_at)
+            if key in rows:
+                rows[key]["closed"] += 1
+    if can_money:
+        internal = set(
+            db.scalars(
+                select(CashItem.id).where(
+                    CashItem.type.in_([CashItemType.MOVE_FROM, CashItemType.PRODUCT_MOVE_FROM, CashItemType.COLLECTION])
+                )
+            )
+        )
+        query = select(Transaction).where(Transaction.is_deleted.is_(False), Transaction.date >= start, Transaction.date < today_end)
+        if allowed:
+            query = query.where(or_(Transaction.location_id.is_(None), Transaction.location_id.in_(allowed)))
+        for tx in db.scalars(query):
+            key = _msk_day(tx.date)
+            if key not in rows:
+                continue
+            if tx.is_income and (tx.order_id is not None or tx.sale_id is not None):
+                rows[key]["income"] += tx.amount
+            elif not tx.is_income and tx.cash_item_id not in internal:
+                rows[key]["expense"] += tx.amount
+    return list(rows.values())
+
+
+def _previous_block(db: DbSession, me: CurrentEmployee, allowed: set[int], period_from: datetime, period_to: datetime) -> dict:
+    """Те же показатели за предыдущий период такой же длины — для «+12% к прошлому периоду» на плитках."""
+    length = period_to - period_from
+    prev_from, prev_to = period_from - length, period_from
+    location_filter = [Order.location_id.in_(allowed)] if allowed else []
+    created = db.scalar(
+        select(func.count()).select_from(Order).where(
+            Order.is_deleted.is_(False), Order.created_at >= prev_from, Order.created_at < prev_to, *location_filter
+        )
+    ) or 0
+    closed = None
+    if has_permission(me, "dashboardOrderClosedAccess"):
+        closed = db.scalar(
+            select(func.count()).select_from(Order).where(
+                Order.is_deleted.is_(False), Order.closed_at >= prev_from, Order.closed_at < prev_to, *location_filter
+            )
+        ) or 0
+    income = None
+    if has_permission(me, "dashboardFinanceAccess"):
+        income = _finance_block(db, allowed, prev_from, prev_to)["income"]
+    return {"created": created, "closed": closed, "income": income}
+
+
 @router.get("")
 def get_dashboard(
     db: DbSession,
@@ -199,5 +277,7 @@ def get_dashboard(
         "finance": _finance_block(db, allowed, period_from, period_to) if has_permission(me, "dashboardFinanceAccess") else None,
         "how_know": _how_know_block(db, allowed, period_from, period_to) if has_permission(me, "dashboardHowKnowAccess") else None,
         "masters": _masters_block(db, allowed),
+        "trend": _trend_block(db, me, allowed),
+        "previous": _previous_block(db, me, allowed, orders_from, orders_to),
     }
 

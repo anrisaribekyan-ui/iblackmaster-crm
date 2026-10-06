@@ -1,8 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../auth'
-import { money } from './shared'
+import BarList from '../components/charts/BarList'
+import ChartCard from '../components/charts/ChartCard'
+import StatTile from '../components/charts/StatTile'
+import TimeChart from '../components/charts/TimeChart'
+import { compact, count, dayShort, rub } from '../components/charts/format'
 
 type Dashboard = {
   orders: { created: number; in_work: number; ready: number; closed: number | null }
@@ -10,9 +14,14 @@ type Dashboard = {
   finance: { income: string; expense: string; cash_registers: { id: number; name: string; cash_balance: string; bank_balance: string }[] } | null
   how_know: { name: string; count: number }[] | null
   masters: { employee_id: number; name: string; orders_in_work: number }[] | null
+  trend: { day: string; created: number; closed: number | null; income: string | null; expense: string | null }[]
+  previous: { created: number; closed: number | null; income: string | null }
 }
 type Location = { id: number; name: string }
 type Period = 'today' | 'yesterday' | 'week' | 'month' | 'custom'
+
+const PERIOD_LABELS: Record<Period, string> = { today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', custom: 'Период' }
+const PERIOD_NAMES: Record<Period, string> = { today: 'сегодня', yesterday: 'вчера', week: '7 дней', month: 'месяц', custom: 'период' }
 
 const MOSCOW_OFFSET_MS = 3 * 60 * 60 * 1000
 
@@ -91,42 +100,43 @@ export default function DashboardPage() {
     return registers.reduce((sum, r) => sum + Number(r.cash_balance) + Number(r.bank_balance), 0)
   }, [data])
 
-  const howKnowTotal = (data?.how_know ?? []).reduce((sum, item) => sum + item.count, 0)
-
-  if (loading) return <p className="text-muted">Загрузка…</p>
+  if (loading && !data) return <p className="text-muted">Загрузка…</p>
   if (!data) return <section>{error && <p role="alert" className="text-danger">{error}</p>}</section>
 
-  const { orders } = data
+  const { orders, trend, previous } = data
+  const days = trend.map((t) => t.day)
+  const last14 = trend.slice(-14)
+  const hasMoney = data.finance !== null
+  const hasClosed = orders.closed !== null
+  const periodName = canPeriod ? PERIOD_NAMES[period] : 'сегодня'
 
   return (
-    <section>
-      <header className="mb-5 flex flex-wrap items-end gap-3">
-        <h1 className="text-xl font-semibold">Главная</h1>
-        <label className="grid gap-1 text-sm text-muted">Локация
-          <select className="rounded-md border border-line bg-surface px-3 py-2" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-            <option value="">Все</option>
+    <section className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+      <header className="mb-5 flex flex-wrap items-center gap-3">
+        <h1 className="mr-auto text-xl font-semibold">Главная</h1>
+        <label className="sr-only" htmlFor="dash-location">Локация</label>
+          <select id="dash-location" className="rounded-md border border-line bg-surface px-3 py-2" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+            <option value="">Все локации</option>
             {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
-        </label>
         {canPeriod && (
           <div className="flex flex-wrap items-end gap-2">
-            <label className="grid gap-1 text-sm text-muted">Период
-              <select className="rounded-md border border-line bg-surface px-3 py-2" value={period} onChange={(e) => setPeriod(e.target.value as Period)}>
-                <option value="today">Сегодня</option>
-                <option value="yesterday">Вчера</option>
-                <option value="week">7 дней</option>
-                <option value="month">Месяц</option>
-                <option value="custom">Свой</option>
-              </select>
-            </label>
+            <div className="flex rounded-md border border-line bg-surface p-0.5" role="group" aria-label="Период">
+              {(Object.keys(PERIOD_NAMES) as Period[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  className={`rounded px-2.5 py-1.5 text-sm ${period === p ? 'bg-ink text-white' : 'text-muted hover:bg-canvas'}`}
+                  onClick={() => setPeriod(p)}
+                >
+                  {PERIOD_LABELS[p]}
+                </button>
+              ))}
+            </div>
             {period === 'custom' && (
               <>
-                <label className="grid gap-1 text-sm text-muted">С
-                  <input type="date" className="rounded-md border border-line bg-surface px-3 py-2" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
-                </label>
-                <label className="grid gap-1 text-sm text-muted">По
-                  <input type="date" className="rounded-md border border-line bg-surface px-3 py-2" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
-                </label>
+                <input type="date" aria-label="С" className="rounded-md border border-line bg-surface px-3 py-2" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
+                <input type="date" aria-label="По" className="rounded-md border border-line bg-surface px-3 py-2" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
               </>
             )}
           </div>
@@ -135,18 +145,111 @@ export default function DashboardPage() {
 
       {error && <p role="alert" className="mb-4 text-danger">{error}</p>}
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile label="Создано" value={orders.created} />
-        <Tile label="В работе" value={orders.in_work} />
-        <Tile label="Готово" value={orders.ready} />
-        {orders.closed !== null && <Tile label="Выдано" value={orders.closed} />}
+      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {hasMoney && (
+          <div className="col-span-2 xl:col-span-1">
+            <StatTile
+              hero
+              label={`Выручка, ${periodName}`}
+              value={Number(data.finance!.income)}
+              format={rub}
+              previous={previous.income === null ? null : Number(previous.income)}
+              trend={last14.map((t) => Number(t.income ?? 0))}
+            />
+          </div>
+        )}
+        <StatTile label={`Принято заказов, ${periodName}`} value={orders.created} format={count} previous={previous.created} trend={last14.map((t) => t.created)} />
+        {hasClosed && (
+          <StatTile label={`Выдано, ${periodName}`} value={orders.closed!} format={count} previous={previous.closed} trend={last14.map((t) => t.closed ?? 0)} />
+        )}
+        <div className="flex min-h-28 flex-col justify-between rounded-xl border border-line bg-surface p-4">
+          <p className="text-sm text-muted">Сейчас в работе</p>
+          <div>
+            <p className="text-[28px] font-semibold leading-none">{count(orders.in_work)}</p>
+            <p className="mt-2 text-xs text-muted">из них готово к выдаче: <strong className="num text-ink">{orders.ready}</strong></p>
+          </div>
+        </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="mb-4 grid gap-4 xl:grid-cols-2">
+        {hasMoney && (
+          <ChartCard
+            title="Деньги по дням"
+            subtitle="Последние 30 дней: приход по заказам и чекам, расход без переводов между кассами"
+            table={{ headers: ['День', 'Приход', 'Расход'], rows: [...trend].reverse().map((t) => [dayShort(t.day), rub(Number(t.income)), rub(Number(t.expense))]) }}
+          >
+            <TimeChart
+              kind="columns"
+              days={days}
+              label="Приход и расход по дням за 30 дней"
+              format={rub}
+              axisFormat={compact}
+              series={[
+                { name: 'Приход', color: 'var(--viz-1)', values: trend.map((t) => Number(t.income ?? 0)) },
+                { name: 'Расход', color: 'var(--viz-2)', values: trend.map((t) => Number(t.expense ?? 0)) },
+              ]}
+            />
+          </ChartCard>
+        )}
+        <ChartCard
+          title="Заказы по дням"
+          subtitle={hasClosed ? 'Последние 30 дней: сколько приняли и сколько выдали' : 'Последние 30 дней: сколько приняли'}
+          table={{
+            headers: hasClosed ? ['День', 'Принято', 'Выдано'] : ['День', 'Принято'],
+            rows: [...trend].reverse().map((t) => (hasClosed ? [dayShort(t.day), t.created, t.closed ?? 0] : [dayShort(t.day), t.created])),
+          }}
+        >
+          <TimeChart
+            days={days}
+            label="Принятые и выданные заказы по дням за 30 дней"
+            format={count}
+            series={[
+              { name: 'Принято', color: 'var(--viz-1)', values: trend.map((t) => t.created) },
+              ...(hasClosed ? [{ name: 'Выдано', color: 'var(--viz-2)', values: trend.map((t) => t.closed ?? 0) }] : []),
+            ]}
+          />
+        </ChartCard>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {data.how_know !== null && (
+          <ChartCard title="Откуда клиенты" subtitle={`Источники рекламы, ${periodName}`}>
+            {data.how_know.length === 0 ? (
+              <p className="text-sm text-muted">За период заказов с источником нет. Источник указывают при приёме заказа.</p>
+            ) : (
+              <BarList share format={count} items={data.how_know.map((h) => ({ key: h.name, name: h.name, value: h.count }))} />
+            )}
+          </ChartCard>
+        )}
+
+        {data.masters !== null && (
+          <ChartCard title="Загрузка мастеров" subtitle="Незакрытые заказы сейчас">
+            {data.masters.length === 0 ? (
+              <p className="text-sm text-muted">Незакрытых заказов у мастеров нет.</p>
+            ) : (
+              <BarList format={(v) => `${count(v)} в работе`} items={data.masters.map((m) => ({ key: m.employee_id, name: m.name, value: m.orders_in_work }))} />
+            )}
+          </ChartCard>
+        )}
+
+        {data.finance !== null && (
+          <ChartCard title="Деньги в кассах" subtitle="Остаток сейчас">
+            <p className="mb-3 text-3xl font-semibold">{rub(cashTotal)}</p>
+            <ul className="divide-y divide-line text-sm">
+              {data.finance.cash_registers.map((r) => (
+                <li key={r.id} className="flex items-baseline justify-between gap-3 py-2">
+                  <span className="truncate">{r.name}</span>
+                  <span className="num shrink-0 font-medium">{rub(Number(r.cash_balance) + Number(r.bank_balance))}</span>
+                </li>
+              ))}
+            </ul>
+          </ChartCard>
+        )}
+
         {data.overdue !== null && (
-          <Card title="Просроченные">
+          <ChartCard title="Просроченные" subtitle={data.overdue.length ? `${data.overdue.length} заказ(ов) после срока` : undefined}>
             {data.overdue.length === 0 ? (
-              <p className="text-sm text-muted">Просроченных заказов нет.</p>
+              <p className="text-sm text-muted">Просроченных заказов нет 👍</p>
             ) : (
               <ul className="divide-y divide-line">
                 {data.overdue.map((item) => (
@@ -158,92 +261,9 @@ export default function DashboardPage() {
                 ))}
               </ul>
             )}
-          </Card>
-        )}
-
-        {data.finance !== null && (
-          <Card title="Кассы">
-            <ul className="mb-3 divide-y divide-line">
-              {data.finance.cash_registers.map((r) => (
-                <li key={r.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                  <span>{r.name}</span>
-                  <span className="text-muted">нал {money(r.cash_balance)} · безнал {money(r.bank_balance)}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="text-right text-sm">Итого: <strong className="num">{money(cashTotal)}</strong></p>
-          </Card>
-        )}
-
-        {data.finance !== null && (
-          <Card title="Приход / расход за период">
-            <div className="grid grid-cols-2 gap-3 text-center">
-              <div>
-                <p className="text-sm text-muted">Приход</p>
-                <p className="num text-success">{money(data.finance.income)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted">Расход</p>
-                <p className="num text-danger">{money(data.finance.expense)}</p>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {data.how_know !== null && (
-          <Card title="Источники рекламы">
-            {data.how_know.length === 0 ? (
-              <p className="text-sm text-muted">Заказов с источником рекламы за период нет.</p>
-            ) : (
-              <ul className="space-y-2">
-                {data.how_know.map((item) => (
-                  <li key={item.name} className="text-sm">
-                    <div className="mb-1 flex justify-between"><span>{item.name}</span><span className="num text-muted">{item.count}</span></div>
-                    <div className="h-2 overflow-hidden rounded-full bg-canvas">
-                      <div className="h-full rounded-full bg-accent" style={{ width: `${howKnowTotal ? (item.count / howKnowTotal) * 100 : 0}%` }} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        )}
-
-        {data.masters !== null && (
-          <Card title="Загрузка мастеров">
-            {data.masters.length === 0 ? (
-              <p className="text-sm text-muted">Незакрытых заказов у мастеров нет.</p>
-            ) : (
-              <ul className="divide-y divide-line">
-                {data.masters.map((item) => (
-                  <li key={item.employee_id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                    <span>{item.name}</span>
-                    <span className="num">{item.orders_in_work} в работе</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
+          </ChartCard>
         )}
       </div>
-    </section>
-  )
-}
-
-function Tile({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl border border-line bg-surface p-4">
-      <p className="text-sm text-muted">{label}</p>
-      <p className="mt-1 text-2xl font-semibold num">{value}</p>
-    </div>
-  )
-}
-
-function Card({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="rounded-xl border border-line bg-surface p-4">
-      <h2 className="mb-3 font-semibold">{title}</h2>
-      {children}
     </section>
   )
 }

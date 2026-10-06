@@ -59,3 +59,5 @@
 - Фронтенд: `cd frontend && npm run dev` (порт 5173, /api проксируется на 8000).
 
 - Деньги — целые рубли, без копеек. Backend: округление через money.to_money / тип Rubles (app/db.py). Frontend: суммы выводить через money() из pages/shared.ts, поля ввода сумм step="1".
+
+- Графики — только компонентами из src/components/charts (TimeChart, BarList, StatTile, ChartCard), цвета серий var(--viz-1), var(--viz-2). Свои цвета и библиотеки графиков не добавлять.

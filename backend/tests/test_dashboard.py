@@ -100,3 +100,20 @@ def test_dashboard_money_move_is_not_expense(client, auth_headers, db):
     assert r.status_code == 200, r.text
     after = client.get("/api/dashboard", headers=auth_headers).json()["finance"]["expense"]
     assert Decimal(str(after)) == Decimal(str(before))
+
+
+def test_dashboard_trend_has_30_days_and_today(client, auth_headers, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    status = db.scalars(select(OrderStatus)).first()
+    owner = db.scalars(select(Employee).where(Employee.is_owner.is_(True))).one()
+    customer = Counteragent(name="Тренд")
+    db.add(customer)
+    db.flush()
+    db.add(Order(number="TREND-1", location_id=location.id, order_type_id=order_type.id, counteragent_id=customer.id,
+                 status_id=status.id, created_by_id=owner.id))
+    db.commit()
+    body = client.get("/api/dashboard", headers=auth_headers).json()
+    assert len(body["trend"]) == 30
+    assert body["trend"][-1]["created"] == 1
+    assert body["previous"]["created"] == 0

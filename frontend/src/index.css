@@ -32,3 +32,21 @@ body {
 .num {
   font-variant-numeric: tabular-nums;
 }
+
+/* Графики (метод dataviz): цвета по ролям, палитра проверена validate_palette.js на белом фоне.
+   Серии: 1 — синий, 2 — оранжевый (порядок фиксированный, по рангу не перекрашиваем). */
+:root {
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-1-wash: rgba(42, 120, 214, 0.1);
+  --viz-seq: #3987e5; /* одна шкала «больше = темнее» для рейтингов */
+  --viz-seq-track: #e8f0fb;
+  --viz-grid: #ecebe6;
+  --viz-axis: #c3c2b7;
+  --viz-label: #898781;
+  --viz-ink: #1d1f23;
+  --viz-ink-2: #52514e;
+  --viz-quiet: #b9b8b1; /* де-акцент: спарклайны, «остальные» */
+  --viz-good: #006300;
+  --viz-bad: #d03b3b;
+}
