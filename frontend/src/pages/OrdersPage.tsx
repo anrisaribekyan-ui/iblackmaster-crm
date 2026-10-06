@@ -270,10 +270,19 @@ export default function OrdersPage() {
       ) : (
         <>
           <div className="overflow-x-auto rounded-xl border border-line bg-surface">
-            <table className="w-full min-w-[1300px] text-left text-sm">
+            <table className="w-full text-left text-sm">
               <thead className="bg-canvas text-xs text-muted">
                 <tr>
-                  {['Заказ', 'Статус', 'Крайний срок', 'Менеджер', 'Создан', 'Тип заказа', 'Устройство', 'Неисправность', 'Контрагент', 'Сумма'].map((heading) => <th key={heading} className="px-3 py-2 font-medium">{heading}</th>)}
+                  <th className="px-3 py-2 font-medium">Заказ</th>
+                  <th className="px-3 py-2 font-medium">Статус</th>
+                  <th className="hidden px-3 py-2 font-medium md:table-cell">Крайний срок</th>
+                  <th className="hidden px-3 py-2 font-medium md:table-cell">Менеджер</th>
+                  <th className="hidden px-3 py-2 font-medium md:table-cell">Создан</th>
+                  <th className="hidden px-3 py-2 font-medium md:table-cell">Тип заказа</th>
+                  <th className="hidden px-3 py-2 font-medium md:table-cell">Устройство</th>
+                  <th className="hidden px-3 py-2 font-medium md:table-cell">Неисправность</th>
+                  <th className="hidden px-3 py-2 font-medium md:table-cell">Контрагент</th>
+                  <th className="px-3 py-2 text-right font-medium">Сумма</th>
                 </tr>
               </thead>
               <tbody>
@@ -283,13 +292,13 @@ export default function OrdersPage() {
                     <tr key={order.id} className="border-t border-line hover:bg-canvas">
                       <td className="px-3 py-2"><Link to={`/orders/${order.id}`} className="font-medium text-accent hover:underline">{order.is_urgent && <span aria-label="Срочный заказ" title="Срочный" className="mr-1 text-danger">●</span>}{order.number}</Link></td>
                       <td className="px-3 py-2"><span className="whitespace-nowrap rounded-full px-2 py-1 text-xs" style={{ color: order.status.color, backgroundColor: `${order.status.color}22` }}>{order.status.name}</span></td>
-                      <td className={`px-3 py-2 whitespace-nowrap ${overdue ? 'font-medium text-danger' : ''}`}>{formatDate(order.deadline)}</td>
-                      <td className="px-3 py-2">{order.manager ?? '—'}</td>
-                      <td className="px-3 py-2 whitespace-nowrap">{formatDate(order.created_at)}</td>
-                      <td className="px-3 py-2">{orderTypes.find((type) => type.id === order.order_type_id)?.name ?? '—'}</td>
-                      <td className="px-3 py-2">{[order.brand, order.model].filter(Boolean).join(' ') || '—'}</td>
-                      <td className="px-3 py-2">{order.problems?.join(', ') || '—'}</td>
-                      <td className="px-3 py-2">{order.counteragent.name}<small className="block text-muted">{formatPhone(order.counteragent.phones)}</small></td>
+                      <td className={`hidden px-3 py-2 whitespace-nowrap md:table-cell ${overdue ? 'font-medium text-danger' : ''}`}>{formatDate(order.deadline)}</td>
+                      <td className="hidden px-3 py-2 md:table-cell">{order.manager ?? '—'}</td>
+                      <td className="hidden px-3 py-2 whitespace-nowrap md:table-cell">{formatDate(order.created_at)}</td>
+                      <td className="hidden px-3 py-2 md:table-cell">{orderTypes.find((type) => type.id === order.order_type_id)?.name ?? '—'}</td>
+                      <td className="hidden px-3 py-2 md:table-cell">{[order.brand, order.model].filter(Boolean).join(' ') || '—'}</td>
+                      <td className="hidden px-3 py-2 md:table-cell">{order.problems?.join(', ') || '—'}</td>
+                      <td className="hidden px-3 py-2 md:table-cell">{order.counteragent.name}<small className="block text-muted">{formatPhone(order.counteragent.phones)}</small></td>
                       <td className="px-3 py-2 whitespace-nowrap text-right num">{Number(order.total_price) > 0
                         ? <>{formatMoney(order.total_price)}<small className="block text-muted">Оплачено {formatMoney(order.paid)}</small></>
                         : <span className="text-muted">{order.approximate_price ? `≈ ${order.approximate_price}` : '—'}</span>}</td>

@@ -88,13 +88,13 @@ export default function CashItemsPage() {
         <p className="rounded-lg border border-line bg-surface p-4 text-muted">Статей пока нет. Добавьте статью для ручных операций.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-line bg-surface">
-          <table className="w-full min-w-[600px] text-left text-sm">
+          <table className="w-full text-left text-sm">
             <thead className="border-b border-line text-muted">
               <tr>
                 <th className="px-3 py-2">Название</th>
                 <th className="px-3 py-2">Направление</th>
-                <th className="px-3 py-2">Баланс контрагента</th>
-                <th className="px-3 py-2">Тип</th>
+                <th className="hidden px-3 py-2 md:table-cell">Баланс контрагента</th>
+                <th className="hidden px-3 py-2 md:table-cell">Тип</th>
                 {canEdit && <th className="px-3 py-2">Действие</th>}
               </tr>
             </thead>
@@ -103,8 +103,8 @@ export default function CashItemsPage() {
                 <tr key={item.id}>
                   <td className="px-3 py-2 font-medium">{item.name}</td>
                   <td className="px-3 py-2">{item.is_income ? 'Приход' : 'Расход'}</td>
-                  <td className="px-3 py-2">{item.affects_balance ? 'Влияет' : 'Не влияет'}</td>
-                  <td className="px-3 py-2">{item.type ? 'Системная' : 'Пользовательская'}</td>
+                  <td className="hidden px-3 py-2 md:table-cell">{item.affects_balance ? 'Влияет' : 'Не влияет'}</td>
+                  <td className="hidden px-3 py-2 md:table-cell">{item.type ? 'Системная' : 'Пользовательская'}</td>
                   {canEdit && (
                     <td className="whitespace-nowrap px-3 py-2">
                       {item.type === null ? (

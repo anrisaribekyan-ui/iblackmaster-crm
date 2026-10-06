@@ -13,13 +13,13 @@ export default function FinanceLayout() {
   return (
     <section>
       <h1 className="mb-5 text-xl font-semibold">Финансы</h1>
-      <nav aria-label="Финансы" className="mb-5 flex gap-1 border-b border-line">
+      <nav aria-label="Финансы" className="mb-5 flex gap-1 overflow-x-auto border-b border-line">
         {links.map((link) => (
           <NavLink
             key={link.to}
             to={link.to}
             className={({ isActive }) =>
-              `border-b-2 px-3 py-2 ${isActive ? 'border-accent font-medium' : 'border-transparent text-muted'}`
+              `shrink-0 whitespace-nowrap border-b-2 px-3 py-2 ${isActive ? 'border-accent font-medium' : 'border-transparent text-muted'}`
             }
           >
             {link.label}

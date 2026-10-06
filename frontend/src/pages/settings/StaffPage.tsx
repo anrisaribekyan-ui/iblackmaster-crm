@@ -185,18 +185,25 @@ export default function StaffPage() {
             <p className="rounded-lg border border-line bg-surface p-4 text-muted">Сотрудников пока нет.</p>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-line bg-surface">
-              <table className="w-full min-w-[760px] text-left">
+              <table className="w-full text-left">
                 <thead className="bg-canvas text-sm text-muted">
-                  <tr>{['Имя', 'Email', 'Роль', 'Локации', 'Активен', 'Действия'].map((heading) => <th key={heading} className="px-3 py-2 font-medium">{heading}</th>)}</tr>
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Имя</th>
+                    <th className="hidden px-3 py-2 font-medium md:table-cell">Email</th>
+                    <th className="px-3 py-2 font-medium">Роль</th>
+                    <th className="hidden px-3 py-2 font-medium md:table-cell">Локации</th>
+                    <th className="hidden px-3 py-2 font-medium md:table-cell">Активен</th>
+                    <th className="px-3 py-2 font-medium">Действия</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {employees.map((employee) => (
                     <tr key={employee.id} className="border-t border-line">
                       <td className="px-3 py-2">{employee.short_name}{employee.is_owner && <small className="ml-1 text-muted">владелец</small>}</td>
-                      <td className="px-3 py-2">{employee.email}</td>
+                      <td className="hidden px-3 py-2 md:table-cell">{employee.email}</td>
                       <td className="px-3 py-2">{roleNames.get(employee.role_id) ?? '—'}</td>
-                      <td className="px-3 py-2">{employee.location_ids.map((id) => locationNames.get(id)).filter(Boolean).join(', ') || '—'}</td>
-                      <td className="px-3 py-2">{employee.is_active ? 'Да' : 'Нет'}</td>
+                      <td className="hidden px-3 py-2 md:table-cell">{employee.location_ids.map((id) => locationNames.get(id)).filter(Boolean).join(', ') || '—'}</td>
+                      <td className="hidden px-3 py-2 md:table-cell">{employee.is_active ? 'Да' : 'Нет'}</td>
                       <td className="px-3 py-2">
                         {can('settingAccess') && (
                           <span className="flex gap-2 whitespace-nowrap text-sm">

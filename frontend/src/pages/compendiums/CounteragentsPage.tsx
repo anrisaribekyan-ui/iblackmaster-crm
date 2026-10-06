@@ -213,14 +213,22 @@ export default function CounteragentsPage() {
       ) : (
         <>
           <div className="overflow-x-auto rounded-xl border border-line bg-surface">
-            <table className="w-full min-w-[680px] text-left text-sm">
-              <thead className="bg-canvas text-muted"><tr>{['Имя', 'Телефоны', 'Тип', 'Баланс', ''].map((label) => <th key={label} className="px-3 py-2 font-medium">{label}</th>)}</tr></thead>
+            <table className="w-full text-left text-sm">
+              <thead className="bg-canvas text-muted">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Имя</th>
+                  <th className="hidden px-3 py-2 font-medium md:table-cell">Телефоны</th>
+                  <th className="hidden px-3 py-2 font-medium md:table-cell">Тип</th>
+                  <th className="px-3 py-2 font-medium">Баланс</th>
+                  <th className="px-3 py-2" />
+                </tr>
+              </thead>
               <tbody>
                 {data.items.map((item) => (
                   <tr key={item.id} className="border-t border-line">
                     <td className="px-3 py-2"><button className="font-medium text-accent hover:underline" onClick={() => void openCard(item)}>{item.name}</button>{item.is_vendor && <small className="ml-2 text-muted">поставщик</small>}</td>
-                    <td className="px-3 py-2">{formatPhoneList(item.phones) || '—'}</td>
-                    <td className="px-3 py-2">{typeNames.get(item.type_id ?? -1) ?? '—'}</td>
+                    <td className="hidden px-3 py-2 md:table-cell">{formatPhoneList(item.phones) || '—'}</td>
+                    <td className="hidden px-3 py-2 md:table-cell">{typeNames.get(item.type_id ?? -1) ?? '—'}</td>
                     <td className="px-3 py-2 num">{Number(item.balance).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽</td>
                     <td className="px-3 py-2">{canEdit && <span className="flex gap-2 whitespace-nowrap"><button className="text-muted" onClick={() => setEditor(item)}>Изменить</button><button className="text-danger" onClick={() => void remove(item)}>Удалить</button></span>}</td>
                   </tr>

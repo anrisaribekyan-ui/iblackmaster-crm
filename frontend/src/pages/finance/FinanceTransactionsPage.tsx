@@ -193,15 +193,15 @@ export default function FinanceTransactionsPage() {
           ) : (
             <>
               <div className="overflow-x-auto rounded-xl border border-line bg-surface">
-                <table className="w-full min-w-[850px] text-left text-sm">
+                <table className="w-full text-left text-sm">
                   <thead className="border-b border-line text-muted">
                     <tr>
                       <th className="px-3 py-2">Дата</th>
-                      <th className="px-3 py-2">Локация / касса</th>
+                      <th className="hidden px-3 py-2 md:table-cell">Локация / касса</th>
                       <th className="px-3 py-2">Статья</th>
-                      <th className="px-3 py-2">Тип</th>
+                      <th className="hidden px-3 py-2 md:table-cell">Тип</th>
                       <th className="px-3 py-2 text-right">Сумма</th>
-                      <th className="px-3 py-2">Комментарий</th>
+                      <th className="hidden px-3 py-2 md:table-cell">Комментарий</th>
                       {canChange && <th className="px-3 py-2">Действие</th>}
                     </tr>
                   </thead>
@@ -211,13 +211,13 @@ export default function FinanceTransactionsPage() {
                       return (
                         <tr key={transaction.id} className={transaction.is_deleted ? 'text-muted' : ''}>
                           <td className="whitespace-nowrap px-3 py-2">{formatDate(transaction.date)}</td>
-                          <td className="px-3 py-2">{locationLabel(transaction.location_id)} · {transaction.cash_register_name ?? 'Касса'}</td>
+                          <td className="hidden px-3 py-2 md:table-cell">{locationLabel(transaction.location_id)} · {transaction.cash_register_name ?? 'Касса'}</td>
                           <td className="px-3 py-2">{transaction.cash_item_name ?? '—'}</td>
-                          <td className="px-3 py-2">{transaction.is_bank ? 'Безнал' : 'Наличные'}</td>
+                          <td className="hidden px-3 py-2 md:table-cell">{transaction.is_bank ? 'Безнал' : 'Наличные'}</td>
                           <td className={`num whitespace-nowrap px-3 py-2 text-right font-medium ${transaction.is_income ? 'text-success' : 'text-danger'}`}>
                             {transaction.is_income ? '+' : '−'}{money(transaction.amount)}
                           </td>
-                          <td className="max-w-64 truncate px-3 py-2">{transaction.note || '—'}</td>
+                          <td className="hidden max-w-64 truncate px-3 py-2 md:table-cell">{transaction.note || '—'}</td>
                           {canChange && (
                             <td className="whitespace-nowrap px-3 py-2">
                               {filters.deleted ? (

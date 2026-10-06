@@ -162,15 +162,15 @@ export default function NomenclaturePage({ isWork }: { isWork: boolean }) {
       ) : (
         <>
           <div className="overflow-x-auto rounded-xl border border-line bg-surface">
-            <table className="w-full min-w-[720px] text-left text-sm">
+            <table className="w-full text-left text-sm">
               <thead className="bg-canvas text-muted">
                 <tr>
                   <th className="px-3 py-2">Код</th>
-                  <th className="px-3 py-2">Артикул</th>
+                  <th className="hidden px-3 py-2 md:table-cell">Артикул</th>
                   <th className="px-3 py-2">Название</th>
-                  <th className="px-3 py-2">Группа</th>
-                  <th className="px-3 py-2">Ед.</th>
-                  {priceTypes.map((priceType) => <th key={priceType.id} className="px-3 py-2">{priceType.name}</th>)}
+                  <th className="hidden px-3 py-2 md:table-cell">Группа</th>
+                  <th className="hidden px-3 py-2 md:table-cell">Ед.</th>
+                  {priceTypes.map((priceType) => <th key={priceType.id} className="hidden px-3 py-2 md:table-cell">{priceType.name}</th>)}
                   {canEdit && <th className="px-3 py-2">Действия</th>}
                 </tr>
               </thead>
@@ -178,11 +178,11 @@ export default function NomenclaturePage({ isWork }: { isWork: boolean }) {
                 {pageData.items.map((item) => (
                   <tr key={item.id} className="border-t border-line">
                     <td className="px-3 py-2 num">{item.code}</td>
-                    <td className="px-3 py-2">{item.article || '—'}</td>
+                    <td className="hidden px-3 py-2 md:table-cell">{item.article || '—'}</td>
                     <td className="px-3 py-2 font-medium">{item.name}</td>
-                    <td className="px-3 py-2">{groups.find((group) => group.id === item.group_id)?.label ?? '—'}</td>
-                    <td className="px-3 py-2">{measures.find((measure) => measure.id === item.measure_id)?.name ?? '—'}</td>
-                    {priceTypes.map((priceType) => <td key={priceType.id} className="px-3 py-2 num">{priceLabel(priceType, item)}</td>)}
+                    <td className="hidden px-3 py-2 md:table-cell">{groups.find((group) => group.id === item.group_id)?.label ?? '—'}</td>
+                    <td className="hidden px-3 py-2 md:table-cell">{measures.find((measure) => measure.id === item.measure_id)?.name ?? '—'}</td>
+                    {priceTypes.map((priceType) => <td key={priceType.id} className="hidden px-3 py-2 num md:table-cell">{priceLabel(priceType, item)}</td>)}
                     {canEdit && <td className="px-3 py-2"><span className="flex gap-2 whitespace-nowrap"><button className="text-muted" onClick={() => setEditing(item)}>Изменить</button><button className="text-danger" onClick={() => void remove(item)}>Удалить</button></span></td>}
                   </tr>
                 ))}
