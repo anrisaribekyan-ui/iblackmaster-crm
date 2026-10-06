@@ -117,3 +117,21 @@ def test_dashboard_trend_has_30_days_and_today(client, auth_headers, db):
     assert len(body["trend"]) == 30
     assert body["trend"][-1]["created"] == 1
     assert body["previous"]["created"] == 0
+
+
+def test_dashboard_revenue_counts_closed_orders(client, auth_headers, db):
+    from decimal import Decimal
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    closed = db.scalars(select(OrderStatus).where(OrderStatus.group == "closed")).first()
+    owner = db.scalars(select(Employee).where(Employee.is_owner.is_(True))).one()
+    customer = Counteragent(name="Выручка")
+    db.add(customer)
+    db.flush()
+    db.add(Order(number="REV-1", location_id=location.id, order_type_id=order_type.id, counteragent_id=customer.id,
+                 status_id=closed.id, created_by_id=owner.id, total_price=Decimal("5000"), total_purchase=Decimal("2000"),
+                 closed_at=utcnow()))
+    db.commit()
+    body = client.get("/api/dashboard", headers=auth_headers).json()
+    assert Decimal(str(body["finance"]["revenue"])) == Decimal("5000")
+    assert Decimal(str(body["trend"][-1]["profit"])) == Decimal("3000")

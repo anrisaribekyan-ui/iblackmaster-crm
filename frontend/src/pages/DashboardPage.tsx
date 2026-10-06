@@ -11,11 +11,11 @@ import { compact, count, dayShort, rub } from '../components/charts/format'
 type Dashboard = {
   orders: { created: number; in_work: number; ready: number; closed: number | null }
   overdue: { id: number; number: string; deadline: string; status_name: string; status_color: string; master_name: string | null }[] | null
-  finance: { income: string; expense: string; cash_registers: { id: number; name: string; cash_balance: string; bank_balance: string }[] } | null
+  finance: { income: string; expense: string; revenue: string; cash_registers: { id: number; name: string; cash_balance: string; bank_balance: string }[] } | null
   how_know: { name: string; count: number }[] | null
   masters: { employee_id: number; name: string; orders_in_work: number }[] | null
-  trend: { day: string; created: number; closed: number | null; income: string | null; expense: string | null }[]
-  previous: { created: number; closed: number | null; income: string | null }
+  trend: { day: string; created: number; closed: number | null; income: string | null; expense: string | null; revenue: string | null; profit: string | null }[]
+  previous: { created: number; closed: number | null; income: string | null; revenue: string | null }
 }
 type Location = { id: number; name: string }
 type Period = 'today' | 'yesterday' | 'week' | 'month' | 'custom'
@@ -108,6 +108,7 @@ export default function DashboardPage() {
   const last14 = trend.slice(-14)
   const hasMoney = data.finance !== null
   const hasClosed = orders.closed !== null
+  const hasProfit = trend.some((t) => t.profit !== null)
   const periodName = canPeriod ? PERIOD_NAMES[period] : 'сегодня'
 
   return (
@@ -151,10 +152,10 @@ export default function DashboardPage() {
             <StatTile
               hero
               label={`Выручка, ${periodName}`}
-              value={Number(data.finance!.income)}
+              value={Number(data.finance!.revenue)}
               format={rub}
-              previous={previous.income === null ? null : Number(previous.income)}
-              trend={last14.map((t) => Number(t.income ?? 0))}
+              previous={previous.revenue === null ? null : Number(previous.revenue)}
+              trend={last14.map((t) => Number(t.revenue ?? 0))}
             />
           </div>
         )}
@@ -174,19 +175,22 @@ export default function DashboardPage() {
       <div className="mb-4 grid gap-4 xl:grid-cols-2">
         {hasMoney && (
           <ChartCard
-            title="Деньги по дням"
-            subtitle="Последние 30 дней: приход по заказам и чекам, расход без переводов между кассами"
-            table={{ headers: ['День', 'Приход', 'Расход'], rows: [...trend].reverse().map((t) => [dayShort(t.day), rub(Number(t.income)), rub(Number(t.expense))]) }}
+            title={hasProfit ? 'Выручка и прибыль по дням' : 'Выручка по дням'}
+            subtitle="Последние 30 дней: выданные заказы и продажи"
+            table={{
+              headers: hasProfit ? ['День', 'Выручка', 'Прибыль'] : ['День', 'Выручка'],
+              rows: [...trend].reverse().map((t) => (hasProfit ? [dayShort(t.day), rub(Number(t.revenue)), rub(Number(t.profit))] : [dayShort(t.day), rub(Number(t.revenue))])),
+            }}
           >
             <TimeChart
               kind="columns"
               days={days}
-              label="Приход и расход по дням за 30 дней"
+              label="Выручка и прибыль по дням за 30 дней"
               format={rub}
               axisFormat={compact}
               series={[
-                { name: 'Приход', color: 'var(--viz-1)', values: trend.map((t) => Number(t.income ?? 0)) },
-                { name: 'Расход', color: 'var(--viz-2)', values: trend.map((t) => Number(t.expense ?? 0)) },
+                { name: 'Выручка', color: 'var(--viz-1)', values: trend.map((t) => Number(t.revenue ?? 0)) },
+                ...(hasProfit ? [{ name: 'Прибыль', color: 'var(--viz-2)', values: trend.map((t) => Number(t.profit ?? 0)) }] : []),
               ]}
             />
           </ChartCard>

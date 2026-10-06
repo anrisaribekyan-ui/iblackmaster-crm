@@ -13,7 +13,7 @@ from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids
 from app.db import utcnow
-from app.models import CashItem, CashItemType, CashRegister, Employee, HowKnow, Order, OrderStatus, StatusGroup, Transaction
+from app.models import CashItem, CashItemType, CashRegister, Sale, Employee, HowKnow, Order, OrderStatus, StatusGroup, Transaction
 
 router = APIRouter(prefix="/dashboard", tags=["Главная"])
 
@@ -181,7 +181,8 @@ def _trend_block(db: DbSession, me: CurrentEmployee, allowed: set[int], days: in
     _, today_end = _day_bounds_msk()
     start = today_end - timedelta(days=days)
     keys = [(start + timedelta(days=i, hours=3)).astimezone(MSK).strftime("%Y-%m-%d") for i in range(days)]
-    rows = {k: {"day": k, "created": 0, "closed": None, "income": None, "expense": None} for k in keys}
+    rows = {k: {"day": k, "created": 0, "closed": None, "income": None, "expense": None, "revenue": None, "profit": None} for k in keys}
+    can_margin = has_permission(me, "marginPriceAccess")
     can_closed = has_permission(me, "dashboardOrderClosedAccess")
     can_money = has_permission(me, "dashboardFinanceAccess")
     for row in rows.values():
@@ -190,6 +191,9 @@ def _trend_block(db: DbSession, me: CurrentEmployee, allowed: set[int], days: in
         if can_money:
             row["income"] = Decimal("0")
             row["expense"] = Decimal("0")
+            row["revenue"] = Decimal("0")
+            if can_margin:
+                row["profit"] = Decimal("0")
 
     location_filter = [Order.location_id.in_(allowed)] if allowed else []
     for (created_at,) in db.execute(
@@ -206,6 +210,28 @@ def _trend_block(db: DbSession, me: CurrentEmployee, allowed: set[int], days: in
             if key in rows:
                 rows[key]["closed"] += 1
     if can_money:
+        # Выручка как в LiveSklad: выданные заказы + чеки продаж (не зависит от того, как шли деньги по кассам)
+        for closed_at, total, cost in db.execute(
+            select(Order.closed_at, Order.total_price, Order.total_purchase).where(
+                Order.is_deleted.is_(False), Order.closed_at >= start, Order.closed_at < today_end, *location_filter
+            )
+        ):
+            key = _msk_day(closed_at)
+            if key in rows:
+                rows[key]["revenue"] += total
+                if can_margin:
+                    rows[key]["profit"] += total - cost
+        sale_filter = [Sale.location_id.in_(allowed)] if allowed else []
+        for date, total, cost in db.execute(
+            select(Sale.date, Sale.total_price, Sale.total_purchase).where(
+                Sale.is_deleted.is_(False), Sale.date >= start, Sale.date < today_end, *sale_filter
+            )
+        ):
+            key = _msk_day(date)
+            if key in rows:
+                rows[key]["revenue"] += total
+                if can_margin:
+                    rows[key]["profit"] += total - cost
         internal = set(
             db.scalars(
                 select(CashItem.id).where(
@@ -227,6 +253,20 @@ def _trend_block(db: DbSession, me: CurrentEmployee, allowed: set[int], days: in
     return list(rows.values())
 
 
+def _revenue(db: DbSession, allowed: set[int], period_from: datetime, period_to: datetime) -> Decimal:
+    """Выручка за период: сумма выданных заказов + чеки продаж."""
+    orders = select(func.coalesce(func.sum(Order.total_price), 0)).where(
+        Order.is_deleted.is_(False), Order.closed_at >= period_from, Order.closed_at < period_to
+    )
+    sales = select(func.coalesce(func.sum(Sale.total_price), 0)).where(
+        Sale.is_deleted.is_(False), Sale.date >= period_from, Sale.date < period_to
+    )
+    if allowed:
+        orders = orders.where(Order.location_id.in_(allowed))
+        sales = sales.where(Sale.location_id.in_(allowed))
+    return Decimal(str(db.scalar(orders) or 0)) + Decimal(str(db.scalar(sales) or 0))
+
+
 def _previous_block(db: DbSession, me: CurrentEmployee, allowed: set[int], period_from: datetime, period_to: datetime) -> dict:
     """Те же показатели за предыдущий период такой же длины — для «+12% к прошлому периоду» на плитках."""
     length = period_to - period_from
@@ -244,10 +284,11 @@ def _previous_block(db: DbSession, me: CurrentEmployee, allowed: set[int], perio
                 Order.is_deleted.is_(False), Order.closed_at >= prev_from, Order.closed_at < prev_to, *location_filter
             )
         ) or 0
-    income = None
+    income = revenue = None
     if has_permission(me, "dashboardFinanceAccess"):
         income = _finance_block(db, allowed, prev_from, prev_to)["income"]
-    return {"created": created, "closed": closed, "income": income}
+        revenue = _revenue(db, allowed, prev_from, prev_to)
+    return {"created": created, "closed": closed, "income": income, "revenue": revenue}
 
 
 @router.get("")
@@ -274,7 +315,11 @@ def get_dashboard(
     return {
         "orders": _orders_block(db, me, allowed, orders_from, orders_to),
         "overdue": _overdue_block(db, allowed) if has_permission(me, "dashboardDeadlineAccess") else None,
-        "finance": _finance_block(db, allowed, period_from, period_to) if has_permission(me, "dashboardFinanceAccess") else None,
+        "finance": (
+            {**_finance_block(db, allowed, period_from, period_to), "revenue": _revenue(db, allowed, period_from, period_to)}
+            if has_permission(me, "dashboardFinanceAccess")
+            else None
+        ),
         "how_know": _how_know_block(db, allowed, period_from, period_to) if has_permission(me, "dashboardHowKnowAccess") else None,
         "masters": _masters_block(db, allowed),
         "trend": _trend_block(db, me, allowed),
