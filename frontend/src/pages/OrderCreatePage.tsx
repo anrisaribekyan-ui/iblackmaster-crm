@@ -1,3 +1,4 @@
+import { ClientCard, useIntakeHints, WarrantyAlert } from '../components/IntakeHints'
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
@@ -159,9 +160,14 @@ export default function OrderCreatePage() {
         if (!active) return
         const visible = result.filter((field) => field.is_visible)
         setFields(visible)
-        setValues(Object.fromEntries(visible.map((field) => [field.key, initialValue(field, me?.id)])))
-        setCounteragentId(null)
-        setCounteragentFound('')
+        // Смена типа заказа не стирает то, что уже введено: общие поля переносятся
+        setValues((current) => Object.fromEntries(
+          visible.map((field) => [field.key, field.key in current ? current[field.key] : initialValue(field, me?.id)]),
+        ))
+        if (!visible.some((field) => field.key === 'phones')) {
+          setCounteragentId(null)
+          setCounteragentFound('')
+        }
       })
       .catch((e: unknown) => {
         if (active) setError(e instanceof ApiError ? e.message : 'Не удалось загрузить поля заказа')
@@ -298,6 +304,23 @@ export default function OrderCreatePage() {
   }
 
   const rows = useMemo(() => getRows(fields), [fields])
+  const hints = useIntakeHints(counteragentId, String(values.sn ?? ''), String(values.brand ?? ''), String(values.model ?? ''))
+  const isWarrantyType = Boolean(hints?.warranty_order_type_id) && Number(orderTypeId) === hints?.warranty_order_type_id
+  const applyWarranty = (item: NonNullable<typeof hints>['warranty'][number]) => {
+    if (!hints?.warranty_order_type_id) return
+    // Смена типа перезагружает поля формы — введённые значения сохраняются в values
+    setOrderTypeId(String(hints.warranty_order_type_id))
+    setValues((current) => {
+      const note = String(current.orderNode ?? '')
+      const mark = `Гарантия по заказу ${item.number}`
+      return {
+        ...current,
+        brand: current.brand || item.brand || current.brand,
+        model: current.model || item.model || current.model,
+        orderNode: note.includes(mark) ? note : note ? `${mark}. ${note}` : mark,
+      }
+    })
+  }
 
   if (loading) return <p className="text-muted">Загрузка формы заказа…</p>
   return (
@@ -367,6 +390,8 @@ export default function OrderCreatePage() {
                       )
                     })}
                   </div>
+                  {group === 'counteragent' && hints?.client && <ClientCard client={hints.client} />}
+                  {group === 'device' && hints && <div className="mt-3"><WarrantyAlert hints={hints} isWarrantyType={isWarrantyType} onApply={applyWarranty} /></div>}
                 </section>
               ))}
             </div>
