@@ -8,6 +8,7 @@ import app.models  # noqa: F401  — регистрирует все табли�
 from app.api import (
     auth,
     intake,
+    order_files,
     notifications as notifications_api,
     boards,
     cash_registers,
@@ -100,6 +101,7 @@ app.include_router(reports.router, prefix="/api")
 app.include_router(boards.router, prefix="/api")
 app.include_router(notifications_api.router, prefix="/api")
 app.include_router(intake.router, prefix="/api")
+app.include_router(order_files.router, prefix="/api")
 app.include_router(salary.router, prefix="/api")
 app.include_router(stock_documents.router, prefix="/api")
 app.include_router(stock_remains.router, prefix="/api")

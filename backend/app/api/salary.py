@@ -5,7 +5,7 @@
 Начисления считает app.services.salary; здесь только чтение, ручные бонусы/штрафы, выплаты и правила.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Literal
 from zoneinfo import ZoneInfo
@@ -120,6 +120,54 @@ def _sums(db: DbSession, employee_id: int, start: datetime, end: datetime, locat
 
 
 # --- Сводка и история --------------------------------------------------------------
+
+
+@router.get("/me")
+def my_earnings(db: DbSession, me: CurrentEmployee):
+    """Плитка «Мой заработок» на главной (ТЗ этап 3, C5): только свои начисления, доступна каждому сотруднику."""
+    now = datetime.now(MSK)
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    month_start, month_end = month_bounds(now.year, now.month)
+    week_start = day_start - timedelta(days=6)
+
+    events = db.scalars(
+        select(SalaryEvent)
+        .where(SalaryEvent.employee_id == me.id, SalaryEvent.date >= min(week_start.astimezone(timezone.utc), month_start),
+               SalaryEvent.date < month_end)
+        .order_by(SalaryEvent.date.desc())
+    ).all()
+
+    def local(value: datetime) -> datetime:
+        return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).astimezone(MSK)
+
+    today = [e for e in events if local(e.date) >= day_start]
+    by_order: dict[int | None, dict] = {}
+    for e in today:
+        key = e.order_id
+        row = by_order.setdefault(key, {"order_id": e.order_id, "amount": Decimal("0"), "kinds": []})
+        row["amount"] += e.amount
+        title = KIND_TITLES.get(AccrualKind(e.kind), e.kind)
+        if title not in row["kinds"]:
+            row["kinds"].append(title)
+    numbers = dict(db.execute(select(Order.id, Order.number).where(Order.id.in_({k for k in by_order if k} or {0}))).all())
+    for row in by_order.values():
+        row["number"] = numbers.get(row["order_id"])
+
+    week = []
+    for offset in range(7):
+        start = week_start + timedelta(days=offset)
+        end = start + timedelta(days=1)
+        week.append({"date": start.date().isoformat(), "amount": sum((e.amount for e in events if start <= local(e.date) < end), Decimal("0"))})
+
+    month = _sums(db, me.id, month_start, month_end, None)
+    return {
+        "today": sum((e.amount for e in today), Decimal("0")),
+        "today_items": sorted(by_order.values(), key=lambda r: r["amount"], reverse=True),
+        "week": week,
+        "month": month["total"],
+        "month_paid": month["paid"],
+        "month_to_pay": month["to_pay"],
+    }
 
 
 @router.get("/summary")

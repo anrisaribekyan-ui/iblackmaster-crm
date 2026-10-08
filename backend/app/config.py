@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     smsgate_user: str = ""
     smsgate_password: str = ""
     sms_daily_limit: int = 150  # больше с обычной симки слать опасно — оператор заблокирует как спам
+    uploads_dir: str = "uploads"  # фото и файлы заказов; на сервере — том docker uploads
     sms_worker: bool = True  # фоновая отправка (в тестах выключено)
 
 

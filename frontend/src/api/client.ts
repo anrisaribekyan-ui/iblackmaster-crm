@@ -80,7 +80,27 @@ async function requestHtml(path: string): Promise<string> {
   return res.text()
 }
 
+async function requestRaw(method: string, path: string, body?: FormData): Promise<Response> {
+  const headers: Record<string, string> = {}
+  const token = getToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const res = await fetch(`/api${path}`, { method, headers, body })
+  if (res.status === 401) {
+    setToken(null)
+    if (!location.pathname.startsWith('/login')) location.href = '/login'
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, data.error ?? 'error', data.message ?? 'Ошибка сервера')
+  }
+  return res
+}
+
 export const api = {
+  /** Файл с токеном (фото заказа): <img src> не умеет слать заголовок, поэтому берём blob. */
+  blob: async (path: string) => (await requestRaw('GET', path)).blob(),
+  /** Загрузка файлов: FormData уходит как multipart, Content-Type ставит браузер. */
+  upload: async <T>(path: string, form: FormData) => (await requestRaw('POST', path, form)).json() as Promise<T>,
   get: <T>(path: string) => request<T>('GET', path),
   getHtml: requestHtml,
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body ?? {}),

@@ -8,6 +8,7 @@ import TaskForm, { type TaskEmployee, type TaskFormValues } from '../components/
 import { escapeHtml, openPrint } from '../print'
 import QRCode from 'qrcode'
 import OrderSms from '../components/OrderSms'
+import OrderPhotos from '../components/OrderPhotos'
 
 type Status = { id: number; group: string; name: string; color: string; pay_required: boolean; comment_mode: string }
 type StatusGroup = { group: string; title: string; statuses: Status[] }
@@ -817,6 +818,9 @@ export default function OrderDetailPage() {
               </div>
             </section>
           )}
+          <div className="mt-4">
+            <OrderPhotos orderId={detail.order.id} disabled={isDeleted} onChanged={() => void loadDetail()} />
+          </div>
         </div>
         <aside className="space-y-4">
           <section className="rounded-xl border border-line bg-surface p-4">

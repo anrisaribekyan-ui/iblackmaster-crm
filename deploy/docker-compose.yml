@@ -51,7 +51,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
 
-  # Ежедневный бэкап БД в ./backups, хранятся последние 14 дней
+  # Ежедневный бэкап БД в ./backups (последние 14 дней) и копия фото заказов в ./backups/uploads
   backup:
     image: ${REGISTRY:-docker.io/library}/postgres:16-alpine
     restart: unless-stopped
@@ -62,10 +62,12 @@ services:
       PGPASSWORD: ${DB_PASSWORD}
     volumes:
       - ./backups:/backups
+      - uploads:/uploads:ro
     entrypoint: >
       sh -c 'while true; do
         f=/backups/crm-$$(date +%F_%H%M).sql.gz;
         pg_dump -h db -U crm crm | gzip > $$f && echo "backup ok $$f";
+        mkdir -p /backups/uploads && cp -a /uploads/. /backups/uploads/ && echo "uploads copied";
         find /backups -name "crm-*.sql.gz" -mtime +14 -delete;
         sleep 86400;
       done'

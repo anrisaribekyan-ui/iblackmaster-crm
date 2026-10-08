@@ -187,3 +187,34 @@ def test_manual_events_survive_recalc(db, env):
     db.flush()
     salary.recalc_order(db, order)
     assert total(db, master) == Decimal("5000")
+
+
+def test_my_earnings_tile(client, auth_headers, db, owner):
+    from datetime import timedelta
+
+    from app.db import utcnow
+
+    order = db.scalars(select(Order)).first()
+    if order is None:
+        from app.models import Counteragent, Location, OrderStatus
+
+        c = Counteragent(name="Клиент")
+        db.add(c)
+        db.flush()
+        order = Order(number="S-1", location_id=db.scalars(select(Location)).first().id, order_type_id=db.scalars(select(OrderType)).first().id,
+                      counteragent_id=c.id, status_id=db.scalars(select(OrderStatus)).first().id, created_by_id=owner.id)
+        db.add(order)
+        db.flush()
+    db.add_all([
+        SalaryEvent(employee_id=owner.id, kind=AccrualKind.WORK_ORDER, amount=Decimal("700"), order_id=order.id),
+        SalaryEvent(employee_id=owner.id, kind=AccrualKind.PRODUCT_ORDER, amount=Decimal("300"), order_id=order.id),
+        SalaryEvent(employee_id=owner.id, kind=AccrualKind.BONUS, amount=Decimal("500"), is_manual=True),
+        SalaryEvent(employee_id=owner.id, kind=AccrualKind.WORK_ORDER, amount=Decimal("999"), date=utcnow() - timedelta(days=40)),
+    ])
+    db.commit()
+    body = client.get("/api/salary/me", headers=auth_headers).json()
+    assert Decimal(str(body["today"])) == 1500
+    top = body["today_items"][0]
+    assert top["number"] == order.number and Decimal(str(top["amount"])) == 1000 and len(top["kinds"]) == 2
+    assert len(body["week"]) == 7 and Decimal(str(body["week"][-1]["amount"])) == 1500
+    assert Decimal(str(body["month"])) >= 1500  # событие 40 дней назад в месяц не входит
