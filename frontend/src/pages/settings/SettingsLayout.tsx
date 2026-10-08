@@ -5,6 +5,7 @@ const links = [
   { to: 'statuses', label: 'Статусы' },
   { to: 'order-types', label: 'Типы заказов' },
   { to: 'staff', label: 'Сотрудники и роли' },
+  { to: 'notifications', label: 'Уведомления' },
 ]
 
 export default function SettingsLayout() {

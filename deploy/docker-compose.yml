@@ -28,6 +28,10 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://crm:${DB_PASSWORD}@db:5432/crm
       JWT_SECRET: ${JWT_SECRET:?Задайте JWT_SECRET в .env}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      SMSGATE_USER: ${SMSGATE_USER:-}
+      SMSGATE_PASSWORD: ${SMSGATE_PASSWORD:-}
+      SMS_DAILY_LIMIT: ${SMS_DAILY_LIMIT:-150}
     volumes:
       - uploads:/app/uploads
 

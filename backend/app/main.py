@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 import app.models  # noqa: F401  — регистрирует все таблицы
 from app.api import (
     auth,
+    notifications as notifications_api,
     boards,
     cash_registers,
     complete_sets,
@@ -33,7 +34,8 @@ from app.api import (
     stores,
 )
 from app.config import settings
-from app.db import Base, engine
+from app.db import Base, SessionLocal, engine
+from app.services import notifications
 from app.errors import BusinessError
 
 STATUS_BY_CODE = {"not_found": 404, "forbidden": 403, "unauthorized": 401, "bad_credentials": 401}
@@ -47,6 +49,7 @@ async def lifespan(_: FastAPI):
         Base.metadata.create_all(engine)
     elif settings.jwt_secret == "change-me-in-production" or len(settings.jwt_secret) < 32:
         raise RuntimeError("Задайте JWT_SECRET длиной от 32 символов (openssl rand -hex 32)")
+    notifications.start_worker(SessionLocal)  # SMS-очередь; ничего не делает, если шлюз не настроен
     yield
 
 
@@ -94,6 +97,7 @@ app.include_router(dashboard.router, prefix="/api")
 app.include_router(orders.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(boards.router, prefix="/api")
+app.include_router(notifications_api.router, prefix="/api")
 app.include_router(salary.router, prefix="/api")
 app.include_router(stock_documents.router, prefix="/api")
 app.include_router(stock_remains.router, prefix="/api")

@@ -6,6 +6,8 @@ import { useAuth } from '../auth'
 import Modal from '../components/Modal'
 import TaskForm, { type TaskEmployee, type TaskFormValues } from '../components/TaskForm'
 import { escapeHtml, openPrint } from '../print'
+import QRCode from 'qrcode'
+import OrderSms from '../components/OrderSms'
 
 type Status = { id: number; group: string; name: string; color: string; pay_required: boolean; comment_mode: string }
 type StatusGroup = { group: string; title: string; statuses: Status[] }
@@ -191,6 +193,7 @@ export default function OrderDetailPage() {
   const [taskEmployees, setTaskEmployees] = useState<TaskEmployee[]>([])
   const [taskCreating, setTaskCreating] = useState(false)
   const [locations, setLocations] = useState<LocationInfo[]>([])
+  const [trackQr, setTrackQr] = useState('')
 
   const loadDetail = useCallback(async (initial = false) => {
     if (!orderId) return
@@ -484,6 +487,18 @@ export default function OrderDetailPage() {
     )
   }
 
+  // QR для квитанции готовим заранее: окно печати должно открыться сразу по клику, иначе браузер его заблокирует
+  const detailOrderId = detail?.order.id
+  useEffect(() => {
+    if (!detailOrderId) return
+    let cancelled = false
+    api.get<{ code: string }>(`/orders/${detailOrderId}/tracking`)
+      .then(({ code }) => QRCode.toString(`${window.location.origin}/track/${code}`, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' }))
+      .then((svg) => { if (!cancelled) setTrackQr(svg) })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [detailOrderId])
+
   const currentLocation = locations.find((location) => location.id === detail?.order.location_id)
   const orderFields = (detail?.order ?? {}) as Record<string, unknown>
   const str = (value: unknown): string => (value == null ? '' : String(value))
@@ -499,7 +514,7 @@ export default function OrderDetailPage() {
       : 'Нет'
     const body = `
       <h1>Квитанция о приёме заказа № ${escapeHtml(detail.order.number)}</h1>
-      <div class="columns">
+      <div class="columns" style="display:flex;justify-content:space-between;gap:8mm">
         <section>
           <h2>Локация</h2>
           <p><strong>${escapeHtml(currentLocation?.name)}</strong></p>
@@ -507,6 +522,7 @@ export default function OrderDetailPage() {
           ${currentLocation?.phones ? `<p>Телефон: ${escapeHtml(currentLocation.phones)}</p>` : ''}
           <p>Дата приёма: ${escapeHtml(String(orderFields.created_at ?? '').slice(0, 10).split('-').reverse().join('.'))}</p>
         </section>
+        ${trackQr ? `<section style="text-align:center;width:32mm;flex-shrink:0"><div style="width:28mm;height:28mm;margin:0 auto">${trackQr}</div><p style="font-size:11px;margin-top:1mm">Следите за ремонтом — наведите камеру</p></section>` : ''}
       </div>
       <h2>Клиент</h2>
       <p>${escapeHtml(detail.counteragent.name)}</p>
@@ -846,6 +862,12 @@ export default function OrderDetailPage() {
               </ul>
             )}
           </section>
+          <OrderSms
+            orderId={detail.order.id}
+            hasPhone={/(^|,)\s*79\d{9}/.test(detail.counteragent.phones ?? '')}
+            disabled={isDeleted}
+            onSent={() => void loadDetail()}
+          />
           <section className="rounded-xl border border-line bg-surface p-4">
             <h2 className="mb-3 font-semibold">История</h2>
             <form onSubmit={(event) => void sendComment(event)} className="mb-3 grid gap-2">

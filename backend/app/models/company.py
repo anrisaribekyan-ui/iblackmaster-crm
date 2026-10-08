@@ -41,6 +41,7 @@ class Location(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(200))
     address: Mapped[str | None] = mapped_column(String(300))
     phones: Mapped[str | None] = mapped_column(String(300))  # через запятую
+    work_hours: Mapped[str | None] = mapped_column(String(100))  # «ежедневно 10:00–21:00» — для клиента
     color: Mapped[str] = mapped_column(String(9), default="#171717")
     sort: Mapped[int] = mapped_column(default=0)
     is_active: Mapped[bool] = mapped_column(default=True)

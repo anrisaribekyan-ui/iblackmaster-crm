@@ -9,6 +9,7 @@ type Location = {
   name: string
   address: string | null
   phones: string | null
+  work_hours: string | null
   color: string
   sort: number
   stores: Store[]
@@ -78,6 +79,7 @@ export default function LocationsPage() {
           name: text('name'),
           address: text('address') || null,
           phones: text('phones') || null,
+          work_hours: text('work_hours') || null,
           color: text('color'),
           sort: Number(text('sort') || 0),
         }
@@ -287,6 +289,9 @@ export default function LocationsPage() {
                 </label>
                 <label className={labelClass}>Телефоны
                   <input className={fieldClass} name="phones" defaultValue={editor.item?.phones ?? ''} />
+                </label>
+                <label className={labelClass}>Часы работы <span className="text-muted">(для SMS и страницы отслеживания)</span>
+                  <input className={fieldClass} name="work_hours" placeholder="ежедневно 10:00–21:00" defaultValue={editor.item?.work_hours ?? ''} />
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <label className={labelClass}>Цвет

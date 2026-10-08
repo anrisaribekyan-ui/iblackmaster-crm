@@ -14,6 +14,7 @@ class LocationIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     address: str | None = Field(default=None, max_length=300)
     phones: str | None = Field(default=None, max_length=300)
+    work_hours: str | None = Field(default=None, max_length=100)
     color: str = Field(default="#171717", pattern=r"^#[0-9A-Fa-f]{6}$")
     sort: int = 0
 
@@ -33,6 +34,7 @@ class LocationOut(BaseModel):
     name: str
     address: str | None
     phones: str | None
+    work_hours: str | None = None
     color: str
     sort: int
     stores: list[StoreOut]
@@ -44,6 +46,7 @@ def location_out(location: Location) -> LocationOut:
         name=location.name,
         address=location.address,
         phones=location.phones,
+        work_hours=location.work_hours,
         color=location.color,
         sort=location.sort,
         stores=[StoreOut.model_validate(store) for store in location.stores if store.is_active],

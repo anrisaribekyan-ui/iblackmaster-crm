@@ -33,6 +33,7 @@ from app.models import (
     Transaction,
 )
 from app.services import orders as order_service
+from app.services import notifications as notification_service
 from app.services import salary as salary_service
 from app.utils.phone import normalize_phone
 
@@ -501,6 +502,8 @@ def create_order(data: OrderCreate, db: DbSession, me: CurrentEmployee):
     db.add(order)
     db.flush()
     order_service.add_history(db, order, "created", me, status_id=first_status.id)
+    notification_service.ensure_tracking_code(db, order)
+    notification_service.enqueue_status(db, order, first_status, me.id)  # SMS «Заказ принят», если включено
     db.commit()
     return OrderCreateOut(id=order.id, number=order.number)
 

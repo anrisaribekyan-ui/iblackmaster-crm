@@ -23,7 +23,7 @@ from app.models import (
     StatusGroup,
     Transaction,
 )
-from app.services import money, salary, stock
+from app.services import money, notifications, salary, stock
 
 CENT = MONEY_STEP  # без копеек
 
@@ -283,6 +283,7 @@ def change_status(
     order.status = new_status
     add_history(db, order, "status", employee, text=comment, status_id=new_status.id, from_status_id=old.id)
     salary.recalc_order(db, order)
+    notifications.enqueue_status(db, order, new_status, employee.id)
 
 
 # --- Оплаты ------------------------------------------------------------------------

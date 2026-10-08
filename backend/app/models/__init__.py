@@ -17,6 +17,7 @@ from app.models.catalog import (
 from app.models.company import CashRegister, Company, Location, Store
 from app.models.counteragent import Counteragent, CounteragentType, HowKnow
 from app.models.finance import CashItem, CashItemType, Transaction
+from app.models.notification import Notification, NotificationState, NotificationTemplate
 from app.models.order import (
     HISTORY_TYPES,
     STATUS_GROUP_TITLES,

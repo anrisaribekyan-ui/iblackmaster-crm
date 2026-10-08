@@ -7,6 +7,8 @@ import LoginPage from './pages/LoginPage'
 import SettingsLayout from './pages/settings/SettingsLayout'
 import LocationsPage from './pages/settings/LocationsPage'
 import StatusesPage from './pages/settings/StatusesPage'
+import TrackPage from './pages/TrackPage'
+import NotificationsPage from './pages/settings/NotificationsPage'
 import StaffPage from './pages/settings/StaffPage'
 import OrderTypesPage from './pages/settings/OrderTypesPage'
 import CompendiumsLayout from './pages/compendiums/CompendiumsLayout'
@@ -57,6 +59,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/track/:code" element={<TrackPage />} />
           <Route
             element={
               <Protected>
@@ -110,6 +113,7 @@ export default function App() {
               <Route path="statuses" element={<StatusesPage />} />
               <Route path="order-types" element={<OrderTypesPage />} />
               <Route path="staff" element={<StaffPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
             </Route>
             <Route path="*" element={<Stub title="Страница не найдена" task="—" />} />
           </Route>

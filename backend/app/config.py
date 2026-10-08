@@ -17,5 +17,16 @@ class Settings(BaseSettings):
     # Часовой пояс компании (Москва). Все даты в БД хранятся в UTC.
     company_utc_offset_minutes: int = 180
 
+    # Публичный адрес CRM (для ссылки отслеживания в SMS и QR), например https://crm.iblackmaster.ru
+    public_url: str = "http://localhost:5173"
+
+    # SMS через приложение SMS Gateway for Android (sms-gate.app) на рабочем телефоне с симкой.
+    # Пусто — SMS не отправляются (сообщения копятся в очереди со статусом «в очереди»).
+    smsgate_url: str = "https://api.sms-gate.app/3rdparty/v1"
+    smsgate_user: str = ""
+    smsgate_password: str = ""
+    sms_daily_limit: int = 150  # больше с обычной симки слать опасно — оператор заблокирует как спам
+    sms_worker: bool = True  # фоновая отправка (в тестах выключено)
+
 
 settings = Settings()

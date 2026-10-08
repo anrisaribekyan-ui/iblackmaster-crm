@@ -156,6 +156,8 @@ class Order(Base, TimestampMixin):
     closed_at: Mapped[datetime | None]
     last_action_at: Mapped[datetime] = mapped_column(default=utcnow)
     is_deleted: Mapped[bool] = mapped_column(default=False)
+    # Случайный код для публичной страницы отслеживания (QR на квитанции). По номеру заказа страница не открывается.
+    tracking_code: Mapped[str | None] = mapped_column(String(16), unique=True, index=True)
 
     order_type: Mapped[OrderType] = relationship()
     status: Mapped[OrderStatus] = relationship()
