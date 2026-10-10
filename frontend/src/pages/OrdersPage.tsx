@@ -192,12 +192,12 @@ export default function OrdersPage() {
             <option value="">Все локации</option>
             {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
           </select>
-          {can('createOrderAccess') && <Link className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" to="/orders/new">Создать</Link>}
+          {can('createOrderAccess') && <Link className="hidden rounded-md bg-accent px-3 py-2 font-medium text-accent-ink md:inline-block" to="/orders/new">Создать</Link>}
           <button className="hidden whitespace-nowrap rounded-md border border-line bg-surface px-3 py-2 sm:block" onClick={() => void exportCsv()}>Скачать CSV</button>
         </div>
       </header>
       <form onSubmit={submitSearch} className="mb-3 flex gap-2">
-        <input className={`${filterInput} min-w-0 flex-1`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Номер, телефон, имя, серийный номер или модель" />
+        <input className={`${filterInput} min-w-0 flex-1`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Номер, телефон, имя, IMEI" />
         <button className="rounded-md border border-line bg-surface px-3 py-2">Найти</button>
         <button type="button" className="rounded-md border border-line bg-surface px-3 py-2" onClick={() => setFiltersOpen((current) => !current)}>
           {filtersOpen ? 'Скрыть фильтры' : 'Фильтры'}
@@ -270,7 +270,51 @@ export default function OrdersPage() {
         <p className="rounded-xl border border-line bg-surface p-5 text-muted">Заказов по выбранным условиям нет. Измените фильтры или создайте новый заказ.</p>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-line bg-surface">
+          {/* Телефон: карточки вместо таблицы — всё главное видно без прокрутки вбок */}
+          <ul className="space-y-2 md:hidden">
+            {data.items.map((order) => {
+              const overdue = order.deadline && new Date(order.deadline).getTime() < Date.now() && order.status.group !== 'closed'
+              const device = [order.brand, order.model].filter(Boolean).join(' ')
+              return (
+                <li key={order.id}>
+                  <Link
+                    to={`/orders/${order.id}`}
+                    className={`block rounded-xl border border-line bg-surface p-3 active:bg-canvas ${order.is_deleted ? 'opacity-60' : ''}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`font-semibold ${order.is_deleted ? 'text-muted line-through' : 'text-accent'}`}>
+                        {order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" className="mr-1 text-danger">●</span>}
+                        {order.number}
+                      </span>
+                      {order.is_deleted && <span className="rounded bg-[#fef3f2] px-1.5 py-0.5 text-xs font-medium text-danger">удалён</span>}
+                      <span className="ml-auto truncate rounded-full px-2 py-0.5 text-xs" style={{ color: order.status.color, backgroundColor: `${order.status.color}22` }}>{order.status.name}</span>
+                    </div>
+                    <p className="mt-1.5 truncate font-medium">{device || 'Устройство не указано'}</p>
+                    {order.problems?.length > 0 && <p className="truncate text-sm text-muted">{order.problems.join(', ')}</p>}
+                    <div className="mt-2 flex items-end justify-between gap-3 text-sm">
+                      <div className="min-w-0">
+                        <p className="truncate">{order.counteragent.name}</p>
+                        <p className={`text-xs ${overdue ? 'font-medium text-danger' : 'text-muted'}`}>
+                          {formatDate(order.created_at)}{order.deadline ? ` · срок ${formatDate(order.deadline)}` : ''}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        {Number(order.total_price) > 0 ? (
+                          <>
+                            <p className="font-semibold tabular-nums">{formatMoney(order.total_price)}</p>
+                            {Number(order.paid) < Number(order.total_price) && <p className="text-xs text-danger">долг {formatMoney(String(Number(order.total_price) - Number(order.paid)))}</p>}
+                          </>
+                        ) : (
+                          <p className="text-muted">{order.approximate_price ? `≈ ${order.approximate_price}` : '—'}</p>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+          <div className="hidden overflow-x-auto rounded-xl border border-line bg-surface md:block">
             <table className="w-full text-left text-sm">
               <thead className="bg-canvas text-xs text-muted">
                 <tr>
@@ -312,7 +356,7 @@ export default function OrdersPage() {
               </tbody>
             </table>
           </div>
-          <footer className="mt-3 flex items-center justify-between text-sm text-muted">
+          <footer className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
             <span>Всего: {data.total}</span>
             <span className="flex items-center gap-3">
               <button disabled={currentPage <= 1} className="text-ink disabled:opacity-40" onClick={() => setParam('page', String(currentPage - 1))}>Назад</button>

@@ -37,7 +37,9 @@ function fmt(y: number, m: number, d: number): string {
 
 function periodRange(period: Period, customFrom: string, customTo: string): { from: string; to: string } | null {
   const today = moscowNow()
-  if (period === 'today') return null
+  if (period === 'today') {
+    return { from: moscowMidnightUtc(today.y, today.m, today.d), to: moscowMidnightUtc(today.y, today.m, today.d + 1) }
+  }
   if (period === 'yesterday') {
     const day = addDays(today.y, today.m, today.d, -1)
     return { from: moscowMidnightUtc(day.y, day.m, day.d), to: moscowMidnightUtc(today.y, today.m, today.d) }
@@ -161,10 +163,14 @@ export default function AnalyticsPage() {
       const params = new URLSearchParams()
       if (locationId) params.set('location_id', locationId)
       const range = periodRange(period, customFrom, customTo)
-      if (range) {
-        params.set('date_from', range.from)
-        params.set('date_to', range.to)
+      if (!range) {
+        // «Период» без обеих дат — отчёт без границ не строим, ждём, пока выберут даты
+        setRows(null)
+        setError('Выберите даты «с» и «по»')
+        return
       }
+      params.set('date_from', range.from)
+      params.set('date_to', range.to)
       let path = ''
       if (tab === 'orders') path = `/reports/orders?${params}&group_by=${groupBy}`
       else if (tab === 'works') path = `/reports/works?${params}&group_by=${groupBy}&is_work=${isWork}`

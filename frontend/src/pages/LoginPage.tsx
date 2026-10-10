@@ -26,7 +26,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center bg-rail p-4">
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-rail p-4">
       <div className="mb-8 flex items-center gap-3">
         <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-xl font-bold text-white" aria-hidden>i</span>
         <span className="text-2xl font-semibold tracking-tight text-white">iBlack<span className="text-rail-ink">Master</span></span>

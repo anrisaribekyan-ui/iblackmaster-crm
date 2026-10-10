@@ -23,10 +23,40 @@
   --radius-md: 0.5rem;
 }
 
-html,
-body,
-#root {
-  height: 100%;
+/* На компьютере — каркас во всю высоту окна с прокруткой внутри; на телефоне прокручивается сама страница */
+@media (min-width: 768px) {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Телефон: поля ввода 16px — иначе iOS увеличивает страницу при касании, а на Android мелко */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    font-size: 16px;
+    max-width: 100%;
+    min-width: 0;
+  }
+  /* Поле даты на Android имеет свою минимальную ширину и вылезает из карточки */
+  input[type="date"],
+  input[type="datetime-local"] {
+    width: 100%;
+  }
+  /* Ряды вкладок прокручиваются пальцем, без полосы прокрутки */
+  nav {
+    scrollbar-width: none;
+  }
+  nav::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 body {

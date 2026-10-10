@@ -4,6 +4,11 @@
 	handle /api/* {
 		reverse_proxy backend:8000
 	}
+	# Страницы, service worker и manifest браузер всегда сверяет с сервером — иначе телефон застрянет на старой версии
+	@fresh not path /assets/* /icons/* /api/*
+	header @fresh Cache-Control "no-cache"
+	# Файлы сборки с хэшем в имени не меняются — пусть браузер держит их год
+	header /assets/* Cache-Control "public, max-age=31536000, immutable"
 	# Всё остальное — приложение (SPA)
 	handle {
 		root * /srv

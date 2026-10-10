@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../auth'
 import Icon from './icons'
+import InstallApp from './InstallApp'
 
 /** Меню как в LiveSklad. permission — право, без которого пункт скрыт (пусто — виден всем). */
 export const MENU: { to: string; label: string; icon: string; permission?: string }[] = [
@@ -48,10 +49,10 @@ export default function Layout() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="md:flex md:h-full">
       {menuOpen && <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setMenuOpen(false)} aria-hidden />}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col bg-rail text-rail-ink transition-transform md:static md:w-56 md:translate-x-0 ${menuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col bg-rail pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] text-rail-ink transition-transform md:static md:w-56 md:translate-x-0 ${menuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}
       >
         <div className="flex items-center gap-2.5 px-5 pb-5 pt-5">
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-[15px] font-bold text-white" aria-hidden>i</span>
@@ -78,6 +79,7 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
+        <InstallApp />
         <div className="m-3 flex items-center gap-3 rounded-lg bg-rail-hover px-3 py-2.5">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#3a3f47] text-sm font-medium text-white" aria-hidden>
             {(me?.short_name ?? '?').slice(0, 1)}
@@ -91,16 +93,10 @@ export default function Layout() {
           </button>
         </div>
       </aside>
-      <main className="min-w-0 flex-1 overflow-auto px-3 py-3 sm:px-8 sm:py-6">
-        <header className="mb-4 flex items-center gap-2 md:justify-end">
-          <button
-            type="button"
-            className="grid h-10 w-10 place-items-center rounded-md border border-line bg-surface md:hidden"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Открыть меню"
-          >
-            <Icon name="menu" />
-          </button>
+      {/* На телефоне прокручивается вся страница (прячется адресная строка, работает «потянуть — обновить»),
+          на компьютере — только рабочая область справа от меню */}
+      <main className="min-w-0 flex-1 px-3 pb-24 sm:px-8 md:overflow-auto md:py-6 md:pb-6">
+        <header className="sticky top-0 z-20 -mx-3 mb-3 flex items-center gap-2 bg-canvas/95 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur sm:-mx-8 sm:px-8 md:static md:mx-0 md:mb-4 md:justify-end md:bg-transparent md:p-0 md:backdrop-blur-none">
           <form onSubmit={(event) => void submitSearch(event)} className="relative min-w-0 flex-1 md:max-w-md md:flex-none md:basis-[28rem]">
             <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
@@ -113,6 +109,33 @@ export default function Layout() {
         </header>
         <Outlet />
       </main>
+      <MobileTabBar onMore={() => setMenuOpen(true)} canCreate={can('createOrderAccess')} />
     </div>
+  )
+}
+
+/** Нижняя панель на телефоне — как в обычных приложениях: главное под большим пальцем. */
+function MobileTabBar({ onMore, canCreate }: { onMore: () => void; canCreate: boolean }) {
+  const item = ({ isActive }: { isActive: boolean }) =>
+    `flex flex-1 flex-col items-center gap-0.5 pt-2 text-[11px] ${isActive ? 'text-accent' : 'text-muted'}`
+  return (
+    <nav
+      aria-label="Быстрые разделы"
+      className="fixed inset-x-0 bottom-0 z-20 flex border-t border-line bg-surface/95 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] backdrop-blur md:hidden"
+    >
+      <NavLink to="/" end className={item}><Icon name="home" className="h-6 w-6" />Главная</NavLink>
+      <NavLink to="/orders" end className={item}><Icon name="orders" className="h-6 w-6" />Заказы</NavLink>
+      {canCreate && (
+        <NavLink to="/orders/new" className="flex flex-1 flex-col items-center pt-1.5" aria-label="Новый заказ">
+          <span className="grid h-11 w-11 place-items-center rounded-full bg-accent text-white shadow-md shadow-accent/30">
+            <Icon name="plus" className="h-6 w-6" />
+          </span>
+        </NavLink>
+      )}
+      <NavLink to="/tasks" className={item}><Icon name="tasks" className="h-6 w-6" />Задачи</NavLink>
+      <button type="button" onClick={onMore} className="flex flex-1 flex-col items-center gap-0.5 pt-2 text-[11px] text-muted">
+        <Icon name="menu" className="h-6 w-6" />Ещё
+      </button>
+    </nav>
   )
 }

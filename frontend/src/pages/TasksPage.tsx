@@ -104,9 +104,9 @@ export default function TasksPage() {
       </header>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <nav className="flex gap-1 border-b border-line">
+        <nav className="flex max-w-full gap-1 overflow-x-auto border-b border-line">
           {tabs.map((t) => (
-            <button key={t.key} className={`border-b-2 px-3 py-2 ${tab === t.key ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab(t.key)}>
+            <button key={t.key} className={`whitespace-nowrap border-b-2 px-3 py-2 ${tab === t.key ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab(t.key)}>
               {t.label}
             </button>
           ))}

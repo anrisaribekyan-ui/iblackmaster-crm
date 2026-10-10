@@ -37,8 +37,17 @@ import DocumentsPage from './pages/store/DocumentsPage'
 import InventoryPage from './pages/store/InventoryPage'
 
 function Protected({ children }: { children: ReactNode }) {
-  const { me, loading } = useAuth()
+  const { me, loading, offline, retry } = useAuth()
   if (loading) return <div className="p-6 text-muted">Загрузка…</div>
+  if (!me && offline) {
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="text-lg font-semibold">Нет связи с сервером</p>
+        <p className="max-w-xs text-muted">Проверьте интернет на телефоне. CRM откроется сама, как только связь появится.</p>
+        <button type="button" onClick={retry} className="mt-2 rounded-md bg-accent px-5 py-2.5 font-medium text-accent-ink">Повторить</button>
+      </div>
+    )
+  }
   if (!me) return <Navigate to="/login" replace />
   return <>{children}</>
 }

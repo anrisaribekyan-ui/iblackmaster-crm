@@ -28,7 +28,7 @@ type Transaction = {
 type TransactionPage = { items: Transaction[]; total: number; page: number }
 type Filters = { locationId: string; registerId: string; itemId: string; dateFrom: string; dateTo: string; deleted: boolean }
 
-const inputClass = 'rounded-md border border-line bg-surface px-2.5 py-2'
+const inputClass = 'w-full min-w-0 rounded-md border border-line bg-surface px-2.5 py-2'
 const dateFormatter = new Intl.DateTimeFormat('ru-RU', {
   timeZone: 'Europe/Moscow',
   dateStyle: 'short',

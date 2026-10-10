@@ -1,5 +1,5 @@
 import { ClientCard, useIntakeHints, WarrantyAlert } from '../components/IntakeHints'
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { localInputToIso } from '../format'
@@ -357,7 +357,12 @@ export default function OrderCreatePage() {
                     {groupRows.map(({ row, columns }) => {
                       const columnCount = Math.max(...columns.map((column) => column.column)) + 1
                       return (
-                        <div key={row} className="grid gap-3" style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}>
+                        <div
+                          key={row}
+                          // На телефоне поля одно под другим, с планшета — колонки из настройки формы
+                          className="grid gap-3 sm:[grid-template-columns:var(--form-cols)]"
+                          style={{ '--form-cols': `repeat(${columnCount}, minmax(0, 1fr))` } as CSSProperties}
+                        >
                           {columns.map(({ column, fields: columnFields }) => (
                             <div key={column} className="grid content-start gap-3">
                               {columnFields.map((field) => (
@@ -398,8 +403,8 @@ export default function OrderCreatePage() {
           )}
           {fields.length > 0 && (
             <div className="flex justify-end gap-2">
-              <button type="button" className="rounded-md border border-line bg-surface px-4 py-2" onClick={() => navigate('/orders')}>Отмена</button>
-              <button disabled={saving || fieldsLoading} className="rounded-md bg-accent px-4 py-2 font-medium text-accent-ink disabled:opacity-60">
+              <button type="button" className="rounded-md border border-line bg-surface px-4 py-2.5" onClick={() => navigate('/orders')}>Отмена</button>
+              <button disabled={saving || fieldsLoading} className="flex-1 rounded-md bg-accent px-4 py-2.5 font-medium text-accent-ink disabled:opacity-60 sm:flex-none">
                 {saving ? 'Создание…' : 'Создать заказ'}
               </button>
             </div>
