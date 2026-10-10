@@ -86,7 +86,7 @@ def _rub(value) -> str:
     return f"{Decimal(value or 0):,.0f}".replace(",", " ")
 
 
-def render(db: Session, text: str, order: Order) -> str:
+def render(db: Session, text: str, order: Order, extra: dict[str, str] | None = None) -> str:
     client = db.get(Counteragent, order.counteragent_id)
     location = db.get(Location, order.location_id)
     debt = max(Decimal("0"), Decimal(order.total_price or 0) - Decimal(order.paid or 0))
@@ -104,6 +104,7 @@ def render(db: Session, text: str, order: Order) -> str:
     }
     if "{ссылка}" in text:
         values["{ссылка}"] = tracking_url(ensure_tracking_code(db, order))
+    values.update(extra or {})
     for key, value in values.items():
         text = text.replace(key, value)
     return re.sub(r"\s{2,}", " ", text).replace(" ,", ",").strip()
@@ -154,6 +155,21 @@ def enqueue_status(db: Session, order: Order, status: OrderStatus, employee_id: 
         text=render(db, template.text, order),
         created_by_id=employee_id,
     )
+    db.add(item)
+    db.flush()
+    return item
+
+
+def enqueue_text(db: Session, order: Order, text: str, kind: str, extra: dict[str, str] | None = None) -> Notification | None:
+    """Автоматическое SMS не по статусу (напоминание о забытом аппарате и т. п.).
+    Уважает «не присылать SMS» и молча пропускает клиентов без мобильного номера."""
+    client = db.get(Counteragent, order.counteragent_id)
+    if client is None or not client.allow_sms:
+        return None
+    phone = sms_phone(client)
+    if phone is None:
+        return None
+    item = Notification(order_id=order.id, counteragent_id=client.id, kind=kind, phone=phone, text=render(db, text, order, extra))
     db.add(item)
     db.flush()
     return item
@@ -243,10 +259,12 @@ def process(db: Session, gateway: SmsGateway) -> dict:
         if budget <= 0:
             stats["waiting"] += 1
             continue
-        if item.kind == "status":
+        if item.kind == "status" or item.kind.startswith("remind"):
             recent = db.scalar(
                 select(func.max(Notification.sent_at)).where(
-                    Notification.phone == item.phone, Notification.kind == "status", Notification.sent_at.is_not(None)
+                    Notification.phone == item.phone,
+                    (Notification.kind == "status") | Notification.kind.like("remind%"),
+                    Notification.sent_at.is_not(None),
                 )
             )
             if recent is not None and now - _as_utc(recent) < AUTO_PAUSE:
@@ -320,9 +338,17 @@ def start_worker(session_factory, interval: int = 15) -> None:
     _worker_started = True
 
     def loop():
+        last_reminders = 0.0
         while True:
             db = session_factory()
             try:
+                # Напоминания о забытых аппаратах — раз в час (днём; ночью queue_reminders ничего не ставит)
+                if time.monotonic() - last_reminders > 3600:
+                    last_reminders = time.monotonic()  # даже при ошибке не повторяем каждые 15 секунд
+                    from app.services import forgotten
+
+                    if forgotten.queue_reminders(db):
+                        db.commit()
                 stats = process(db, gateway)
                 db.commit()
                 if stats["sent"] or stats["failed"]:

@@ -8,7 +8,10 @@ import SettingsLayout from './pages/settings/SettingsLayout'
 import LocationsPage from './pages/settings/LocationsPage'
 import StatusesPage from './pages/settings/StatusesPage'
 import TrackPage from './pages/TrackPage'
+import ForgottenPage from './pages/ForgottenPage'
 import NotificationsPage from './pages/settings/NotificationsPage'
+import QuickOrdersPage from './pages/settings/QuickOrdersPage'
+import ChecklistSettingsPage from './pages/settings/ChecklistSettingsPage'
 import StaffPage from './pages/settings/StaffPage'
 import OrderTypesPage from './pages/settings/OrderTypesPage'
 import CompendiumsLayout from './pages/compendiums/CompendiumsLayout'
@@ -80,6 +83,7 @@ export default function App() {
             <Route path="orders">
               <Route index element={<OrdersPage />} />
               <Route path="new" element={<OrderCreatePage />} />
+              <Route path="forgotten" element={<ForgottenPage />} />
               <Route path=":orderId" element={<OrderDetailPage />} />
             </Route>
             <Route path="sales" element={<SalesPage />} />
@@ -123,6 +127,8 @@ export default function App() {
               <Route path="order-types" element={<OrderTypesPage />} />
               <Route path="staff" element={<StaffPage />} />
               <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="quick-orders" element={<QuickOrdersPage />} />
+              <Route path="checklist" element={<ChecklistSettingsPage />} />
             </Route>
             <Route path="*" element={<Stub title="Страница не найдена" task="—" />} />
           </Route>

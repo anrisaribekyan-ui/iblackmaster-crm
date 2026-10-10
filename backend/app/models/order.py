@@ -158,6 +158,9 @@ class Order(Base, TimestampMixin):
     is_deleted: Mapped[bool] = mapped_column(default=False)
     # Случайный код для публичной страницы отслеживания (QR на квитанции). По номеру заказа страница не открывается.
     tracking_code: Mapped[str | None] = mapped_column(String(16), unique=True, index=True)
+    # Чек-лист проверки аппарата (ТЗ этап 3, E5): {"Face ID": "ok" | "fail" | "na", ...}
+    check_in: Mapped[dict] = mapped_column(JSON, default=dict)  # при приёме
+    check_out: Mapped[dict] = mapped_column(JSON, default=dict)  # при выдаче
 
     order_type: Mapped[OrderType] = relationship()
     status: Mapped[OrderStatus] = relationship()
@@ -241,6 +244,8 @@ HISTORY_TYPES = {
     "max": "Отправлено в MAX",
     "email": "Отправлено на почту",
     "file": "Прикреплён файл",
+    "checklist": "Проверка устройства",
+    "signature": "Подпись клиента",
     "deleted": "Заказ удалён",
     "restored": "Заказ восстановлен",
 }
@@ -257,3 +262,27 @@ class OrderFile(Base):
     mimetype: Mapped[str] = mapped_column(String(100))
     size: Mapped[int]
     path: Mapped[str] = mapped_column(String(500))
+
+
+class QuickOrder(Base, TimestampMixin):
+    """Быстрый заказ (ТЗ этап 3, E3): частый ремонт одной кнопкой на приёмке.
+
+    Подставляет устройство, неисправность и ориентировочную цену, добавляет работы с ценой и гарантией.
+    Запчасти не списываются при приёме (аппарат ещё не разобран) — parts_note уходит мастеру в комментарий.
+    """
+
+    __tablename__ = "quick_order"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))  # «Замена АКБ iPhone 11»
+    device_type: Mapped[str | None] = mapped_column(String(100))
+    brand: Mapped[str | None] = mapped_column(String(100))
+    model: Mapped[str | None] = mapped_column(String(200))
+    problems: Mapped[list[str]] = mapped_column(JSON, default=list)
+    approximate_price: Mapped[str | None] = mapped_column(String(100))
+    # [{"name": "Замена АКБ", "price": 3500, "guarantee_days": 90}]
+    works: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    parts_note: Mapped[str | None] = mapped_column(String(300))
+    sort: Mapped[int] = mapped_column(default=0)
+    uses: Mapped[int] = mapped_column(default=0)  # сколько раз применили — частые выше
+    is_active: Mapped[bool] = mapped_column(default=True)

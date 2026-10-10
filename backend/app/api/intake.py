@@ -1,15 +1,19 @@
-"""Подсказки на приёмке (ТЗ этап 3, C1 + C2).
+"""Подсказки на приёмке (ТЗ этап 3, C1 + C2 + E2).
 
 C1. Узнавание клиента: номер вбит → сколько раз был, что чинили в последний раз, долг, «постоянный».
 C2. Гарантия на лету: тот же аппарат (IMEI/серийник) или тот же клиент + модель ремонтировались,
     и гарантия по позициям ещё не истекла. Если сроков гарантии в заказе нет (так у перенесённых из LiveSklad),
     но ремонт был недавно — показываем мягкую подсказку «повторное обращение».
 
+E2. Цена за 3 секунды: по модели — частые ремонты с обычной ценой из истории выданных заказов.
+
 Смотрим по всем точкам: гарантию, выданную в Ленте, должны увидеть и в Панфиловском.
 """
 
 import re
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
+from statistics import median
 
 from fastapi import APIRouter
 from sqlalchemy import func, or_, select
@@ -171,3 +175,77 @@ def intake_hints(
         "warranty": warranty_matches(db, client.id if client else None, serial, brand, model),
         "warranty_order_type_id": warranty_type.id if warranty_type else None,
     }
+
+
+# --- E2. Цена за 3 секунды ------------------------------------------------------------
+
+PRICE_WINDOW_DAYS = 365  # цены меняются — смотрим последний год, если за год мало данных, берём всё
+
+
+def _round100(value) -> int:
+    return int((Decimal(value) / 100).quantize(Decimal("1")) * 100)
+
+
+def _quantile(values: list, q: float):
+    ordered = sorted(values)
+    index = min(len(ordered) - 1, max(0, round(q * (len(ordered) - 1))))
+    return ordered[index]
+
+
+def _work_key(name: str) -> str:
+    return re.sub(r"\s+", " ", name.lower()).strip(" .,")
+
+
+def price_hints(db, brand: str | None, model: str | None, limit: int = 6) -> list[dict]:
+    """Частые работы по модели: сколько обычно стоил весь заказ с этой работой (итог для клиента),
+    диапазон «от-до» без выбросов (25–75 %), последняя цена и сколько раз делали."""
+    model = (model or "").strip()
+    if len(model) < 2:
+        return []
+    brand_key = _norm_model(brand)
+    base = (
+        select(Order.id, Order.brand, Order.total_price, Order.closed_at, OrderPosition.name)
+        .join(OrderPosition, OrderPosition.order_id == Order.id)
+        .where(
+            Order.is_deleted.is_(False),
+            Order.closed_at.is_not(None),
+            Order.total_price > 0,
+            OrderPosition.is_work.is_(True),
+            Order.model.ilike(model),
+        )
+    )
+    since = datetime.now(timezone.utc) - timedelta(days=PRICE_WINDOW_DAYS)
+    rows = db.execute(base.where(Order.closed_at >= since)).all()
+    if len({r.id for r in rows}) < 3:
+        rows = db.execute(base).all()
+    groups: dict[str, dict] = {}
+    for row in rows:
+        if brand_key and row.brand and _norm_model(row.brand) != brand_key:
+            continue
+        key = _work_key(row.name)
+        g = groups.setdefault(key, {"name": row.name.strip(), "orders": {}})
+        g["orders"][row.id] = (row.total_price, row.closed_at)
+    result = []
+    for g in groups.values():
+        orders = list(g["orders"].values())
+        totals = [t for t, _ in orders]
+        last_total, last_date = max(orders, key=lambda o: o[1])
+        result.append(
+            {
+                "work": g["name"],
+                "count": len(orders),
+                "from": _round100(_quantile(totals, 0.25)),
+                "to": _round100(_quantile(totals, 0.75)),
+                "typical": _round100(median(totals)),
+                "last": _round100(last_total),
+                "last_date": last_date,
+            }
+        )
+    result.sort(key=lambda r: (-r["count"], r["work"]))
+    return result[:limit]
+
+
+@router.get("/prices")
+def intake_prices(db: DbSession, me: CurrentEmployee, model: str, brand: str | None = None):
+    require_order_read(me)
+    return price_hints(db, brand, model)

@@ -64,3 +64,21 @@ def test_warranty_by_serial_and_by_model(client, auth_headers, db, owner):
     # Другая модель того же клиента — ничего
     hints = client.get(f"/api/intake/hints?counteragent_id={ivan.id}&brand=Apple&model=iPhone%2015", headers=auth_headers).json()
     assert hints["warranty"] == []
+
+
+def test_price_hints_by_model(client, auth_headers, db, owner):
+    ivan = Counteragent(name="Иван", phones="79161866119")
+    db.add(ivan)
+    db.flush()
+    for i, total in enumerate([6500, 7000, 7000, 7500, 20000]):  # 20 000 — выброс (дисплей + корпус)
+        make_order(db, owner, ivan, f"P{i}", days_ago=10 + i, model="iPhone 11", positions=[("Замена дисплея", 0)], total=total)
+    make_order(db, owner, ivan, "P9", days_ago=5, model="iPhone 11", positions=[("Замена АКБ", 0)], total=3500)
+    make_order(db, owner, ivan, "PX", days_ago=5, model="iPhone 12", positions=[("Замена дисплея", 0)], total=12000)
+    db.commit()
+    hints = client.get("/api/intake/prices?brand=apple&model=iphone 11", headers=auth_headers).json()
+    display = hints[0]
+    assert display["work"] == "Замена дисплея" and display["count"] == 5
+    assert (display["from"], display["to"], display["typical"]) == (7000, 7500, 7000)
+    assert display["last"] == 6500  # последний по дате выдачи (10 дней назад)
+    assert hints[1]["work"] == "Замена АКБ" and hints[1]["typical"] == 3500
+    assert client.get("/api/intake/prices?model=x", headers=auth_headers).json() == []

@@ -1,5 +1,9 @@
 import { ClientCard, useIntakeHints, WarrantyAlert } from '../components/IntakeHints'
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
+import PriceHints from '../components/PriceHints'
+import { DevicePasswordInput } from '../components/PatternLock'
+import { ChecklistInput, SignaturePad, useChecklistItems, type ChecklistValues } from '../components/Checklist'
+import QuickOrderPicker, { type QuickOrder } from '../components/QuickOrderPicker'
+import { Fragment, useEffect, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { localInputToIso } from '../format'
@@ -104,6 +108,10 @@ export default function OrderCreatePage() {
   const [managers, setManagers] = useState<Employee[]>([])
   const [deviceSuggestions, setDeviceSuggestions] = useState<DeviceSuggestion[]>([])
   const [counteragentId, setCounteragentId] = useState<number | null>(null)
+  const [quickOrder, setQuickOrder] = useState<QuickOrder | null>(null)
+  const checklistItems = useChecklistItems()
+  const [checkIn, setCheckIn] = useState<ChecklistValues>({})
+  const [signature, setSignature] = useState<string | null>(null)
   const [counteragentFound, setCounteragentFound] = useState('')
   const [lookupError, setLookupError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -293,8 +301,14 @@ export default function OrderCreatePage() {
         custom_fields: customFields,
         master_id: toOptionalNumber(values.master),
         manager_id: toOptionalNumber(values.manager),
+        quick_order_id: quickOrder?.id ?? null,
+        check_in: checkIn,
       }
       const created = await api.post<{ id: number; number: string }>('/orders', payload)
+      if (signature) {
+        // Заказ уже создан — подпись не должна его потерять, поэтому ошибку подписи не показываем как ошибку заказа
+        await api.post(`/orders/${created.id}/signature`, { stage: 'in', image: signature }).catch(() => undefined)
+      }
       navigate(`/orders/${created.id}`)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Не удалось создать заказ')
@@ -344,6 +358,27 @@ export default function OrderCreatePage() {
               </select>
             </label>
           </div>
+          {!fieldsLoading && fields.length > 0 && (
+            <div className="rounded-xl border border-line bg-surface p-4">
+              <QuickOrderPicker
+                model={String(values.model ?? '')}
+                selected={quickOrder}
+                onSelect={(q) => {
+                  setQuickOrder(q)
+                  if (!q) return
+                  // Подставляем устройство, неисправность и цену; уже введённое клиентом не затираем
+                  setValues((current) => ({
+                    ...current,
+                    deviceType: current.deviceType || q.device_type || current.deviceType,
+                    brand: current.brand || q.brand || current.brand,
+                    model: current.model || q.model || current.model,
+                    problem: Array.from(new Set([...(Array.isArray(current.problem) ? (current.problem as string[]) : []), ...q.problems])),
+                    approximatePrice: q.approximate_price || (q.total ? String(q.total) : current.approximatePrice),
+                  }))
+                }}
+              />
+            </div>
+          )}
           {fieldsLoading ? (
             <p className="text-muted">Загрузка формы…</p>
           ) : fields.length === 0 ? (
@@ -366,8 +401,8 @@ export default function OrderCreatePage() {
                           {columns.map(({ column, fields: columnFields }) => (
                             <div key={column} className="grid content-start gap-3">
                               {columnFields.map((field) => (
+                                <Fragment key={field.id}>
                                 <DynamicField
-                                  key={field.id}
                                   field={field}
                                   value={values[field.key]}
                                   choices={
@@ -388,6 +423,15 @@ export default function OrderCreatePage() {
                                     setCounteragentFound('')
                                   }}
                                 />
+                                {field.key === 'model' && (
+                                  // «Цена за 3 секунды» — сразу под моделью, пока приёмщик разговаривает с клиентом
+                                  <PriceHints
+                                    brand={String(values.brand ?? '')}
+                                    model={String(values.model ?? '')}
+                                    onPick={(price) => setValues((current) => ({ ...current, approximatePrice: price }))}
+                                  />
+                                )}
+                                </Fragment>
                               ))}
                             </div>
                           ))}
@@ -397,9 +441,20 @@ export default function OrderCreatePage() {
                   </div>
                   {group === 'counteragent' && hints?.client && <ClientCard client={hints.client} />}
                   {group === 'device' && hints && <div className="mt-3"><WarrantyAlert hints={hints} isWarrantyType={isWarrantyType} onApply={applyWarranty} /></div>}
+
                 </section>
               ))}
             </div>
+          )}
+          {!fieldsLoading && fields.length > 0 && checklistItems.length > 0 && (
+            <section className="rounded-xl border border-line bg-surface p-4">
+              <h2 className="mb-1 font-semibold">Проверка при приёме</h2>
+              <p className="mb-3 text-sm text-muted">Что работает у аппарата сейчас — при споре после ремонта это главный аргумент.</p>
+              <ChecklistInput items={checklistItems} value={checkIn} onChange={setCheckIn} />
+              <div className="mt-4">
+                <SignaturePad onChange={setSignature} />
+              </div>
+            </section>
           )}
           {fields.length > 0 && (
             <div className="flex justify-end gap-2">
@@ -480,6 +535,8 @@ function DynamicField({
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
     )
+  } else if (field.key === 'password') {
+    control = <DevicePasswordInput className={inputClass} value={String(value ?? '')} onChange={(v) => onChange(v)} />
   } else if (field.data_type === 'boolean') {
     control = <input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} />
   } else if (field.data_type === 'text') {
@@ -509,7 +566,7 @@ function DynamicField({
 
   // Поля с кнопками внутри (подсказки, «+») нельзя оборачивать в <label>: клик по кнопке
   // перехватывается label и значение не добавляется.
-  const Wrapper = field.data_type === 'multiple' && field.key !== 'phones' ? 'div' : 'label'
+  const Wrapper = (field.data_type === 'multiple' && field.key !== 'phones') || field.key === 'password' ? 'div' : 'label'
   return (
     <Wrapper className="grid gap-1 text-sm text-muted">
       {label}

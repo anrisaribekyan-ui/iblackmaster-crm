@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../auth'
+import { isSignatureFile } from './OrderChecklistCard'
 
 type OrderFileItem = {
   id: number
@@ -60,7 +61,8 @@ export default function OrderPhotos({ orderId, disabled, onChanged }: { orderId:
 
   const load = useCallback(async () => {
     try {
-      setItems(await api.get<OrderFileItem[]>(`/orders/${orderId}/files`))
+      // Подписи клиента показываются в блоке «Проверка устройства», не среди фото
+      setItems((await api.get<OrderFileItem[]>(`/orders/${orderId}/files`)).filter((f) => !isSignatureFile(f.filename)))
     } catch {
       /* без фото карточка заказа работает */
     }

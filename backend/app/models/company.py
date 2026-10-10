@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import JSON, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base, TimestampMixin
@@ -89,3 +89,13 @@ class CashRegister(Base, TimestampMixin):
     bank_balance: Mapped[Decimal] = mapped_column(default=Decimal("0"))
 
     location: Mapped[Location | None] = relationship(back_populates="cash_registers")
+
+
+class AppSetting(Base, TimestampMixin):
+    """Настройки CRM «ключ → значение» (напоминания о забытых аппаратах, пункты чек-листа и т. п.).
+    Значения по умолчанию живут в app.services.settings, в таблице — только то, что изменили."""
+
+    __tablename__ = "app_setting"
+
+    key: Mapped[str] = mapped_column(String(50), primary_key=True)
+    value: Mapped[dict] = mapped_column(JSON, default=dict)

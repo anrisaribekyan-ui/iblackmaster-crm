@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../../api/client'
+import ForgottenSettings from '../../components/ForgottenSettings'
 
 type Variable = { name: string; hint: string }
 type Template = {
@@ -234,6 +235,8 @@ export default function NotificationsPage() {
               ))}
             </div>
           </div>
+
+          <ForgottenSettings />
 
           <div className="rounded-xl border border-line bg-surface p-3">
             <h3 className="mb-2 font-semibold">Проверить отправку</h3>

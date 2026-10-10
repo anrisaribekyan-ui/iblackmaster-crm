@@ -75,6 +75,8 @@ class OrderCreate(BaseModel):
     custom_fields: dict = Field(default_factory=dict)
     master_id: int | None = None
     manager_id: int | None = None
+    check_in: dict[str, str] = Field(default_factory=dict)  # чек-лист при приёме: пункт → ok | fail | na
+    quick_order_id: int | None = None  # быстрый заказ: добавить его работы
 
 
 class OrderUpdate(BaseModel):
@@ -491,7 +493,7 @@ def create_order(data: OrderCreate, db: DbSession, me: CurrentEmployee):
         raise BusinessError("Не настроен начальный статус заказа")
 
     order = Order(
-        **data.model_dump(exclude={"counteragent", "master_id", "manager_id"}),
+        **data.model_dump(exclude={"counteragent", "master_id", "manager_id", "quick_order_id"}),
         number=order_service.next_order_number(db),
         status_id=first_status.id,
         counteragent_id=counteragent.id,
@@ -502,6 +504,10 @@ def create_order(data: OrderCreate, db: DbSession, me: CurrentEmployee):
     db.add(order)
     db.flush()
     order_service.add_history(db, order, "created", me, status_id=first_status.id)
+    if data.quick_order_id:
+        from app.api.quick_orders import apply_to_order
+
+        apply_to_order(db, order, data.quick_order_id, me)
     notification_service.ensure_tracking_code(db, order)
     notification_service.enqueue_status(db, order, first_status, me.id)  # SMS «Заказ принят», если включено
     db.commit()

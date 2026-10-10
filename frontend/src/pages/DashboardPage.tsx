@@ -6,6 +6,7 @@ import BarList from '../components/charts/BarList'
 import ChartCard from '../components/charts/ChartCard'
 import StatTile from '../components/charts/StatTile'
 import MyEarnings from '../components/MyEarnings'
+import ForgottenBanner from '../components/ForgottenBanner'
 import TimeChart from '../components/charts/TimeChart'
 import { compact, count, dayShort, rub } from '../components/charts/format'
 
@@ -147,6 +148,7 @@ export default function DashboardPage() {
 
       {error && <p role="alert" className="mb-4 text-danger">{error}</p>}
 
+      <ForgottenBanner locationId={locationId} />
       <MyEarnings />
 
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">

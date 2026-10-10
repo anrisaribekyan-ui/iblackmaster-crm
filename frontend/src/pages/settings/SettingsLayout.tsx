@@ -6,6 +6,8 @@ const links = [
   { to: 'order-types', label: 'Типы заказов' },
   { to: 'staff', label: 'Сотрудники и роли' },
   { to: 'notifications', label: 'Уведомления' },
+  { to: 'quick-orders', label: 'Быстрые заказы' },
+  { to: 'checklist', label: 'Чек-лист' },
 ]
 
 export default function SettingsLayout() {

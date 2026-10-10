@@ -193,6 +193,7 @@ export default function OrdersPage() {
             {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
           </select>
           {can('createOrderAccess') && <Link className="hidden rounded-md bg-accent px-3 py-2 font-medium text-accent-ink md:inline-block" to="/orders/new">Создать</Link>}
+          <Link className="whitespace-nowrap rounded-md border border-line bg-surface px-3 py-2" to="/orders/forgotten">Забытые</Link>
           <button className="hidden whitespace-nowrap rounded-md border border-line bg-surface px-3 py-2 sm:block" onClick={() => void exportCsv()}>Скачать CSV</button>
         </div>
       </header>

@@ -9,6 +9,9 @@ import { escapeHtml, openPrint } from '../print'
 import QRCode from 'qrcode'
 import OrderSms from '../components/OrderSms'
 import OrderPhotos from '../components/OrderPhotos'
+import OrderChecklistCard, { checklistHtml, signatureHtml, type Signatures } from '../components/OrderChecklistCard'
+import type { ChecklistValues } from '../components/Checklist'
+import { DevicePasswordInput, parsePattern, PatternView } from '../components/PatternLock'
 
 type Status = { id: number; group: string; name: string; color: string; pay_required: boolean; comment_mode: string }
 type StatusGroup = { group: string; title: string; statuses: Status[] }
@@ -195,6 +198,7 @@ export default function OrderDetailPage() {
   const [taskCreating, setTaskCreating] = useState(false)
   const [locations, setLocations] = useState<LocationInfo[]>([])
   const [trackQr, setTrackQr] = useState('')
+  const [signatures, setSignatures] = useState<Signatures>({})
 
   const loadDetail = useCallback(async (initial = false) => {
     if (!orderId) return
@@ -538,6 +542,8 @@ export default function OrderDetailPage() {
       <p>Предоплата: ${escapeHtml(prepayment)}</p>
       <p>Мастер: ${escapeHtml(detail.master?.short_name ?? '—')}</p>
       ${orderFields.note ? `<p>Примечание: ${escapeHtml(String(orderFields.note))}</p>` : ''}
+      ${checklistHtml((orderFields.check_in ?? {}) as ChecklistValues)}
+      ${signatureHtml(signatures.in, 'Подпись клиента при приёме')}
       <div class="signatures">
         <div class="signature">Заказчик: ____________________</div>
         <div class="signature">Принял: ____________________</div>
@@ -586,7 +592,9 @@ export default function OrderDetailPage() {
       </table>
       <p style="margin-top: 3mm"><strong>Итого: ${escapeHtml(formatMoney(detail.order.total_price))}</strong></p>
       <p>Оплачено: ${escapeHtml(formatMoney(detail.order.paid))}</p>
+      ${checklistHtml((orderFields.check_in ?? {}) as ChecklistValues, (orderFields.check_out ?? {}) as ChecklistValues)}
       <p style="margin-top: 8mm">Претензий к качеству и срокам не имею.</p>
+      ${signatureHtml(signatures.out, 'Подпись клиента при выдаче')}
       <div class="signatures">
         <div class="signature">Заказчик: ____________________</div>
         <div class="signature">Мастер: ____________________</div>
@@ -698,7 +706,14 @@ export default function OrderDetailPage() {
                 <Info label="Тип заказа" value={detail.order_type.name} />
                 <Info label="Статус" value={detail.status.name} />
                 {fields.filter((field) => field.is_visible && field.key !== 'name' && field.key !== 'phones').map((field) => (
-                  <Info key={field.id} label={field.label} value={displayValue(field, detail, masters, managers, howKnows)} />
+                  field.key === 'password' && parsePattern(String(fieldValue(field, detail) ?? ''))
+                    ? (
+                      <div key={field.id}>
+                        <dt className="text-sm text-muted">{field.label}</dt>
+                        <dd className="mt-1"><PatternView dots={parsePattern(String(fieldValue(field, detail)))!} size={84} /></dd>
+                      </div>
+                    )
+                    : <Info key={field.id} label={field.label} value={displayValue(field, detail, masters, managers, howKnows)} />
                 ))}
               </div>
             </section>
@@ -818,6 +833,16 @@ export default function OrderDetailPage() {
               </div>
             </section>
           )}
+          <div className="mt-4">
+            <OrderChecklistCard
+              orderId={detail.order.id}
+              checkIn={(orderFields.check_in ?? {}) as ChecklistValues}
+              checkOut={(orderFields.check_out ?? {}) as ChecklistValues}
+              disabled={isDeleted}
+              onChanged={() => void loadDetail()}
+              onSignatures={setSignatures}
+            />
+          </div>
           <div className="mt-4">
             <OrderPhotos orderId={detail.order.id} disabled={isDeleted} onChanged={() => void loadDetail()} />
           </div>
@@ -1062,6 +1087,15 @@ function OrderInfoEditor({
           const value = values[field.key]
           const staticField = field.key === 'name' || field.key === 'phones'
           const selectOptions = field.key === 'master' ? masters : field.key === 'manager' ? managers : []
+          if (field.key === 'password') {
+            // Графический ключ рисуется в отдельном окне — поэтому не <label>, чтобы тапы не уходили в поле
+            return (
+              <div key={field.id} className="grid gap-1 text-sm text-muted">
+                {field.label}
+                <DevicePasswordInput className={inputClass} value={String(value ?? '')} onChange={(v) => setValues((current) => ({ ...current, [field.key]: v }))} />
+              </div>
+            )
+          }
           return (
             <label key={field.id} className="grid gap-1 text-sm text-muted">
               {field.label}

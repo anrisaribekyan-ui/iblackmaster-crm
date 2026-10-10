@@ -14,7 +14,7 @@ from app.models.catalog import (
     Problem,
     StockBalance,
 )
-from app.models.company import CashRegister, Company, Location, Store
+from app.models.company import AppSetting, CashRegister, Company, Location, Store
 from app.models.counteragent import Counteragent, CounteragentType, HowKnow
 from app.models.finance import CashItem, CashItemType, Transaction
 from app.models.notification import Notification, NotificationState, NotificationTemplate
@@ -29,6 +29,7 @@ from app.models.order import (
     OrderPosition,
     OrderStatus,
     OrderType,
+    QuickOrder,
     StatusGroup,
 )
 from app.models.salary import AccrualKind, SalaryEvent, SalaryRule
