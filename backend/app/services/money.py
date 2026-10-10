@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.db import MONEY_STEP, utcnow
 from app.errors import BusinessError
-from app.models import CashItem, CashItemType, CashRegister, Company, Counteragent, Transaction
+from app.models import CashItem, CashItemType, CashRegister, Company, Counteragent, Order, Sale, StockDocument, Transaction
 
 CENT = MONEY_STEP  # без копеек
 
@@ -72,6 +72,19 @@ def _apply(db: Session, tx: Transaction, sign: int) -> None:
         ca.balance = ca.balance + delta
 
 
+def _transaction_location(db: Session, reg: CashRegister, order_id, sale_id, stock_document_id) -> int | None:
+    """Точка операции. У кассы точки — её точка; у общей кассы (терминал, перевод на карту) — точка заказа,
+    чека или документа, иначе отчёты по точкам не увидят оплату через общую кассу."""
+    if reg.location_id is not None:
+        return reg.location_id
+    for model, key in ((Order, order_id), (Sale, sale_id), (StockDocument, stock_document_id)):
+        if key:
+            doc = db.get(model, key)
+            if doc is not None:
+                return doc.location_id
+    return None
+
+
 def create_transaction(
     db: Session,
     *,
@@ -110,7 +123,7 @@ def create_transaction(
         is_income=cash_item.is_income,
         is_bank=is_bank,
         amount=amount,
-        location_id=reg.location_id,
+        location_id=_transaction_location(db, reg, order_id, sale_id, stock_document_id),
         counteragent_id=counteragent_id,
         employee_id=employee_id,
         created_by_id=created_by_id,

@@ -59,3 +59,26 @@ def test_update_unknown_cash_register_returns_404(client, auth_headers):
         headers=auth_headers,
     )
     assert response.status_code == 404
+
+def test_global_register_payment_keeps_order_location(db, owner):
+    """Оплата заказа через общую кассу (терминал, перевод на карту) попадает в отчёт точки заказа."""
+    from sqlalchemy import select
+
+    from app.models import CashItem, CashRegister, Counteragent, Location, Order, OrderStatus, OrderType
+    from app.services import money
+
+    lenta = db.scalars(select(Location).order_by(Location.sort)).all()[1]
+    common = db.scalars(select(CashRegister).where(CashRegister.location_id.is_(None), CashRegister.accepts_bank.is_(True))).first()
+    assert common is not None
+    client = Counteragent(name="Клиент")
+    db.add(client)
+    db.flush()
+    order = Order(number="G-1", location_id=lenta.id, order_type_id=db.scalars(select(OrderType)).first().id,
+                  counteragent_id=client.id, status_id=db.scalars(select(OrderStatus)).first().id, created_by_id=owner.id)
+    db.add(order)
+    db.flush()
+    item = db.scalars(select(CashItem).where(CashItem.type == "order")).first()
+    tx = money.create_transaction(db, cash_register_id=common.id, cash_item=item, amount=2000, is_bank=True, order_id=order.id)
+    assert tx.location_id == lenta.id
+    plain = money.create_transaction(db, cash_register_id=common.id, cash_item=item, amount=100, is_bank=True)
+    assert plain.location_id is None  # без заказа и чека точки нет — это нормально для общей кассы

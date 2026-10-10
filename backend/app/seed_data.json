@@ -33,15 +33,6 @@
      "allow_negative": true,
      "allow_internal_move": true,
      "is_default": true
-    },
-    {
-     "name": "Перевод 89996671607",
-     "accepts_cash": false,
-     "accepts_bank": true,
-     "bank_percent": "0",
-     "allow_negative": true,
-     "allow_internal_move": true,
-     "is_default": false
     }
    ]
   },
@@ -65,15 +56,6 @@
      "allow_negative": true,
      "allow_internal_move": true,
      "is_default": true
-    },
-    {
-     "name": "Перевод 89996671607",
-     "accepts_cash": false,
-     "accepts_bank": true,
-     "bank_percent": "0",
-     "allow_negative": true,
-     "allow_internal_move": true,
-     "is_default": false
     }
    ]
   },
@@ -97,15 +79,6 @@
      "allow_negative": true,
      "allow_internal_move": true,
      "is_default": true
-    },
-    {
-     "name": "Перевод 89996671607",
-     "accepts_cash": false,
-     "accepts_bank": true,
-     "bank_percent": "0",
-     "allow_negative": true,
-     "allow_internal_move": true,
-     "is_default": false
     }
    ]
   }
@@ -116,6 +89,15 @@
    "accepts_cash": false,
    "accepts_bank": true,
    "bank_percent": "9.7",
+   "allow_negative": true,
+   "allow_internal_move": true,
+   "is_default": false
+  },
+  {
+   "name": "Перевод 89996671607",
+   "accepts_cash": false,
+   "accepts_bank": true,
+   "bank_percent": "0",
    "allow_negative": true,
    "allow_internal_move": true,
    "is_default": false
