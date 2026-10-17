@@ -5,6 +5,7 @@ import ChartCard from './charts/ChartCard'
 import TimeChart from './charts/TimeChart'
 import BarList from './charts/BarList'
 import { compact, dayLong, dayShort, rub } from './charts/format'
+import Skeleton from './Skeleton'
 
 type GroupBy = 'day' | 'week' | 'month'
 
@@ -141,7 +142,7 @@ export default function ProfitReport({ range, locationId, filenameBase }: { rang
 
       {error && <p role="alert" className="mb-3 text-danger">{error}</p>}
       {loading && !data ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : !data || !t ? null : t.revenue === 0 && t.expenses === 0 && t.salary === 0 ? (
         <p className="rounded-xl border border-line bg-surface p-5 text-muted">За выбранный период данных нет.</p>
       ) : (

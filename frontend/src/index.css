@@ -147,10 +147,15 @@ button.border-line:not(:disabled):hover {
   box-shadow: 0 1px 2px rgb(16 24 40 / 0.04);
 }
 
+/* Меньше движения = без перемещений, но цвет и прозрачность остаются: состояние всё равно видно */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
-    transition: none !important;
-    animation: none !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+  button:active {
+    transform: none !important;
   }
 }
 
@@ -184,9 +189,71 @@ input[list]::-webkit-calendar-picker-indicator {
   display: none !important;
 }
 
-/* Заголовки таблиц: мелко, капителью — данные читаются первыми */
-thead th {
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+/* ── Движение (принципы Эмиля Ковальски): только transform и opacity, сильный ease-out, интерфейс < 300 мс.
+   Частые действия (вкладки, строки, клавиатура) не анимируем вовсе — только то, что появляется редко. */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
+
+/* Нажатие: кнопка чуть «проседает» под пальцем — отклик раньше, чем ответ сервера */
+@layer base {
+  button {
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 160ms var(--ease-out);
+  }
+  button:not(:disabled):active {
+    transform: scale(0.97);
+  }
+}
+
+/* Окна: фон проявляется, само окно — из 97 % к 100 %; на телефоне выезжает снизу, как шторка */
+@keyframes backdrop-in { from { opacity: 0; } }
+@keyframes dialog-in { from { opacity: 0; transform: scale(0.97); } }
+@keyframes sheet-in { from { transform: translateY(100%); } }
+.modal-backdrop { animation: backdrop-in 200ms ease-out; }
+.modal-panel { animation: dialog-in 200ms var(--ease-out); }
+@media (max-width: 639px) {
+  .modal-panel { animation: sheet-in 320ms var(--ease-drawer); }
+}
+
+/* Выпадающее меню растёт из своей кнопки (правый верхний угол), а не из центра */
+details[open] > .pop {
+  transform-origin: top right;
+  animation: dialog-in 150ms var(--ease-out);
+}
+
+/* Меню «+» на телефоне: пункты поднимаются друг за другом */
+@keyframes rise-in { from { opacity: 0; transform: translateY(12px); } }
+.rise > * { animation: rise-in 260ms var(--ease-out) both; }
+.rise > *:nth-child(2) { animation-delay: 40ms; }
+.rise > *:nth-child(3) { animation-delay: 80ms; }
+
+/* Подтверждение (чек пробит, сохранено): короткий подъём — видно, что изменилось */
+.pop-in { animation: rise-in 220ms var(--ease-out); }
+
+/* ── Поверхности браузера тоже часть дизайна */
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-ink);
+}
+input, textarea {
+  caret-color: var(--color-accent);
+}
+@media (min-width: 768px) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #c9ced6 transparent;
+  }
+}
+
+/* Выпадающий список на графитовом фоне: своя светлая стрелка вместо системной */
+.dark-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%23ffffffb3' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7rem center;
+  min-height: 0;
+}
+.dark-select:focus { border-color: transparent; box-shadow: 0 0 0 3px rgb(255 255 255 / 0.2); }
+.dark-select option, .dark-select optgroup { color: var(--color-ink); background: var(--color-surface); }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRowLink } from '../../components/rowLink'
 import { api, ApiError } from '../../api/client'
 import ForgottenSettings from '../../components/ForgottenSettings'
+import Skeleton from '../../components/Skeleton'
 
 type Variable = { name: string; hint: string }
 type Template = {
@@ -192,7 +193,7 @@ export default function NotificationsPage() {
     <section className="space-y-6">
       <h2 className="text-lg font-semibold">Уведомления клиентам</h2>
       {error && <p role="alert" className="rounded-md border border-danger p-3 text-danger">{error}</p>}
-      {loading ? <p className="text-muted">Загрузка…</p> : (
+      {loading ? <Skeleton /> : (
         <>
           {status && (
             <div className="grid gap-3 sm:grid-cols-3">

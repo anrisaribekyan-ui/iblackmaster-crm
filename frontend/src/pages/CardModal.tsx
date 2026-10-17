@@ -5,6 +5,7 @@ import { useAuth } from '../auth'
 import { isoToLocalInput, localInputToIso } from '../format'
 import { formatDateTime, inputClass } from './shared'
 import { CARD_COLORS, type CardDetail, type ChecklistItem, type EmployeeShort } from './boardsTypes'
+import Skeleton from '../components/Skeleton'
 
 type OrderRef = { id: number; number: string }
 type CommentRef = { id: number; author_name: string | null; text: string; created_at: string }
@@ -140,7 +141,7 @@ export default function CardModal({
 
         <div className="flex-1 overflow-auto p-4">
           {loading ? (
-            <p className="text-muted">Загрузка…</p>
+            <Skeleton />
           ) : (
             <div className="grid gap-3">
               {error && <p role="alert" className="text-sm text-danger">{error}</p>}

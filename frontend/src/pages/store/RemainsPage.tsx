@@ -5,6 +5,7 @@ import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import { inputClass, money, qty, useLocationsAndRegisters } from '../shared'
 import { downloadCsv } from '../../csv'
+import Skeleton from '../../components/Skeleton'
 
 type Remain = {
   store_id: number
@@ -92,27 +93,27 @@ export default function RemainsPage() {
   return (
     <div>
       <form onSubmit={(e) => void load(e)} className="mb-4 flex flex-wrap items-end gap-2">
-        <label className="grid gap-1 text-xs text-muted">Локация
+        <label className="grid min-w-0 flex-1 gap-1 text-xs text-muted md:flex-none">Локация
           <select className={inputClass} value={locationId} onChange={(e) => { setLocationId(e.target.value); setStoreId('') }}>
             <option value="">Все локации</option>
             {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
         </label>
-        <label className="grid gap-1 text-xs text-muted">Склад
+        <label className="grid min-w-0 flex-1 gap-1 text-xs text-muted md:flex-none">Склад
           <select className={inputClass} value={storeId} onChange={(e) => setStoreId(e.target.value)} disabled={!locationId}>
             <option value="">Все склады</option>
             {stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </label>
-        <input type="search" className={`${inputClass} min-w-48 flex-1`} placeholder="Товар, артикул или код" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <button type="button" className="rounded-md border border-line bg-surface px-3 py-2" onClick={exportCsv}>Скачать CSV</button>
+        <input type="search" className={`${inputClass} order-first basis-full md:order-none md:basis-auto md:min-w-48 md:flex-1`} placeholder="Товар, артикул или код" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <button type="button" className="hidden rounded-md border border-line bg-surface px-3 py-2 md:block" onClick={exportCsv}>Скачать CSV</button>
       </form>
       <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
         <button type="button" onClick={() => setOnlyPositive((v) => !v)} className={`rounded-full border px-3 py-1 ${onlyPositive ? 'border-ink bg-ink text-white' : 'border-line bg-surface'}`}>В наличии</button>
         <button type="button" onClick={() => setOnlyLow((v) => !v)} className={`rounded-full border px-3 py-1 ${onlyLow ? 'border-warning bg-warning text-white' : 'border-line bg-surface'}`}>
           Заканчивается{lowCount > 0 && <span className="ml-1.5 num opacity-80">{lowCount}</span>}
         </button>
-        <label className="ml-auto flex items-center gap-2 text-muted">Сортировка
+        <label className="ml-auto flex items-center gap-2 text-muted"><span className="hidden sm:inline">Сортировка</span>
           <select className="rounded-md border border-line bg-surface px-2 py-1" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
             <option value="name">по названию</option>
             <option value="quantity">меньше всего</option>
@@ -123,7 +124,7 @@ export default function RemainsPage() {
 
       {error && <p className="mb-3 text-danger">{error}</p>}
       {rows === null ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : shown.length === 0 ? (
         <p className="rounded-xl border border-line bg-surface p-4 text-muted">
           {search ? `По «${search}» ничего нет.` : onlyLow ? 'Ничего не заканчивается — у всех товаров остаток выше минимального.' : 'Товаров нет. Остатки появятся после поступления.'}
@@ -132,12 +133,12 @@ export default function RemainsPage() {
         <>
         <p className="mb-2 text-sm text-muted">{shown.length} позиций · {qty(units)} шт{showPrice && <> · <span className="text-ink num">{money(total)}</span> по закупке</>}</p>
         {/* Телефон: карточки */}
-        <ul className="grid gap-2 md:hidden">
+        <ul className="grid grid-cols-1 gap-2 md:hidden">
           {shown.map((r) => (
-            <li key={`${r.store_id}-${r.nomenclature_id}`}>
+            <li key={`${r.store_id}-${r.nomenclature_id}`} className="min-w-0">
               <button type="button" onClick={() => open(r.nomenclature_id)} className="flex w-full items-center gap-3 rounded-xl border border-line bg-surface p-3 text-left active:bg-canvas">
                 <span className="min-w-0 flex-1">
-                  <span className="line-clamp-2">{r.name}</span>
+                  <span className="line-clamp-2 [overflow-wrap:anywhere]">{r.name}</span>
                   <small className="text-muted">{r.group ?? `код ${r.code}`}{!storeId && ` · ${r.store_name}`}</small>
                 </span>
                 <span className="text-right">

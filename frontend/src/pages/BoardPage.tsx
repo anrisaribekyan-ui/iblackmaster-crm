@@ -21,6 +21,7 @@ import { formatDateTime, inputClass } from './shared'
 import { LAST_SPACE_KEY } from './BoardsPage'
 import CardModal from './CardModal'
 import type { Board, CardShort, Column, EmployeeShort, SpaceDetail, SpaceRef } from './boardsTypes'
+import Skeleton from '../components/Skeleton'
 
 type SearchResult = { id: number; title: string; space_id: number; space_name: string; board_name: string; column_name: string }
 type MenuState = { kind: 'board' | 'column' | 'card'; id: number; name: string } | null
@@ -573,7 +574,7 @@ export default function BoardPage() {
       {error && <p role="alert" className="mb-3 text-danger">{error}</p>}
 
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : space === null ? (
         <p className="rounded-xl border border-line bg-surface p-5 text-muted">Доска недоступна.</p>
       ) : space.boards.length === 0 ? (

@@ -624,38 +624,65 @@ export default function OrderDetailPage() {
 
   return (
     <section>
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <Link className="text-muted hover:text-ink" to="/orders">← Заказы</Link>
-          <h1 className={`text-xl font-semibold ${isDeleted ? 'text-muted line-through decoration-danger decoration-2' : ''}`}>{detail.order.number}</h1>
-          <select
-            aria-label="Статус заказа"
-            className="rounded-full border-0 px-3 py-1.5 font-medium"
-            style={{ color: statusColors(detail.status.color).text, backgroundColor: statusColors(detail.status.color).bg }}
-            value={detail.status.id}
-            onChange={(event) => selectStatus(event.target.value)}
-            disabled={isDeleted}
-          >
-            {statusGroups.map((group) => (
-              <optgroup key={group.group} label={group.title}>
-                {group.statuses.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}
-              </optgroup>
-            ))}
-          </select>
+      {/* Шапка заказа — как бирка, которую вешают на аппарат: номер крупно, что за устройство, чьё и сколько должны */}
+      <header className="mb-4 overflow-hidden rounded-2xl bg-rail text-white">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 sm:px-5">
+          <Link className="text-sm text-white/50 transition-colors hover:text-white" to="/orders">← Заказы</Link>
+          <span className="flex gap-1.5">
+            <details className="relative">
+              <summary className="cursor-pointer list-none rounded-lg px-3 py-1.5 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white">Печать</summary>
+              <div className="pop absolute right-0 z-20 mt-1 flex w-52 flex-col rounded-lg border border-line bg-surface p-1 text-ink shadow-lg">
+                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={printReceipt}>Квитанция о приёме</button>
+                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={printAct}>Акт выдачи</button>
+              </div>
+            </details>
+            {!isDeleted && can('deleteOrderAccess') && (
+              <button className="rounded-lg px-3 py-1.5 text-sm text-white/60 transition-colors hover:bg-white/10 hover:text-[#ff8a72]" onClick={() => setDeleting(true)}>Удалить</button>
+            )}
+          </span>
         </div>
-        <span className="flex gap-2">
-          <details className="relative">
-            <summary className="cursor-pointer list-none rounded-md border border-line bg-surface px-3 py-2">Печать</summary>
-            <div className="absolute right-0 z-10 mt-1 flex w-52 flex-col rounded-md border border-line bg-surface p-1 shadow-lg">
-              <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={printReceipt}>Квитанция о приёме</button>
-              <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={printAct}>Акт выдачи</button>
+        <div className="grid gap-4 px-4 pb-4 pt-2 sm:px-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className={`num text-[34px] font-semibold leading-none tracking-tight ${isDeleted ? 'text-white/40 line-through decoration-[#ff8a72] decoration-2' : ''}`}>{detail.order.number}</h1>
+              <span className="relative inline-flex items-center">
+                <span className="pointer-events-none absolute left-3 h-2 w-2 rounded-full" style={{ backgroundColor: statusColors(detail.status.color).dot }} aria-hidden />
+                <select
+                  aria-label="Статус заказа"
+                  className="dark-select w-auto rounded-full border-0 bg-white/10 py-1.5 pl-7 pr-8 font-medium text-white"
+                  value={detail.status.id}
+                  onChange={(event) => selectStatus(event.target.value)}
+                  disabled={isDeleted}
+                >
+                  {statusGroups.map((group) => (
+                    <optgroup key={group.group} label={group.title}>
+                      {group.statuses.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+              </span>
             </div>
-          </details>
-          {!isDeleted && detail.status.group !== 'closed' && <button className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" onClick={giveOrder}>Выдать</button>}
-          {!isDeleted && can('deleteOrderAccess') && (
-            <button className="rounded-md border border-line bg-surface px-3 py-2 text-danger" onClick={() => setDeleting(true)}>Удалить</button>
-          )}
-        </span>
+            <p className="mt-2 truncate text-lg text-white/90">{[str(detail.order.brand), str(detail.order.model)].filter(Boolean).join(' ') || str(detail.order.device_type) || 'Устройство не указано'}</p>
+            <p className="truncate text-sm text-white/50">
+              {detail.counteragent.name}{detail.counteragent.phones ? `, ${formatPhone(detail.counteragent.phones.split(',')[0])}` : ''}
+            </p>
+          </div>
+          <div className="flex items-end gap-5 md:justify-end">
+            <div>
+              <p className="text-xs text-white/50">Итого</p>
+              <p className="num text-2xl font-semibold leading-tight">{formatMoney(detail.order.total_price)}</p>
+            </div>
+            {Number(detail.debt) > 0 && (
+              <div>
+                <p className="text-xs text-white/50">Долг</p>
+                <p className="num text-2xl font-semibold leading-tight text-[#ff8a72]">{formatMoney(detail.debt)}</p>
+              </div>
+            )}
+            {!isDeleted && detail.status.group !== 'closed' && (
+              <button className="ml-auto rounded-lg bg-accent px-4 py-2.5 font-semibold text-accent-ink transition-transform active:scale-[0.97] md:ml-2" onClick={giveOrder}>Выдать</button>
+            )}
+          </div>
+        </div>
       </header>
       {isDeleted && (
         <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#fecdca] bg-[#fef3f2] px-4 py-3">

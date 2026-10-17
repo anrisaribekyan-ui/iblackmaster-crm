@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import { formatDateTime, inputClass, qty, useLocationsAndRegisters } from '../shared'
+import Skeleton from '../../components/Skeleton'
 
 type Row = { id: number; number: string; date: string; store: string | null; is_posted: boolean; note: string | null }
 type Detail = {
@@ -162,7 +163,7 @@ export default function InventoryPage() {
         </div>
       )}
       {error && <p className="mb-3 text-danger">{error}</p>}
-      {rows === null ? <p className="text-muted">Загрузка…</p> : rows.length === 0 ? (
+      {rows === null ? <Skeleton /> : rows.length === 0 ? (
         <p className="rounded-xl border border-line bg-surface p-4 text-muted">Инвентаризаций ещё не было.</p>
       ) : (
         <ul className="divide-y divide-line rounded-xl border border-line bg-surface">

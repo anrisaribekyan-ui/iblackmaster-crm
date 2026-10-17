@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../../api/client'
 import { money } from '../shared'
+import Skeleton from '../../components/Skeleton'
 
 type Location = { id: number; name: string }
 type SummaryRow = {
@@ -88,7 +89,7 @@ export default function SalaryPage() {
       {error && <p className="mb-3 text-danger">{error}</p>}
 
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : summary === null ? null : summary.items.length === 0 ? (
         <p className="text-muted">За этот месяц начислений нет.</p>
       ) : (

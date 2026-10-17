@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
+import Skeleton from '../../components/Skeleton'
 
 type StatusGroup = 'new' | 'inWork' | 'wait' | 'finish' | 'closed'
 type Status = {
@@ -94,7 +95,7 @@ export default function StatusesPage() {
       <h2 className="mb-4 text-lg font-semibold">Статусы заказа</h2>
       {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : data === null ? (
         <p className="text-muted">Не удалось загрузить статусы.</p>
       ) : (

@@ -5,6 +5,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../auth'
+import Skeleton from '../components/Skeleton'
 
 type HowKnow = { id: number; name: string; is_active: boolean }
 
@@ -72,7 +73,7 @@ export default function HowKnowsPage() {
       {error && <p className="mb-3 text-danger">{error}</p>}
 
       {items === null ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : items.length === 0 ? (
         <p className="text-muted">Источников пока нет. Добавьте первый — он появится в форме заказа.</p>
       ) : (

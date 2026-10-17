@@ -5,6 +5,7 @@ import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
 import { formatDateTime, inputClass, money } from '../shared'
 import SalarySettings from './SalarySettings'
+import Skeleton from '../../components/Skeleton'
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 const buttonClass = 'rounded-md border border-line bg-surface px-3 py-2 text-sm hover:bg-canvas'
@@ -200,7 +201,7 @@ export default function SalaryEmployeePage() {
       {error && <p className="mb-3 text-danger">{error}</p>}
 
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : tab === 'settings' ? (
         <SalarySettings employeeId={id} />
       ) : tab === 'accruals' ? (
@@ -241,7 +242,7 @@ export default function SalaryEmployeePage() {
                         <tr key={`${key}-events`}>
                           <td colSpan={8} className="bg-canvas px-3 py-3">
                             {events === null ? (
-                              <p className="text-muted">Загрузка…</p>
+                              <Skeleton />
                             ) : events.length === 0 ? (
                               <p className="text-muted">Начислений за месяц нет.</p>
                             ) : (

@@ -11,6 +11,7 @@ import ForgottenBanner from '../components/ForgottenBanner'
 import TimeChart from '../components/charts/TimeChart'
 import { compact, count, dayShort, rub } from '../components/charts/format'
 import StatusBadge from '../components/StatusBadge'
+import Skeleton from '../components/Skeleton'
 
 type Dashboard = {
   orders: { created: number; in_work: number; ready: number; closed: number | null }
@@ -105,7 +106,7 @@ export default function DashboardPage() {
     return registers.reduce((sum, r) => sum + Number(r.cash_balance) + Number(r.bank_balance), 0)
   }, [data])
 
-  if (loading && !data) return <p className="text-muted">Загрузка…</p>
+  if (loading && !data) return <Skeleton />
   if (!data) return <section>{error && <p role="alert" className="text-danger">{error}</p>}</section>
 
   const { orders, trend, previous } = data

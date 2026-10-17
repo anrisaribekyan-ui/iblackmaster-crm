@@ -6,6 +6,7 @@ import CatalogPicker from '../components/CatalogPicker'
 import Modal from '../components/Modal'
 import { escapeHtml, openPrint } from '../print'
 import { formatDateTime, inputClass, money, qty, retailPrice, useLocationsAndRegisters, type CashRegisterRef } from './shared'
+import Skeleton from '../components/Skeleton'
 
 /** Строка чека: из справочника (nomenclatureId) или свободная — название + себестоимость руками. */
 type Line = {
@@ -312,7 +313,7 @@ export default function SalesPage() {
 
         <aside className="grid content-start gap-4 self-start rounded-xl border border-line bg-surface p-4 lg:sticky lg:top-4">
           <div>
-            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Оплата</p>
+            <p className="mb-2 text-sm font-semibold text-ink">Оплата</p>
             {split ? (
               <div className="grid gap-2">
                 {payments.map((p, i) => (
@@ -357,7 +358,7 @@ export default function SalesPage() {
 
           {can('discountSaleAccess') && (
             <div>
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Скидка</p>
+              <p className="mb-2 text-sm font-semibold text-ink">Скидка</p>
               <div className="flex flex-wrap gap-1.5">
                 {DISCOUNTS.map((d) => (
                   <button key={d} type="button" onClick={() => { setDiscount(d); setDiscountSum('') }}
@@ -397,7 +398,7 @@ export default function SalesPage() {
             {busy ? 'Пробиваем…' : lines.length ? `Пробить ${money(total)}` : 'Пробить чек'}
           </button>
           {done && (
-            <div role="status" className="rounded-lg bg-success/10 p-3 text-sm">
+            <div role="status" key={done.id} className="pop-in rounded-lg bg-success/10 p-3 text-sm">
               <p className="font-medium text-success">✓ Чек {done.number} на {money(done.total)} пробит</p>
               {done.debt > 0 && <p className="text-muted">Долг покупателя {money(done.debt)}</p>}
               <button className="mt-1 text-accent" onClick={() => void api.get<SaleDetail>(`/sales/${done.id}`).then(setViewing)}>Открыть / печать</button>
@@ -410,7 +411,7 @@ export default function SalesPage() {
         <h2 className="font-medium">История чеков</h2>
         {todaySales.length > 0 && <p className="text-sm text-muted">Сегодня {todaySales.length} чек. на <span className="num text-ink">{money(todaySales.reduce((s, x) => s + Number(x.total_price), 0))}</span></p>}
       </div>
-      {history === null ? <p className="text-muted">Загрузка…</p> : history.length === 0 ? (
+      {history === null ? <Skeleton /> : history.length === 0 ? (
         <p className="rounded-xl border border-line bg-surface p-4 text-muted">Чеков в этой точке ещё нет.</p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-line bg-surface">

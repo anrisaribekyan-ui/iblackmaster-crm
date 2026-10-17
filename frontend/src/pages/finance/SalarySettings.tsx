@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../../api/client'
 import Modal from '../../components/Modal'
 import { inputClass, money } from '../shared'
+import Skeleton from '../../components/Skeleton'
 
 type Kind = { code: string; title: string }
 type Location = { id: number; name: string }
@@ -238,7 +239,7 @@ export default function SalarySettings({ employeeId }: { employeeId: number }) {
       {recalcResult && <p className="mb-3 text-success">{recalcResult}</p>}
 
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : kinds.length === 0 ? (
         <p className="text-muted">Видов начислений нет.</p>
       ) : (

@@ -147,7 +147,7 @@ export default function ProductCard({ id, onClose, onChanged }: { id: number; on
 
           {card.balances.length > 0 && (
             <section>
-              <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">По складам</h3>
+              <h3 className="mb-2 text-sm font-semibold text-ink">По складам</h3>
               <ul className="divide-y divide-line rounded-lg border border-line">
                 {card.balances.map((b) => (
                   <li key={b.store_id} className="flex items-center gap-3 px-3 py-2 text-sm">
@@ -223,7 +223,7 @@ export default function ProductCard({ id, onClose, onChanged }: { id: number; on
           {item!.note && !editing && <p className="rounded-lg bg-canvas px-3 py-2 text-sm">{item!.note}</p>}
 
           <section>
-            <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">История движений</h3>
+            <h3 className="mb-2 text-sm font-semibold text-ink">История движений</h3>
             {card.history.length === 0 ? (
               <p className="text-sm text-muted">Движений пока не было.</p>
             ) : (

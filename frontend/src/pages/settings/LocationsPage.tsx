@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../../api/client'
 import Modal from '../../components/Modal'
 import { useAuth } from '../../auth'
+import Skeleton from '../../components/Skeleton'
 
 type Store = { id: number; location_id: number; name: string; is_default: boolean }
 type Location = {
@@ -145,7 +146,7 @@ export default function LocationsPage() {
       </div>
       {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : locations === null ? (
         <p className="text-muted">Не удалось загрузить список локаций.</p>
       ) : locations.length === 0 ? (

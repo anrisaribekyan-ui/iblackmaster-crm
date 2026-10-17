@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
+import Skeleton from '../../components/Skeleton'
 
 type DeviceType = { id: number; name: string; salary_percent: string | null; salary_fixed: string | null }
 type Brand = { id: number; name: string; device_type_id: number | null }
@@ -145,7 +146,7 @@ export default function DevicesPage() {
       <h2 className="mb-4 text-lg font-semibold">Устройства</h2>
       {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : types === null ? (
         <p className="text-muted">Не удалось загрузить типы устройств.</p>
       ) : (

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
+import Skeleton from '../../components/Skeleton'
 
 type Location = { id: number; name: string }
 type Role = {
@@ -171,7 +172,7 @@ export default function StaffPage() {
       </div>
       {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : tab === 'employees' ? (
         <section>
           {can('settingAccess') && (

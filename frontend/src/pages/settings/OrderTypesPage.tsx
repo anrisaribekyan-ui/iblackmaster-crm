@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
+import Skeleton from '../../components/Skeleton'
 
 type OrderType = { id: number; name: string; sort: number; is_active: boolean }
 type DataType = 'string' | 'text' | 'date' | 'dateTime' | 'boolean' | 'number' | 'money' | 'enum' | 'multiple'
@@ -215,7 +216,7 @@ export default function OrderTypesPage() {
       <h2 className="mb-4 text-lg font-semibold">Типы заказов и форма</h2>
       {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : types === null ? (
         <p className="text-muted">Не удалось загрузить типы заказов.</p>
       ) : (

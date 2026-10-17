@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
+import Skeleton from '../../components/Skeleton'
 
 type PriceType = { id: number; name: string; is_minimal: boolean; sort: number }
 type Price = { price_type_id: number; name: string; price: string; location_id: number | null }
@@ -154,7 +155,7 @@ export default function NomenclaturePage({ isWork }: { isWork: boolean }) {
       </form>
       {error && <p role="alert" className="mb-3 rounded-md border border-danger p-3 text-danger">{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : pageData === null ? (
         <p className="text-muted">Не удалось загрузить список.</p>
       ) : pageData.items.length === 0 ? (

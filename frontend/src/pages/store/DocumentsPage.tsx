@@ -5,6 +5,7 @@ import { useAuth } from '../../auth'
 import CatalogPicker from '../../components/CatalogPicker'
 import Modal from '../../components/Modal'
 import { formatDateTime, inputClass, money, qty, useLocationsAndRegisters, type CatalogItem } from '../shared'
+import Skeleton from '../../components/Skeleton'
 
 export type DocType = 'purchase' | 'move' | 'cancellation'
 
@@ -96,7 +97,7 @@ export default function DocumentsPage({ type }: { type: DocType }) {
       </div>
       {error && <p className="mb-3 text-danger">{error}</p>}
       {rows === null ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : rows.length === 0 ? (
         <p className="rounded-xl border border-line bg-surface p-4 text-muted">Документов пока нет.</p>
       ) : (

@@ -28,7 +28,7 @@ export default function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 sm:p-4"
+      className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/40 sm:p-4"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose()
@@ -37,7 +37,7 @@ export default function Modal({
       <section
         aria-labelledby="modal-title"
         aria-modal="true"
-        className={`flex h-dvh w-full flex-col bg-surface sm:h-auto sm:max-h-[90vh] ${wide ? 'sm:max-w-3xl' : 'sm:max-w-lg'} sm:rounded-xl sm:border sm:border-line sm:shadow-xl`}
+        className={`modal-panel flex h-dvh w-full flex-col bg-surface sm:h-auto sm:max-h-[90vh] ${wide ? 'sm:max-w-3xl' : 'sm:max-w-lg'} sm:rounded-xl sm:border sm:border-line sm:shadow-xl`}
         role="dialog"
       >
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line py-2 pl-5 pr-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:py-3 sm:pt-3">

@@ -6,6 +6,7 @@ import Modal from '../components/Modal'
 import { inputClass } from './shared'
 import type { LocationRef } from './shared'
 import type { SpaceRef } from './boardsTypes'
+import Skeleton from '../components/Skeleton'
 
 /** id последнего открытого пространства — помним, чтобы открыть его при входе в «Доски». */
 export const LAST_SPACE_KEY = 'boards_last_space'
@@ -66,7 +67,7 @@ export default function BoardsPage() {
 
       {error && <p role="alert" className="mb-3 text-danger">{error}</p>}
       {spaces === null ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : spaces.length === 0 ? (
         <p className="rounded-xl border border-line bg-surface p-5 text-muted">
           Пространств нет. Создайте первое — оно появится здесь.

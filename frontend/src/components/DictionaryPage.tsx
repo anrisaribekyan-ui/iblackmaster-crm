@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../auth'
 import Modal from './Modal'
+import Skeleton from './Skeleton'
 
 export type DictionaryField = {
   name: string
@@ -98,7 +99,7 @@ export default function DictionaryPage({ config }: { config: DictionaryConfig })
       </form>
       {error && <p role="alert" className="mb-3 rounded-md border border-danger p-3 text-danger">{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : items === null ? (
         <p className="text-muted">Не удалось загрузить справочник.</p>
       ) : items.length === 0 ? (

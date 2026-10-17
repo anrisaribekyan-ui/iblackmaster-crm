@@ -7,6 +7,7 @@ import Modal from '../../components/Modal'
 import { formatDateTime, money } from '../shared'
 import { downloadCsv } from '../../csv'
 import StatusBadge from '../../components/StatusBadge'
+import Skeleton from '../../components/Skeleton'
 
 type Counteragent = {
   id: number
@@ -207,7 +208,7 @@ export default function CounteragentsPage() {
       </form>
       {error && <p role="alert" className="mb-3 rounded-md border border-danger p-3 text-danger">{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : data === null ? (
         <p className="text-muted">Не удалось загрузить контрагентов.</p>
       ) : data.items.length === 0 ? (
@@ -323,7 +324,7 @@ function CounteragentCard({ item, onClose }: { item: Counteragent; onClose: () =
   return (
     <Modal title={`Карточка контрагента · ${item.name}`} onClose={onClose}>
       {error ? <p role="alert" className="text-danger">{error}</p> : details === null || history === null ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : (
         <>
           <dl className="grid gap-3 sm:grid-cols-2">

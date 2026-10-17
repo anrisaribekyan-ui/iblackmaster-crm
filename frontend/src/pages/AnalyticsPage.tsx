@@ -8,6 +8,7 @@ import ChartCard from '../components/charts/ChartCard'
 import TimeChart from '../components/charts/TimeChart'
 import { compact, count, dayLong, fillDays, rub } from '../components/charts/format'
 import ProfitReport from '../components/ProfitReport'
+import Skeleton from '../components/Skeleton'
 
 type TabKey = 'profit' | 'orders' | 'works' | 'sales' | 'cashflow' | 'stock'
 type Period = 'today' | 'yesterday' | 'week' | 'month' | 'quarter' | 'year' | 'custom'
@@ -326,7 +327,7 @@ export default function AnalyticsPage() {
       <>
       {error && <p role="alert" className="mb-3 text-danger">{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка…</p>
+        <Skeleton />
       ) : rows === null ? (
         <p className="text-muted">Отчёт недоступен.</p>
       ) : rows.length === 0 ? (

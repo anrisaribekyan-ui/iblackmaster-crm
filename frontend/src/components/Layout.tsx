@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import { useAuth } from '../auth'
 import Icon from './icons'
 import InstallApp from './InstallApp'
+import Skeleton from './Skeleton'
 
 /** Меню как в LiveSklad. permission — право, без которого пункт скрыт (пусто — виден всем). */
 export const MENU: { to: string; label: string; icon: string; permission?: string }[] = [
@@ -163,7 +164,7 @@ export default function Layout() {
             <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-line px-1.5 text-xs text-muted md:block peer-focus:md:hidden" title="Нажмите / чтобы искать">/</kbd>
           </form>
         </header>
-        <Suspense fallback={<p className="py-6 text-muted">Загрузка…</p>}>
+        <Suspense fallback={<Skeleton className="py-6" />}>
           <Outlet />
         </Suspense>
       </main>
@@ -186,8 +187,8 @@ function MobileTabBar({ onMore, canCreate }: { onMore: () => void; canCreate: bo
     <>
       {plus && (
         // «+» — два главных действия дня: принять заказ и пробить продажу
-        <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setPlus(false)}>
-          <div className="absolute inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] grid gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setPlus(false)}>
+          <div className="absolute inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] rise grid gap-2" onClick={(e) => e.stopPropagation()}>
             {canCreate && (
               <button className="flex items-center gap-3 rounded-2xl bg-surface p-4 text-left shadow-xl" onClick={() => go('/orders/new')}>
                 <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-white"><Icon name="orders" className="h-6 w-6" /></span>
