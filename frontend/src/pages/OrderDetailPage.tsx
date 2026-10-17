@@ -11,6 +11,8 @@ import OrderPhotos from '../components/OrderPhotos'
 import OrderChecklistCard, { checklistHtml, signatureHtml, type Signatures } from '../components/OrderChecklistCard'
 import type { ChecklistValues } from '../components/Checklist'
 import { DevicePasswordInput, parsePattern, PatternView } from '../components/PatternLock'
+import StatusBadge, { statusColors } from '../components/StatusBadge'
+import Copyable from '../components/Copyable'
 
 type Status = { id: number; group: string; name: string; color: string; pay_required: boolean; comment_mode: string }
 type StatusGroup = { group: string; title: string; statuses: Status[] }
@@ -627,8 +629,8 @@ export default function OrderDetailPage() {
           <h1 className={`text-xl font-semibold ${isDeleted ? 'text-muted line-through decoration-danger decoration-2' : ''}`}>{detail.order.number}</h1>
           <select
             aria-label="Статус заказа"
-            className="rounded-full border border-line bg-surface px-3 py-1.5"
-            style={{ color: detail.status.color }}
+            className="rounded-full border-0 px-3 py-1.5 font-medium"
+            style={{ color: statusColors(detail.status.color).text, backgroundColor: statusColors(detail.status.color).bg }}
             value={detail.status.id}
             onChange={(event) => selectStatus(event.target.value)}
             disabled={isDeleted}
@@ -701,7 +703,18 @@ export default function OrderDetailPage() {
               </header>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Info label="Клиент" value={detail.counteragent.name} />
-                <Info label="Телефоны" value={formatPhone(detail.counteragent.phones) || '—'} />
+                <div>
+                  <dt className="text-sm text-muted">Телефоны</dt>
+                  <dd className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                    {(detail.counteragent.phones ?? '').split(',').map((p) => p.trim()).filter(Boolean).map((p) => (
+                      <span key={p} className="inline-flex items-center gap-2">
+                        <Copyable value={p.replace(/\D/g, '').length === 11 ? `+${p.replace(/\D/g, '')}` : p}>{formatPhone(p)}</Copyable>
+                        <a href={`tel:+${p.replace(/\D/g, '')}`} className="rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:border-ink/40 hover:text-ink" aria-label={`Позвонить ${formatPhone(p)}`}>Позвонить</a>
+                      </span>
+                    ))}
+                    {!detail.counteragent.phones && '—'}
+                  </dd>
+                </div>
                 <Info label="Тип заказа" value={detail.order_type.name} />
                 <Info label="Статус" value={detail.status.name} />
                 {fields.filter((field) => field.is_visible && field.key !== 'name' && field.key !== 'phones').map((field) => (
@@ -712,7 +725,14 @@ export default function OrderDetailPage() {
                         <dd className="mt-1"><PatternView dots={parsePattern(String(fieldValue(field, detail)))!} size={84} /></dd>
                       </div>
                     )
-                    : <Info key={field.id} label={field.label} value={displayValue(field, detail, masters, managers, howKnows)} />
+                    : (field.key === 'sn' || field.key === 'serial') && displayValue(field, detail, masters, managers, howKnows) !== '—'
+                      ? (
+                        <div key={field.id}>
+                          <dt className="text-sm text-muted">{field.label}</dt>
+                          <dd className="mt-1 num"><Copyable value={displayValue(field, detail, masters, managers, howKnows)} /></dd>
+                        </div>
+                      )
+                      : <Info key={field.id} label={field.label} value={displayValue(field, detail, masters, managers, howKnows)} />
                 ))}
               </div>
             </section>
@@ -909,7 +929,7 @@ export default function OrderDetailPage() {
                 {detail.history.map((item) => (
                   <li key={item.id} className="border-l-2 border-line pl-3">
                     <p className="font-medium">{item.title}</p>
-                    {item.status && <p className="text-sm" style={{ color: item.status.color }}>{item.status.name}</p>}
+                    {item.status && <p className="mt-0.5"><StatusBadge name={item.status.name} color={item.status.color} /></p>}
                     {item.text && <p className="whitespace-pre-wrap text-sm">{item.text}</p>}
                     <small className="text-muted">{item.employee_name ?? 'Система'} · {formatDate(item.created_at)}</small>
                   </li>

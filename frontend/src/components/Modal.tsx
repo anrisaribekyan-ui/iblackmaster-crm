@@ -4,10 +4,12 @@ export default function Modal({
   title,
   onClose,
   children,
+  wide = false,
 }: {
   title: string
   onClose: () => void
   children: ReactNode
+  wide?: boolean // широкое окно — карточки с таблицами (товар, история)
 }) {
   // Пока окно открыто, страница под ним не прокручивается (на телефоне прокручивается весь документ),
   // а Esc закрывает окно
@@ -35,7 +37,7 @@ export default function Modal({
       <section
         aria-labelledby="modal-title"
         aria-modal="true"
-        className="flex h-dvh w-full flex-col bg-surface sm:h-auto sm:max-h-[90vh] sm:max-w-lg sm:rounded-xl sm:border sm:border-line sm:shadow-xl"
+        className={`flex h-dvh w-full flex-col bg-surface sm:h-auto sm:max-h-[90vh] ${wide ? 'sm:max-w-3xl' : 'sm:max-w-lg'} sm:rounded-xl sm:border sm:border-line sm:shadow-xl`}
         role="dialog"
       >
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line py-2 pl-5 pr-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:py-3 sm:pt-3">

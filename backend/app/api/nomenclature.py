@@ -289,6 +289,8 @@ def update_nomenclature(item_id: int, data: NomenclatureIn, db: DbSession, me: C
     validate_nomenclature_references(db, data.group_id, data.measure_id)
     values = data.model_dump(exclude={"prices"})
     values["name"] = values["name"].strip()
+    if not has_permission(me, "purchasePriceAccess"):
+        values.pop("purchase_price")  # кто не видит закупку, тот её и не затирает
     for field, value in values.items():
         setattr(item, field, value)
     save_prices(db, item.id, data.prices)
@@ -398,3 +400,98 @@ def delete_nomenclature_group(group_id: int, db: DbSession):
     db.delete(group)
     db.commit()
     return Response(status_code=204)
+
+@router.get("/nomenclature/{item_id}/card")
+def nomenclature_card(item_id: int, db: DbSession, me: CurrentEmployee):
+    """Карточка товара для склада: всё о позиции на одном экране — остатки по складам,
+    сколько продаётся и на сколько дней хватит, история движений (приход, продажи, установка в заказы)."""
+    from datetime import timedelta
+
+    from app.api.deps import location_ids
+    from app.db import utcnow
+    from app.models import Location, Order, OrderPosition, Sale, SalePosition, StockDocument, StockDocumentPosition
+    from app.models.stock import STOCK_DOC_TITLES, StockDocType
+
+    DOC_LINKS = {StockDocType.PURCHASE: "/store/purchase", StockDocType.MOVE: "/store/move",
+                 StockDocType.CANCELLATION: "/store/cancellation", StockDocType.INVENTORY: "/store/inventory"}
+    item = db.get(Nomenclature, item_id)
+    if item is None or item.is_deleted:
+        raise NotFound("Номенклатура")
+    allowed = location_ids(me)
+    can_price = has_permission(me, "purchasePriceAccess")
+
+    balances = []
+    for bal, store, location in db.execute(
+        select(StockBalance, Store, Location)
+        .join(Store, Store.id == StockBalance.store_id)
+        .join(Location, Location.id == Store.location_id)
+        .where(StockBalance.nomenclature_id == item.id)
+        .order_by(Location.sort, Store.id)
+    ):
+        if allowed and location.id not in allowed:
+            continue
+        balances.append({
+            "store_id": store.id, "store": store.name, "location": location.name, "color": location.color,
+            "quantity": bal.quantity, "avg_purchase_price": bal.avg_purchase_price if can_price else None,
+        })
+
+    history = []
+    doc_rows = db.execute(
+        select(StockDocumentPosition, StockDocument)
+        .join(StockDocument, StockDocument.id == StockDocumentPosition.document_id)
+        .where(StockDocumentPosition.nomenclature_id == item.id, StockDocument.is_deleted.is_(False), StockDocument.is_posted.is_(True))
+        .order_by(StockDocument.date.desc()).limit(100)
+    ).all()
+    for pos, doc in doc_rows:
+        doc_type = StockDocType(doc.type)
+        sign = {StockDocType.PURCHASE: 1, StockDocType.SALE_RETURN: 1, StockDocType.MOVE: 0, StockDocType.INVENTORY: 0}.get(doc_type, -1)
+        quantity = pos.quantity
+        if doc_type == StockDocType.INVENTORY and pos.quantity_accounted is not None:
+            quantity = pos.quantity - pos.quantity_accounted
+            sign = 1
+        history.append({
+            "date": doc.date, "kind": doc_type.value, "title": STOCK_DOC_TITLES.get(doc_type, doc_type.value),
+            "number": doc.number, "link": DOC_LINKS.get(doc_type, "/store/purchase") + f"?open={doc.id}", "note": doc.note,
+            "quantity": quantity * sign if sign else quantity, "price": pos.price if can_price else None,
+        })
+    for pos, sale in db.execute(
+        select(SalePosition, Sale).join(Sale, Sale.id == SalePosition.sale_id)
+        .where(SalePosition.nomenclature_id == item.id, Sale.is_deleted.is_(False))
+        .order_by(Sale.date.desc()).limit(100)
+    ).all():
+        history.append({
+            "date": sale.date, "kind": "sale", "title": "Продажа", "number": sale.number, "link": f"/sales?open={sale.id}", "note": None,
+            "quantity": -pos.quantity, "price": pos.sold_price,
+        })
+    for pos, order in db.execute(
+        select(OrderPosition, Order).join(Order, Order.id == OrderPosition.order_id)
+        .where(OrderPosition.nomenclature_id == item.id, Order.is_deleted.is_(False))
+        .order_by(Order.created_at.desc()).limit(100)
+    ).all():
+        history.append({
+            "date": order.closed_at or order.created_at, "kind": "order", "title": "В заказ" if not item.is_work else "Работа в заказе",
+            "number": order.number, "link": f"/orders/{order.id}", "note": None,
+            "quantity": -pos.quantity, "price": pos.sold_price,
+        })
+    history.sort(key=lambda h: h["date"], reverse=True)
+
+    # Расход за 30 дней (продажи + заказы) → сколько дней хватит текущего остатка
+    since = utcnow() - timedelta(days=30)
+    def _aware(d):
+        from datetime import timezone
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    used_30 = sum((-h["quantity"] for h in history if h["kind"] in ("sale", "order") and _aware(h["date"]) >= since), Decimal("0"))
+    on_hand = sum((b["quantity"] for b in balances), Decimal("0"))
+    days_left = int(on_hand / (used_30 / 30)) if used_30 > 0 and on_hand > 0 else None
+
+    out = serialize_items(db, [item], None, can_price)[0]
+    group = db.get(NomenclatureGroup, item.group_id) if item.group_id else None
+    return {
+        "item": out,
+        "group": group.name if group else None,
+        "balances": balances,
+        "on_hand": on_hand,
+        "used_30": used_30,
+        "days_left": days_left,
+        "history": history[:150],
+    }

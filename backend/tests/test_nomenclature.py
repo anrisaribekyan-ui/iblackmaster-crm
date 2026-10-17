@@ -92,3 +92,33 @@ def test_group_tree_and_price_types(client, auth_headers, db):
     tree = client.get("/api/nomenclature-groups", headers=auth_headers).json()
     assert next(node for node in tree if node["id"] == parent.id)["children"][0]["id"] == child_id
     assert client.get("/api/price-types", headers=auth_headers).status_code == 200
+
+
+def test_nomenclature_card_history_and_days_left(client, auth_headers, db):
+    from decimal import Decimal
+
+    from sqlalchemy import select
+
+    from app.models import CashRegister, Location, Nomenclature, Store
+    from app.services import stock
+
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    store = db.scalars(select(Store).where(Store.location_id == location.id)).first()
+    register = db.scalars(select(CashRegister).where(CashRegister.location_id == location.id)).first()
+    item = Nomenclature(code=770001, name="Карточный товар", is_work=False)
+    db.add(item)
+    db.flush()
+    stock.receive(db, store.id, item.id, Decimal("10"), Decimal("50"))
+    db.commit()
+    r = client.post("/api/sales", headers=auth_headers, json={
+        "location_id": location.id, "store_id": store.id,
+        "positions": [{"nomenclature_id": item.id, "quantity": "3", "price": "200"}],
+        "payments": [{"cash_register_id": register.id, "amount": "600"}],
+    })
+    assert r.status_code == 200, r.text
+
+    card = client.get(f"/api/nomenclature/{item.id}/card", headers=auth_headers).json()
+    assert Decimal(str(card["on_hand"])) == 7 and Decimal(str(card["used_30"])) == 3
+    assert card["days_left"] == 70
+    assert card["history"][0]["kind"] == "sale" and Decimal(str(card["history"][0]["quantity"])) == -3
+    assert card["balances"][0]["store_id"] == store.id

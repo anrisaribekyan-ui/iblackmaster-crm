@@ -1,5 +1,5 @@
-import { Suspense, useEffect, useState, type FormEvent } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Suspense, useEffect, useRef, useState, type FormEvent } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../auth'
 import Icon from './icons'
@@ -27,11 +27,62 @@ export default function Layout() {
   const location = useLocation()
   // На телефоне меню закрывается после перехода
   useEffect(() => setMenuOpen(false), [location.pathname])
+  const searchRef = useRef<HTMLInputElement>(null)
+  const mainRef = useRef<HTMLElement>(null)
+  const navigationType = useNavigationType()
+  // Новая страница открывается сверху; «Назад» оставляет прокрутку как была
+  useEffect(() => {
+    if (navigationType === 'POP') return
+    window.scrollTo(0, 0)
+    mainRef.current?.scrollTo(0, 0)
+  }, [location.pathname, navigationType])
+
+  // В полях сумм и количеств при касании выделяем всё — новое число сразу заменяет старое
+  useEffect(() => {
+    const onFocus = (event: FocusEvent) => {
+      const el = event.target as HTMLInputElement
+      if (el?.tagName === 'INPUT' && (el.type === 'number' || el.inputMode === 'numeric' || el.inputMode === 'decimal')) {
+        requestAnimationFrame(() => { try { el.select() } catch { /* type=number в Safari */ } })
+      }
+    }
+    document.addEventListener('focusin', onFocus)
+    return () => document.removeEventListener('focusin', onFocus)
+  }, [])
+  // В списке заказов свой поиск по списку — общий на телефоне не дублируем
+  const onOrders = location.pathname === '/orders'
+
+  // Название вкладки браузера = раздел: удобно, когда открыто несколько вкладок CRM
+  useEffect(() => {
+    const section = [...MENU].reverse().find((m) => (m.to === '/' ? location.pathname === '/' : location.pathname.startsWith(m.to.split('/').slice(0, 2).join('/'))))
+    document.title = section && section.to !== '/' ? `${section.label} · iBlackMaster` : 'iBlackMaster'
+  }, [location.pathname])
+
+  // Горячие клавиши (когда курсор не в поле ввода): / — поиск, N — новый заказ, P — продажа.
+  // Смотрим на физическую клавишу, поэтому работает и на русской раскладке.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement
+      if (event.metaKey || event.ctrlKey || event.altKey || target.closest('input, textarea, select, [contenteditable="true"]')) return
+      if (document.querySelector('[role="dialog"]')) return
+      if (event.code === 'Slash' || event.key === '/') {
+        event.preventDefault()
+        searchRef.current?.focus()
+      } else if (event.code === 'KeyN' && can('createOrderAccess')) {
+        navigate('/orders/new')
+      } else if (event.code === 'KeyP') {
+        navigate('/sales')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [navigate, can])
 
   const submitSearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const term = query.trim()
+    // «А15911» на русской раскладке и просто «15911» — тоже номер заказа
+    let term = query.trim().replace(/^[АаAa]/, 'A')
     if (!term) return
+    if (/^\d{4,6}$/.test(term)) term = `A${term}`
     if (/^[A-Za-z]\d+$/.test(term)) {
       try {
         const result = await api.get<{ items: { id: number }[]; total: number }>(`/orders?q=${encodeURIComponent(term)}`)
@@ -95,16 +146,21 @@ export default function Layout() {
       </aside>
       {/* На телефоне прокручивается вся страница (прячется адресная строка, работает «потянуть — обновить»),
           на компьютере — только рабочая область справа от меню */}
-      <main className="min-w-0 flex-1 px-3 pb-24 sm:px-8 md:overflow-auto md:py-6 md:pb-6">
-        <header className="sticky top-0 z-20 -mx-3 mb-3 flex items-center gap-2 bg-canvas/95 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur sm:-mx-8 sm:px-8 md:static md:mx-0 md:mb-4 md:justify-end md:bg-transparent md:p-0 md:backdrop-blur-none">
-          <form onSubmit={(event) => void submitSearch(event)} className="relative min-w-0 flex-1 md:max-w-md md:flex-none md:basis-[28rem]">
+      <main ref={mainRef} className="min-w-0 flex-1 px-3 pb-24 sm:px-8 md:overflow-auto md:py-6 md:pb-6">
+        <header className={`top-0 z-20 ${onOrders ? 'max-md:static' : 'sticky'} -mx-3 mb-3 flex items-center gap-2 bg-canvas/95 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur sm:-mx-8 sm:px-8 md:static md:mx-0 md:mb-4 md:justify-end md:bg-transparent md:p-0 md:backdrop-blur-none`}>
+          <form onSubmit={(event) => void submitSearch(event)} className={`${onOrders ? 'max-md:hidden' : ''} relative min-w-0 flex-1 md:max-w-md md:flex-none md:basis-[28rem]`}>
             <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
-              className="w-full rounded-md border border-line bg-surface py-2 pl-9 pr-3"
+              ref={searchRef}
+              type="search"
+              enterKeyHint="search"
+              className="peer w-full rounded-md border border-line bg-surface py-2 pl-9 pr-3 md:pr-9"
               placeholder="Поиск: номер, телефон, имя, IMEI"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => event.key === 'Escape' && (setQuery(''), event.currentTarget.blur())}
             />
+            <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-line px-1.5 text-xs text-muted md:block peer-focus:md:hidden" title="Нажмите / чтобы искать">/</kbd>
           </form>
         </header>
         <Suspense fallback={<p className="py-6 text-muted">Загрузка…</p>}>
@@ -118,26 +174,53 @@ export default function Layout() {
 
 /** Нижняя панель на телефоне — как в обычных приложениях: главное под большим пальцем. */
 function MobileTabBar({ onMore, canCreate }: { onMore: () => void; canCreate: boolean }) {
+  const [plus, setPlus] = useState(false)
+  const navigate = useNavigate()
   const item = ({ isActive }: { isActive: boolean }) =>
     `flex flex-1 flex-col items-center gap-0.5 pt-2 text-[11px] ${isActive ? 'text-accent' : 'text-muted'}`
+  const go = (to: string) => {
+    setPlus(false)
+    navigate(to)
+  }
   return (
-    <nav
-      aria-label="Быстрые разделы"
-      className="fixed inset-x-0 bottom-0 z-20 flex border-t border-line bg-surface/95 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] backdrop-blur md:hidden"
-    >
-      <NavLink to="/" end className={item}><Icon name="home" className="h-6 w-6" />Главная</NavLink>
-      <NavLink to="/orders" end className={item}><Icon name="orders" className="h-6 w-6" />Заказы</NavLink>
-      {canCreate && (
-        <NavLink to="/orders/new" className="flex flex-1 flex-col items-center pt-1.5" aria-label="Новый заказ">
-          <span className="grid h-11 w-11 place-items-center rounded-full bg-accent text-white shadow-md shadow-accent/30">
+    <>
+      {plus && (
+        // «+» — два главных действия дня: принять заказ и пробить продажу
+        <div className="fixed inset-0 z-30 bg-black/30 md:hidden" onClick={() => setPlus(false)}>
+          <div className="absolute inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] grid gap-2" onClick={(e) => e.stopPropagation()}>
+            {canCreate && (
+              <button className="flex items-center gap-3 rounded-2xl bg-surface p-4 text-left shadow-xl" onClick={() => go('/orders/new')}>
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-accent text-white"><Icon name="orders" className="h-6 w-6" /></span>
+                <span><b className="block">Новый заказ</b><small className="text-muted">принять устройство в ремонт</small></span>
+              </button>
+            )}
+            <button className="flex items-center gap-3 rounded-2xl bg-surface p-4 text-left shadow-xl" onClick={() => go('/sales')}>
+              <span className="grid h-11 w-11 place-items-center rounded-xl bg-ink text-white"><Icon name="sales" className="h-6 w-6" /></span>
+              <span><b className="block">Продажа</b><small className="text-muted">плитки ходовых товаров</small></span>
+            </button>
+            <button className="flex items-center gap-3 rounded-2xl bg-surface p-4 text-left shadow-xl" onClick={() => go('/sales?quick=1')}>
+              <span className="grid h-11 w-11 place-items-center rounded-xl border border-line text-2xl">+</span>
+              <span><b className="block">Своя позиция</b><small className="text-muted">продать то, чего нет в справочнике</small></span>
+            </button>
+          </div>
+        </div>
+      )}
+      <nav
+        aria-label="Быстрые разделы"
+        className="fixed inset-x-0 bottom-0 z-40 flex border-t border-line bg-surface/95 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] backdrop-blur md:hidden"
+      >
+        <NavLink to="/" end className={item}><Icon name="home" className="h-6 w-6" />Главная</NavLink>
+        <NavLink to="/orders" end className={item}><Icon name="orders" className="h-6 w-6" />Заказы</NavLink>
+        <button type="button" onClick={() => setPlus((v) => !v)} className="flex flex-1 flex-col items-center pt-1.5" aria-label="Создать" aria-expanded={plus}>
+          <span className={`grid h-11 w-11 place-items-center rounded-full bg-accent text-white shadow-md shadow-accent/30 transition-transform ${plus ? 'rotate-45' : ''}`}>
             <Icon name="plus" className="h-6 w-6" />
           </span>
-        </NavLink>
-      )}
-      <NavLink to="/tasks" className={item}><Icon name="tasks" className="h-6 w-6" />Задачи</NavLink>
-      <button type="button" onClick={onMore} className="flex flex-1 flex-col items-center gap-0.5 pt-2 text-[11px] text-muted">
-        <Icon name="menu" className="h-6 w-6" />Ещё
-      </button>
-    </nav>
+        </button>
+        <NavLink to="/sales" className={item}><Icon name="sales" className="h-6 w-6" />Продажи</NavLink>
+        <button type="button" onClick={onMore} className="flex flex-1 flex-col items-center gap-0.5 pt-2 text-[11px] text-muted">
+          <Icon name="menu" className="h-6 w-6" />Ещё
+        </button>
+      </nav>
+    </>
   )
 }

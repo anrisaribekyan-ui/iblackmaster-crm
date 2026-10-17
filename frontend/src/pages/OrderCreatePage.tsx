@@ -3,7 +3,7 @@ import PriceHints from '../components/PriceHints'
 import { DevicePasswordInput } from '../components/PatternLock'
 import { ChecklistInput, SignaturePad, useChecklistItems, type ChecklistValues } from '../components/Checklist'
 import QuickOrderPicker, { type QuickOrder } from '../components/QuickOrderPicker'
-import { Fragment, useEffect, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { localInputToIso } from '../format'
@@ -96,6 +96,17 @@ export default function OrderCreatePage() {
   const { me } = useAuth()
   const navigate = useNavigate()
   const [locations, setLocations] = useState<Location[]>([])
+  // Начали заполнять и случайно закрыли вкладку — браузер переспросит
+  const dirty = useRef(false)
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (!dirty.current) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [])
   const [orderTypes, setOrderTypes] = useState<OrderType[]>([])
   const [locationId, setLocationId] = useState('')
   const [orderTypeId, setOrderTypeId] = useState('')
@@ -309,6 +320,7 @@ export default function OrderCreatePage() {
         // Заказ уже создан — подпись не должна его потерять, поэтому ошибку подписи не показываем как ошибку заказа
         await api.post(`/orders/${created.id}/signature`, { stage: 'in', image: signature }).catch(() => undefined)
       }
+      dirty.current = false
       navigate(`/orders/${created.id}`)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Не удалось создать заказ')
@@ -344,7 +356,7 @@ export default function OrderCreatePage() {
       {orderTypes.length === 0 ? (
         <p className="rounded-lg border border-line bg-surface p-5 text-muted">Нет активных типов заказов. Добавьте тип в настройках перед созданием заказа.</p>
       ) : (
-        <form onSubmit={(event) => void submit(event)} className="grid gap-4">
+        <form onSubmit={(event) => void submit(event)} onInput={() => { dirty.current = true }} className="grid gap-4">
           <div className="grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2">
             <label className="grid gap-1 text-sm text-muted">Локация
               <select className={inputClass} value={locationId} onChange={(event) => setLocationId(event.target.value)} required>

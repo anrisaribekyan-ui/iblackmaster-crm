@@ -14,6 +14,7 @@
   --color-accent-ink: #ffffff;
   --color-danger: #d92d20;
   --color-success: #12a150;
+  --color-warning: #b54708;
   /* Графитовая боковая панель — «Black» из названия */
   --color-rail: #1c1f24;
   --color-rail-ink: #c9ced6;
@@ -176,4 +177,16 @@ td .num {
   --viz-quiet: #b9b8b1; /* де-акцент: спарклайны, «остальные» */
   --viz-good: #006300;
   --viz-bad: #d03b3b;
+}
+
+/* Подсказки из списка (datalist): без чужеродной стрелки в поле */
+input[list]::-webkit-calendar-picker-indicator {
+  display: none !important;
+}
+
+/* Заголовки таблиц: мелко, капителью — данные читаются первыми */
+thead th {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }

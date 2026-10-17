@@ -6,6 +6,7 @@ import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
 import { formatDateTime, money } from '../shared'
 import { downloadCsv } from '../../csv'
+import StatusBadge from '../../components/StatusBadge'
 
 type Counteragent = {
   id: number
@@ -350,7 +351,7 @@ function CounteragentCard({ item, onClose }: { item: Counteragent; onClose: () =
                   <li key={order.id} {...rowLink(`/orders/${order.id}`)} className="-mx-2 cursor-pointer rounded px-2 py-2 text-sm hover:bg-canvas">
                     <div className="flex items-center justify-between gap-3">
                       <Link className="font-medium text-accent hover:underline" to={`/orders/${order.id}`}>{order.number}</Link>
-                      <span className="whitespace-nowrap rounded-full px-2 py-1 text-xs" style={{ color: order.status_color ?? undefined }}>{order.status_name ?? '—'}</span>
+                      <StatusBadge name={order.status_name ?? '—'} color={order.status_color} />
                     </div>
                     <div className="flex items-center justify-between gap-3 text-muted">
                       <span>{order.device || '—'} · {formatDateTime(order.created_at)}</span>

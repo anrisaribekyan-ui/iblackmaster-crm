@@ -5,7 +5,9 @@ import { useAuth } from '../auth'
 
 export default function LoginPage() {
   const { me, login } = useAuth()
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => {
+    try { return localStorage.getItem('login:email') ?? '' } catch { return '' }
+  })
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -18,6 +20,7 @@ export default function LoginPage() {
     setBusy(true)
     try {
       await login(email, password)
+      try { localStorage.setItem('login:email', email) } catch { /* приватный режим */ }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось войти')
     } finally {

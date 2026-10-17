@@ -19,8 +19,12 @@ class SalePositionIn(BaseModel):
     is_work: bool = False
     quantity: Decimal = Field(gt=Decimal("0"))
     price: Decimal = Field(ge=Decimal("0"))
-    guarantee_days: int = 0
+    guarantee_days: int | None = None
     serials: list[str] = Field(default_factory=list)
+    # Быстрая продажа: товар, которого нет в справочнике или на складе. Себестоимость вводят руками,
+    # склад не трогаем. Для позиции из справочника no_stock=True — продать, не списывая со склада.
+    purchase_price: Decimal | None = Field(default=None, ge=Decimal("0"))
+    no_stock: bool = False
 
 
 class SalePaymentIn(BaseModel):
@@ -88,8 +92,8 @@ def create_sale(data: SaleCreate, db: DbSession, me: CurrentEmployee):
                 raise NotFound("Номенклатура")
             if not nomenclature.is_work and position.is_work:
                 raise BusinessError("Тип позиции не совпадает с номенклатурой")
-        elif not position.is_work or not (position.name or "").strip():
-            raise BusinessError("Для товара укажите номенклатуру, для работы — название")
+        elif not (position.name or "").strip():
+            raise BusinessError("Укажите название позиции")
 
     sale = sales_service.create_sale(
         db,
@@ -136,6 +140,60 @@ def return_sale(sale_id: int, data: SaleReturnIn, db: DbSession, me: CurrentEmpl
     return {"document_id": document.id, "amount": amount, "paid": sale.paid}
 
 # --- Просмотр чеков --------------------------------------------------------------------
+
+
+@router.get("/top")
+def top_positions(db: DbSession, me: CurrentEmployee, location_id: int, store_id: int | None = None, limit: int = 12):
+    """Что чаще всего пробивают в этой точке за последние 90 дней — для плиток быстрой продажи.
+    Позиции из справочника — по номенклатуре, свободные — по названию. Цена и себестоимость — из последней продажи."""
+    from datetime import timedelta
+
+    from sqlalchemy import func
+
+    from app.db import utcnow
+    from app.models import StockBalance
+
+    check_location(me, location_id)
+    since = utcnow() - timedelta(days=90)
+    rows = db.execute(
+        select(SalePosition.nomenclature_id, SalePosition.name, SalePosition.is_work, SalePosition.price,
+               SalePosition.purchase_price, SalePosition.quantity, Sale.date)
+        .join(Sale, Sale.id == SalePosition.sale_id)
+        .where(Sale.is_deleted.is_(False), Sale.location_id == location_id, Sale.date >= since)
+        .order_by(Sale.date)
+    ).all()
+    groups: dict[str, dict] = {}
+    for r in rows:
+        key = f"n{r.nomenclature_id}" if r.nomenclature_id else "t" + " ".join(r.name.lower().split())
+        g = groups.setdefault(key, {"key": key, "nomenclature_id": r.nomenclature_id, "count": 0, "quantity": Decimal("0")})
+        g["count"] += 1
+        g["quantity"] += r.quantity
+        g.update(name=r.name, is_work=r.is_work, price=r.price, purchase_price=r.purchase_price, last=r.date)
+    top = sorted(groups.values(), key=lambda g: (-g["count"], -g["quantity"]))[: max(1, min(limit, 30))]
+    ids = [g["nomenclature_id"] for g in top if g["nomenclature_id"]]
+    noms = {n.id: n for n in db.scalars(select(Nomenclature).where(Nomenclature.id.in_(ids or [0])))}
+    stocks: dict[int, Decimal] = {}
+    if store_id and ids:
+        stocks = dict(db.execute(
+            select(StockBalance.nomenclature_id, StockBalance.quantity)
+            .where(StockBalance.store_id == store_id, StockBalance.nomenclature_id.in_(ids))
+        ).all())
+    result = []
+    for g in top:
+        nom = noms.get(g["nomenclature_id"]) if g["nomenclature_id"] else None
+        if g["nomenclature_id"] and (nom is None or nom.is_deleted):
+            continue
+        result.append({
+            "key": g["key"],
+            "nomenclature_id": g["nomenclature_id"],
+            "name": nom.name if nom else g["name"],
+            "is_work": g["is_work"],
+            "price": g["price"],
+            "purchase_price": g["purchase_price"],
+            "count": g["count"],
+            "stock": stocks.get(g["nomenclature_id"], Decimal("0")) if nom and not nom.is_work else None,
+        })
+    return result
 
 
 @router.get("")

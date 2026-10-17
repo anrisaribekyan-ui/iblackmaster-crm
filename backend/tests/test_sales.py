@@ -114,3 +114,40 @@ def test_partial_sale_payment_charges_customer_debt(client, auth_headers, db):
     assert response.status_code == 200, response.text
     assert Decimal(str(response.json()["paid"])) == Decimal("60.00")
     assert Decimal(str(response.json()["debt"])) == Decimal("40.00")
+
+def test_quick_sale_free_position_and_top(client, auth_headers, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    store = db.scalars(select(Store).where(Store.location_id == location.id)).first()
+    register = db.scalars(
+        select(CashRegister).where(CashRegister.location_id == location.id, CashRegister.is_active.is_(True))
+    ).first()
+    product = Nomenclature(code=660050, name="Стекло без остатка", is_work=False, purchase_price=Decimal("90"))
+    db.add(product)
+    db.commit()
+
+    for _ in range(2):
+        r = client.post("/api/sales", headers=auth_headers, json={
+            "location_id": location.id, "store_id": store.id,
+            "positions": [{"name": "Кабель Type-C", "quantity": "1", "price": "500", "purchase_price": "120"}],
+            "payments": [{"cash_register_id": register.id, "amount": "500"}],
+        })
+        assert r.status_code == 200, r.text
+        assert Decimal(str(r.json()["total_purchase"])) == 120
+    # Товар из справочника, которого нет на складе, — продаём без списания
+    r = client.post("/api/sales", headers=auth_headers, json={
+        "location_id": location.id, "store_id": store.id,
+        "positions": [{"nomenclature_id": product.id, "quantity": "1", "price": "700", "no_stock": True}],
+        "payments": [{"cash_register_id": register.id, "amount": "700"}],
+    })
+    assert r.status_code == 200, r.text
+    assert Decimal(str(r.json()["total_purchase"])) == 90
+    # Без названия — нельзя
+    r = client.post("/api/sales", headers=auth_headers, json={
+        "location_id": location.id, "store_id": store.id,
+        "positions": [{"quantity": "1", "price": "100"}],
+    })
+    assert r.status_code in (400, 422)
+
+    top = client.get(f"/api/sales/top?location_id={location.id}&store_id={store.id}", headers=auth_headers).json()
+    assert top[0]["name"] == "Кабель Type-C" and top[0]["count"] == 2 and top[0]["nomenclature_id"] is None
+    assert any(t["nomenclature_id"] == product.id and Decimal(str(t["stock"])) == 0 for t in top)

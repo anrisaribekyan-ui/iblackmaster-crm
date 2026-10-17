@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, ApiError } from '../api/client'
 import { inputClass, qty, type CatalogItem } from '../pages/shared'
 
@@ -31,6 +31,18 @@ export default function CatalogPicker({
     }
   }
 
+  // Ищем на лету, пока печатают (пауза 250 мс), — кнопка «Найти» остаётся для привычки
+  const searchRef = useRef(search)
+  searchRef.current = search
+  useEffect(() => {
+    if (q.trim().length < 2) {
+      if (!q.trim()) setResults(null)
+      return
+    }
+    const timer = setTimeout(() => void searchRef.current(), 250)
+    return () => clearTimeout(timer)
+  }, [q])
+
   return (
     <div>
       <div className="flex gap-2">
@@ -44,7 +56,9 @@ export default function CatalogPicker({
               void search()
             }
           }}
-          placeholder="Название, артикул или код"
+          placeholder="Поиск: название, артикул или код"
+          type="search"
+          onKeyUp={(e) => e.key === 'Escape' && (setQ(''), setResults(null))}
         />
         <button type="button" className="rounded-md border border-line bg-surface px-3 py-2" onClick={() => void search()}>Найти</button>
       </div>

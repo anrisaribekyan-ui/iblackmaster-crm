@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import CatalogPicker from '../../components/CatalogPicker'
@@ -60,6 +61,13 @@ export default function DocumentsPage({ type }: { type: DocType }) {
       setError(e instanceof ApiError ? e.message : 'Не удалось открыть документ')
     }
   }
+  // Ссылка вида ?open=12 (из карточки товара) сразу открывает документ
+  const [params] = useSearchParams()
+  useEffect(() => {
+    const id = Number(params.get('open'))
+    if (id) void open(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params])
 
   const remove = async (doc: DocDetail) => {
     if (!confirm(`Удалить документ ${doc.number}? Остатки и оплаты будут возвращены.`)) return

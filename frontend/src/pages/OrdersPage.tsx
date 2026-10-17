@@ -5,6 +5,7 @@ import { api, ApiError } from '../api/client'
 import { formatPhone } from '../format'
 import { useAuth } from '../auth'
 import { downloadCsv } from '../csv'
+import StatusBadge from '../components/StatusBadge'
 
 type Tab = 'new' | 'inWork' | 'wait' | 'finish' | 'closed' | 'all'
 type OrderRow = {
@@ -76,12 +77,19 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // Последняя открытая вкладка запоминается: «Заказы» в меню открывают то, где вы были
+  const lastTab = (() => {
+    try { return localStorage.getItem('orders:tab') ?? 'all' } catch { return 'all' }
+  })()
   const queryString = useMemo(() => {
     const params = new URLSearchParams(searchParams)
-    if (!params.has('tab')) params.set('tab', 'all')
+    if (!params.has('tab')) params.set('tab', lastTab)
     return params.toString()
-  }, [searchParams])
-  const currentTab = (searchParams.get('tab') ?? 'all') as Tab
+  }, [searchParams, lastTab])
+  const currentTab = (searchParams.get('tab') ?? lastTab) as Tab
+  useEffect(() => {
+    try { localStorage.setItem('orders:tab', currentTab) } catch { /* приватный режим */ }
+  }, [currentTab])
   const currentPage = Math.max(1, Number(searchParams.get('page') ?? '1'))
 
   const setParam = (key: string, value: string) => {
@@ -255,7 +263,7 @@ export default function OrdersPage() {
           {searchParams.size > 0 && <button className="text-left text-sm text-danger sm:col-span-2 xl:col-span-4" onClick={() => setSearchParams({ tab: currentTab })}>Сбросить фильтры</button>}
         </div>
       )}
-      <nav aria-label="Группы заказов" className="mb-3 flex gap-1 overflow-x-auto border-b border-line">
+      <nav aria-label="Группы заказов" className="mb-3 flex gap-1 overflow-x-auto rounded-xl border border-line bg-surface p-1">
         {tabs.map((tab) => {
           const count = tab.key === 'all'
             ? Object.values(data?.counts ?? {}).reduce((sum, value) => sum + value, 0)
@@ -263,10 +271,10 @@ export default function OrdersPage() {
           return (
             <button
               key={tab.key}
-              className={`whitespace-nowrap border-b-2 px-3 py-2 ${currentTab === tab.key ? 'border-accent font-medium text-ink' : 'border-transparent text-muted'}`}
+              className={`flex-1 whitespace-nowrap rounded-lg px-3 py-1.5 transition-colors ${currentTab === tab.key ? 'bg-ink font-medium text-white shadow-sm' : 'text-muted hover:bg-canvas hover:text-ink'}`}
               onClick={() => setParam('tab', tab.key)}
             >
-              {tab.label} <span className="text-xs text-muted">{count}</span>
+              {tab.label} <span className={`num text-xs ${currentTab === tab.key ? 'text-white/60' : 'text-muted'}`}>{count.toLocaleString('ru-RU')}</span>
             </button>
           )
         })}
@@ -297,7 +305,7 @@ export default function OrdersPage() {
                         {order.number}
                       </span>
                       {order.is_deleted && <span className="rounded bg-[#fef3f2] px-1.5 py-0.5 text-xs font-medium text-danger">удалён</span>}
-                      <span className="ml-auto truncate rounded-full px-2 py-0.5 text-xs" style={{ color: order.status.color, backgroundColor: `${order.status.color}22` }}>{order.status.name}</span>
+                      <StatusBadge className="ml-auto" name={order.status.name} color={order.status.color} />
                     </div>
                     <p className="mt-1.5 truncate font-medium">{device || 'Устройство не указано'}</p>
                     {order.problems?.length > 0 && <p className="truncate text-sm text-muted">{order.problems.join(', ')}</p>}
@@ -349,10 +357,10 @@ export default function OrdersPage() {
                         <Link to={`/orders/${order.id}`} className={`font-medium hover:underline ${order.is_deleted ? 'text-muted' : 'text-accent'}`}>{order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" title="Срочный" className="mr-1 text-danger">●</span>}{order.number}</Link>
                         {order.is_deleted && <span className="ml-2 inline-block rounded bg-[#fef3f2] px-1.5 py-0.5 text-xs font-medium text-danger no-underline [text-decoration:none]">удалён</span>}
                       </td>
-                      <td className="px-3 py-2"><span className="whitespace-nowrap rounded-full px-2 py-1 text-xs" style={{ color: order.status.color, backgroundColor: `${order.status.color}22` }}>{order.status.name}</span></td>
+                      <td className="px-3 py-2"><StatusBadge name={order.status.name} color={order.status.color} /></td>
                       <td className={`hidden px-3 py-2 whitespace-nowrap md:table-cell ${overdue ? 'font-medium text-danger' : ''}`}>{formatDate(order.deadline)}</td>
                       <td className="hidden px-3 py-2 md:table-cell">{order.manager ?? '—'}</td>
-                      <td className="hidden px-3 py-2 whitespace-nowrap md:table-cell">{formatDate(order.created_at)}</td>
+                      <td className="hidden px-3 py-2 whitespace-nowrap md:table-cell" title={formatDate(order.created_at)}>{ago(order.created_at) ?? formatDate(order.created_at)}</td>
                       <td className="hidden px-3 py-2 md:table-cell">{orderTypes.find((type) => type.id === order.order_type_id)?.name ?? '—'}</td>
                       <td className="hidden px-3 py-2 md:table-cell">{[order.brand, order.model].filter(Boolean).join(' ') || '—'}</td>
                       <td className="hidden px-3 py-2 md:table-cell">{order.problems?.join(', ') || '—'}</td>
@@ -378,4 +386,20 @@ export default function OrdersPage() {
       )}
     </section>
   )
+}
+
+
+/** «5 мин назад», «3 ч назад», «вчера, 14:20» — для свежих заказов; старше — обычная дата (null). */
+function ago(value: string): string | null {
+  const date = new Date(value)
+  const minutes = Math.round((Date.now() - date.getTime()) / 60000)
+  if (Number.isNaN(minutes) || minutes < 0) return null
+  if (minutes < 1) return 'только что'
+  if (minutes < 60) return `${minutes} мин назад`
+  if (minutes < 12 * 60) return `${Math.round(minutes / 60)} ч назад`
+  const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' })
+  const day = (d: Date) => d.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })
+  if (day(date) === day(new Date())) return `сегодня, ${time}`
+  if (day(date) === day(new Date(Date.now() - 86400000))) return `вчера, ${time}`
+  return null
 }

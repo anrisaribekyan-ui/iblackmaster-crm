@@ -22,6 +22,8 @@ class StockRemainOut(BaseModel):
     quantity: Decimal
     avg_purchase_price: Decimal | None
     total: Decimal | None
+    min_count: Decimal = Decimal("0")
+    group: str | None = None
 
 
 @router.get("", response_model=list[StockRemainOut])
@@ -70,6 +72,9 @@ def list_stock_remains(
         ]
 
     can_view_purchase = has_permission(me, "purchasePriceAccess")
+    from app.models import NomenclatureGroup
+
+    groups = dict(db.execute(select(NomenclatureGroup.id, NomenclatureGroup.name)).all())
     return [
         StockRemainOut(
             store_id=store.id,
@@ -78,6 +83,8 @@ def list_stock_remains(
             nomenclature_id=item.id,
             code=item.code,
             article=item.article,
+            min_count=item.min_count,
+            group=groups.get(item.group_id),
             name=item.name,
             quantity=balance.quantity,
             avg_purchase_price=balance.avg_purchase_price if can_view_purchase else None,

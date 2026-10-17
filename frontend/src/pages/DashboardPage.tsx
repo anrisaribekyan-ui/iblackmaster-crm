@@ -10,6 +10,7 @@ import MyEarnings from '../components/MyEarnings'
 import ForgottenBanner from '../components/ForgottenBanner'
 import TimeChart from '../components/charts/TimeChart'
 import { compact, count, dayShort, rub } from '../components/charts/format'
+import StatusBadge from '../components/StatusBadge'
 
 type Dashboard = {
   orders: { created: number; in_work: number; ready: number; closed: number | null }
@@ -60,7 +61,7 @@ function formatDate(value: string | null) {
 
 export default function DashboardPage() {
   const rowLink = useRowLink()
-  const { can } = useAuth()
+  const { can, me } = useAuth()
   const canPeriod = can('dashboardOrderPeriodAccess')
   const [locations, setLocations] = useState<Location[]>([])
   const [locationId, setLocationId] = useState('')
@@ -118,7 +119,7 @@ export default function DashboardPage() {
   return (
     <section className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
       <header className="mb-5 flex flex-wrap items-center gap-3">
-        <h1 className="mr-auto text-xl font-semibold">Главная</h1>
+        <h1 className="mr-auto text-xl font-semibold">{greeting()}{me?.short_name ? `, ${me.short_name.split(' ').slice(-1)[0]}` : ''}</h1>
         <label className="sr-only" htmlFor="dash-location">Локация</label>
           <select id="dash-location" className="rounded-md border border-line bg-surface px-3 py-2" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
             <option value="">Все локации</option>
@@ -150,6 +151,7 @@ export default function DashboardPage() {
 
       {error && <p role="alert" className="mb-4 text-danger">{error}</p>}
 
+      <QuickActions canCreate={can('createOrderAccess')} />
       <ForgottenBanner locationId={locationId} />
       <MyEarnings />
 
@@ -267,7 +269,7 @@ export default function DashboardPage() {
                   <li key={item.id} {...rowLink(`/orders/${item.id}`)} className="-mx-2 flex cursor-pointer items-center justify-between gap-3 rounded px-2 py-2 text-sm hover:bg-canvas">
                     <Link className="font-medium text-accent hover:underline" to={`/orders/${item.id}`}>{item.number}</Link>
                     <span className="text-muted">{formatDate(item.deadline)}</span>
-                    <span className="whitespace-nowrap rounded-full px-2 py-1 text-xs" style={{ color: item.status_color, backgroundColor: `${item.status_color}22` }}>{item.status_name}</span>
+                    <StatusBadge name={item.status_name} color={item.status_color} />
                   </li>
                 ))}
               </ul>
@@ -279,3 +281,36 @@ export default function DashboardPage() {
   )
 }
 
+
+
+/** Плитки главных действий дня: на компьютере — сразу под заголовком, на телефоне их дублирует «+». */
+function QuickActions({ canCreate }: { canCreate: boolean }) {
+  const tile = 'group flex items-center gap-3 rounded-xl border border-line bg-surface p-3 transition hover:border-ink/30 hover:shadow-sm active:scale-[0.99]'
+  return (
+    <div className="mb-4 hidden gap-3 md:grid md:grid-cols-3">
+      {canCreate && (
+        <Link to="/orders/new" className="group flex items-center gap-3 rounded-xl bg-ink p-3 text-white transition hover:opacity-90 active:scale-[0.99]">
+          <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent text-xl">+</span>
+          <span><b className="block font-semibold">Новый заказ</b><small className="text-white/60">принять устройство · N</small></span>
+        </Link>
+      )}
+      <Link to="/sales" className={tile}>
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-canvas text-lg">₽</span>
+        <span><b className="block font-semibold">Продажа</b><small className="text-muted">плитки ходовых товаров · P</small></span>
+      </Link>
+      <Link to="/sales?quick=1" className={tile}>
+        <span className="grid h-10 w-10 place-items-center rounded-lg bg-canvas text-xl">+</span>
+        <span><b className="block font-semibold">Своя позиция</b><small className="text-muted">название, себестоимость, цена</small></span>
+      </Link>
+    </div>
+  )
+}
+
+
+function greeting(): string {
+  const hour = Number(new Date().toLocaleString('en-GB', { hour: '2-digit', hour12: false, timeZone: 'Europe/Moscow' }))
+  if (hour < 5) return 'Доброй ночи'
+  if (hour < 12) return 'Доброе утро'
+  if (hour < 18) return 'Добрый день'
+  return 'Добрый вечер'
+}

@@ -57,13 +57,17 @@ def create_sale(
         if item.get("nomenclature_id") and (nomenclature is None or nomenclature.is_deleted):
             raise BusinessError("Позиция справочника не найдена")
         is_work = nomenclature.is_work if nomenclature else bool(item.get("is_work"))
-        if not is_work and nomenclature is None:
-            raise BusinessError("Для товара укажите номенклатуру")
+        manual_cost = item.get("purchase_price")
         unit_price = money.to_money(item["price"])
         purchase_price = Decimal("0")
         if nomenclature is not None and nomenclature.is_work:
             purchase_price = nomenclature.purchase_price
-        elif not is_work:
+        elif nomenclature is None:
+            # Свободная позиция быстрой продажи: себестоимость — как ввели, склад не трогаем
+            purchase_price = money.to_money(manual_cost or 0)
+        elif item.get("no_stock"):
+            purchase_price = money.to_money(manual_cost if manual_cost is not None else nomenclature.purchase_price)
+        else:
             purchase_price = stock.write_off(db, store_id, nomenclature.id, quantity)
         position = SalePosition(
             sale_id=sale.id,
@@ -74,7 +78,7 @@ def create_sale(
             price=unit_price,
             sold_price=unit_price,
             purchase_price=purchase_price,
-            guarantee_days=item.get("guarantee_days", nomenclature.guarantee_days if nomenclature else 0),
+            guarantee_days=item.get("guarantee_days") if item.get("guarantee_days") is not None else (nomenclature.guarantee_days if nomenclature else 0),
             serials=item.get("serials", []),
         )
         sale.positions.append(position)
