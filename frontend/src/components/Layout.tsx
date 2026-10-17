@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../auth'
@@ -107,7 +107,9 @@ export default function Layout() {
             />
           </form>
         </header>
-        <Outlet />
+        <Suspense fallback={<p className="py-6 text-muted">Загрузка…</p>}>
+          <Outlet />
+        </Suspense>
       </main>
       <MobileTabBar onMore={() => setMenuOpen(true)} canCreate={can('createOrderAccess')} />
     </div>

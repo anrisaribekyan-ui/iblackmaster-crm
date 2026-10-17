@@ -12,6 +12,8 @@ type Props = {
   axisFormat?: (value: number) => string // деления оси Y (компактно)
   height?: number
   label: string // что изображено — для экранного диктора
+  tick?: (key: string) => string // подпись под осью (по умолчанию «5 окт»)
+  title?: (key: string) => string // заголовок подсказки (по умолчанию «пн, 5 октября»)
 }
 
 const M = { top: 12, right: 16, bottom: 26, left: 52 }
@@ -21,7 +23,7 @@ const M = { top: 12, right: 16, bottom: 26, left: 52 }
  * Наведение: перекрестие ищет ближайший день, подсказка показывает все серии сразу.
  * Клавиатура: Tab на графике, стрелки ←/→ двигают выбранный день.
  */
-export default function TimeChart({ days, series, kind = 'line', format, axisFormat = format, height = 220, label }: Props) {
+export default function TimeChart({ days, series, kind = 'line', format, axisFormat = format, height = 220, label, tick = dayShort, title = dayLong }: Props) {
   const [ref, width] = useWidth<HTMLDivElement>()
   const [active, setActive] = useState<number | null>(null)
   const clipId = useId()
@@ -112,7 +114,7 @@ export default function TimeChart({ days, series, kind = 'line', format, axisFor
         ))}
         {xTicks.map((i) => (
           <text key={i} x={x(i)} y={height - 6} textAnchor={i === last && kind === 'line' ? 'end' : 'middle'} fontSize={11} fill="var(--viz-label)">
-            {dayShort(days[i])}
+            {tick(days[i])}
           </text>
         ))}
 
@@ -180,7 +182,7 @@ export default function TimeChart({ days, series, kind = 'line', format, axisFor
         <Tooltip
           left={x(active)}
           width={width}
-          title={dayLong(days[active])}
+          title={title(days[active])}
           rows={series.map((s) => ({ name: s.name, color: s.color, value: format(s.values[active] ?? 0), line: kind === 'line' }))}
         />
       )}

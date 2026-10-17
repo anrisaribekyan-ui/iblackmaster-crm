@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useRowLink } from '../../components/rowLink'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
@@ -302,6 +303,7 @@ type History = {
 type HistoryTab = 'orders' | 'sales' | 'transactions'
 
 function CounteragentCard({ item, onClose }: { item: Counteragent; onClose: () => void }) {
+  const rowLink = useRowLink()
   const [details, setDetails] = useState<CounteragentDetail | null>(null)
   const [history, setHistory] = useState<History | null>(null)
   const [tab, setTab] = useState<HistoryTab>('orders')
@@ -345,7 +347,7 @@ function CounteragentCard({ item, onClose }: { item: Counteragent; onClose: () =
             history.orders.length === 0 ? <p className="py-3 text-sm text-muted">Заказов нет.</p> : (
               <ul className="divide-y divide-line">
                 {history.orders.map((order) => (
-                  <li key={order.id} className="py-2 text-sm">
+                  <li key={order.id} {...rowLink(`/orders/${order.id}`)} className="-mx-2 cursor-pointer rounded px-2 py-2 text-sm hover:bg-canvas">
                     <div className="flex items-center justify-between gap-3">
                       <Link className="font-medium text-accent hover:underline" to={`/orders/${order.id}`}>{order.number}</Link>
                       <span className="whitespace-nowrap rounded-full px-2 py-1 text-xs" style={{ color: order.status_color ?? undefined }}>{order.status_name ?? '—'}</span>

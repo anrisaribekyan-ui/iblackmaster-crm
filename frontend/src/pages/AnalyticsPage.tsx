@@ -7,9 +7,10 @@ import BarList from '../components/charts/BarList'
 import ChartCard from '../components/charts/ChartCard'
 import TimeChart from '../components/charts/TimeChart'
 import { compact, count, dayLong, fillDays, rub } from '../components/charts/format'
+import ProfitReport from '../components/ProfitReport'
 
-type TabKey = 'orders' | 'works' | 'sales' | 'cashflow' | 'stock'
-type Period = 'today' | 'yesterday' | 'week' | 'month' | 'custom'
+type TabKey = 'profit' | 'orders' | 'works' | 'sales' | 'cashflow' | 'stock'
+type Period = 'today' | 'yesterday' | 'week' | 'month' | 'quarter' | 'year' | 'custom'
 type Location = { id: number; name: string }
 type Row = Record<string, unknown>
 type Column = { field: string; label: string; kind: 'text' | 'money' | 'number' }
@@ -51,6 +52,13 @@ function periodRange(period: Period, customFrom: string, customTo: string): { fr
   if (period === 'month') {
     return { from: moscowMidnightUtc(today.y, today.m, 1), to: moscowMidnightUtc(today.y, today.m, today.d + 1) }
   }
+  if (period === 'quarter') {
+    // Текущий месяц и два предыдущих целиком
+    return { from: moscowMidnightUtc(today.y, today.m - 2, 1), to: moscowMidnightUtc(today.y, today.m, today.d + 1) }
+  }
+  if (period === 'year') {
+    return { from: moscowMidnightUtc(today.y, 1, 1), to: moscowMidnightUtc(today.y, today.m, today.d + 1) }
+  }
   if (!customFrom || !customTo) return null
   const [fy, fm, fd] = customFrom.split('-').map(Number)
   const [ty, tm, td] = customTo.split('-').map(Number)
@@ -62,10 +70,13 @@ const PERIODS: [Period, string][] = [
   ['yesterday', 'Вчера'],
   ['week', '7 дней'],
   ['month', 'Месяц'],
+  ['quarter', '3 мес.'],
+  ['year', 'Год'],
   ['custom', 'Период'],
 ]
 
 const TABS: { key: TabKey; label: string }[] = [
+  { key: 'profit', label: 'Прибыль' },
   { key: 'orders', label: 'Заказы' },
   { key: 'works', label: 'Работы и запчасти' },
   { key: 'sales', label: 'Продажи' },
@@ -97,9 +108,11 @@ const GROUP_OPTIONS: Record<TabKey, { value: string; label: string }[]> = {
     { value: 'day', label: 'День' },
   ],
   stock: [],
+  profit: [],
 }
 
 const BASE_COLUMNS: Record<TabKey, Column[]> = {
+  profit: [],
   orders: [
     { field: 'name', label: 'Группа', kind: 'text' },
     { field: 'count', label: 'Кол-во', kind: 'number' },
@@ -134,7 +147,8 @@ const MARGIN_COLUMNS: Column[] = [
 
 export default function AnalyticsPage() {
   const { can } = useAuth()
-  const [tab, setTab] = useState<TabKey>('orders')
+  const canProfit = can('marginPriceAccess')
+  const [tab, setTab] = useState<TabKey>(canProfit ? 'profit' : 'orders')
   const [groupBy, setGroupBy] = useState('master')
   const [isWork, setIsWork] = useState(true)
   const [locations, setLocations] = useState<Location[]>([])
@@ -157,6 +171,7 @@ export default function AnalyticsPage() {
   }
 
   const load = useCallback(async () => {
+    if (tab === 'profit') return // свой компонент, сам грузит данные
     setLoading(true)
     setError('')
     try {
@@ -223,13 +238,18 @@ export default function AnalyticsPage() {
       from = addDays(today.y, today.m, today.d, -6)
     } else if (period === 'month') {
       from = { y: today.y, m: today.m, d: 1 }
+    } else if (period === 'quarter') {
+      const start = new Date(Date.UTC(today.y, today.m - 3, 1))
+      from = { y: start.getUTCFullYear(), m: start.getUTCMonth() + 1, d: 1 }
+    } else if (period === 'year') {
+      from = { y: today.y, m: 1, d: 1 }
     } else if (period === 'custom' && customFrom && customTo) {
       const [fy, fm, fd] = customFrom.split('-').map(Number)
       const [ty, tm, td] = customTo.split('-').map(Number)
       from = { y: fy, m: fm, d: fd }
       to = { y: ty, m: tm, d: td }
     }
-    const names: Record<TabKey, string> = { orders: 'заказы', works: 'работы', sales: 'продажи', cashflow: 'деньги', stock: 'склад' }
+    const names: Record<TabKey, string> = { profit: 'прибыль', orders: 'заказы', works: 'работы', sales: 'продажи', cashflow: 'деньги', stock: 'склад' }
     return `отчёт-${names[tab]}-${fmt(from.y, from.m, from.d)}-${fmt(to.y, to.m, to.d)}.csv`
   }, [tab, period, customFrom, customTo])
 
@@ -254,12 +274,12 @@ export default function AnalyticsPage() {
           <option value="">Все локации</option>
           {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
-        <div className="flex rounded-md border border-line bg-surface p-0.5" role="group" aria-label="Период">
+        <div className="flex max-w-full overflow-x-auto rounded-md border border-line bg-surface p-0.5" role="group" aria-label="Период">
           {PERIODS.map(([value, title]) => (
             <button
               key={value}
               type="button"
-              className={`rounded px-2.5 py-1.5 text-sm ${period === value ? 'bg-ink text-white' : 'text-muted hover:bg-canvas'}`}
+              className={`shrink-0 whitespace-nowrap rounded px-2.5 py-1.5 text-sm ${period === value ? 'bg-ink text-white' : 'text-muted hover:bg-canvas'}`}
               onClick={() => setPeriod(value)}
             >
               {title}
@@ -275,7 +295,7 @@ export default function AnalyticsPage() {
       </div>
 
       <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-line">
-        {TABS.map((t) => (
+        {TABS.filter((t) => t.key !== 'profit' || canProfit).map((t) => (
           <button key={t.key} className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-2 ${tab === t.key ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => changeTab(t.key)}>
             {t.label}
           </button>
@@ -300,6 +320,10 @@ export default function AnalyticsPage() {
         )}
       </div>
 
+      {tab === 'profit' ? (
+        <ProfitReport range={periodRange(period, customFrom, customTo)} locationId={locationId} filenameBase={filename.replace(/\.csv$/, '')} />
+      ) : (
+      <>
       {error && <p role="alert" className="mb-3 text-danger">{error}</p>}
       {loading ? (
         <p className="text-muted">Загрузка…</p>
@@ -344,6 +368,8 @@ export default function AnalyticsPage() {
         <div className="mt-4 flex justify-end">
           <button className="rounded-md border border-line bg-surface px-3 py-2" onClick={download}>Скачать CSV</button>
         </div>
+      )}
+      </>
       )}
     </section>
   )

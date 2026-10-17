@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRowLink } from '../../components/rowLink'
 import { api, ApiError } from '../../api/client'
 import ForgottenSettings from '../../components/ForgottenSettings'
 
@@ -128,6 +129,7 @@ function TemplateRow({ item, variables, onSaved }: { item: Template; variables: 
 }
 
 export default function NotificationsPage() {
+  const rowLink = useRowLink()
   const [templates, setTemplates] = useState<Template[]>([])
   const [variables, setVariables] = useState<Variable[]>([])
   const [status, setStatus] = useState<GatewayStatus | null>(null)
@@ -260,7 +262,7 @@ export default function NotificationsPage() {
                   </thead>
                   <tbody>
                     {journal.items.map((i) => (
-                      <tr key={i.id} className="border-t border-line align-top">
+                      <tr key={i.id} {...(i.order_id ? rowLink(`/orders/${i.order_id}`) : {})} className={`border-t border-line align-top ${i.order_id ? 'cursor-pointer hover:bg-canvas' : ''}`}>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums">{formatDateTime(i.sent_at ?? i.created_at)}</td>
                         <td className="px-3 py-2">{i.order_id ? <a className="text-accent" href={`/orders/${i.order_id}`}>{i.order_number}</a> : i.kind === 'test' ? 'тест' : '—'}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums">{i.phone}</td>

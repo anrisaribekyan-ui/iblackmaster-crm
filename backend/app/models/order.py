@@ -4,7 +4,7 @@ import enum
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import JSON, ForeignKey, String, Text
+from sqlalchemy import JSON, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import MONEY_STEP, Base, Quantity, TimestampMixin, utcnow
@@ -108,6 +108,7 @@ class FormField(Base):
 
 class Order(Base, TimestampMixin):
     __tablename__ = "order"
+    __table_args__ = (Index("ix_order_created_at_id", "created_at", "id"),)  # список: новые сверху
 
     id: Mapped[int] = mapped_column(primary_key=True)
     number: Mapped[str] = mapped_column(String(20), unique=True, index=True)  # «A15842»
@@ -211,6 +212,7 @@ class OrderHistory(Base):
     """Лента событий заказа. type — см. HISTORY_TYPES."""
 
     __tablename__ = "order_history"
+    __table_args__ = (Index("ix_order_history_order_id_type", "order_id", "type"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("order.id", ondelete="CASCADE"), index=True)

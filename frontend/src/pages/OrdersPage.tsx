@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useRowLink } from '../components/rowLink'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { formatPhone } from '../format'
@@ -57,7 +58,11 @@ function formatMoney(value: string) {
   return `${Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`
 }
 
+// Последние показанные списки (по фильтрам): вернулись из заказа — список на экране сразу, свежий подгружается следом
+const listCache = new Map<string, OrderList>()
+
 export default function OrdersPage() {
+  const rowLink = useRowLink()
   const { can } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [data, setData] = useState<OrderList | null>(null)
@@ -109,11 +114,15 @@ export default function OrdersPage() {
   }, [])
 
   const loadOrders = useCallback(async () => {
-    setLoading(true)
+    const cached = listCache.get(queryString)
+    if (cached) setData(cached)
+    setLoading(!cached) // есть сохранённый список — без «Загрузка…», обновим тихо
     setError('')
     try {
       const params = new URLSearchParams(queryString)
-      setData(await api.get<OrderList>(`/orders?${params.toString()}`))
+      const fresh = await api.get<OrderList>(`/orders?${params.toString()}`)
+      listCache.set(queryString, fresh)
+      setData(fresh)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Не удалось загрузить список заказов')
       setData(null)
@@ -263,14 +272,14 @@ export default function OrdersPage() {
         })}
       </nav>
       {error && <p role="alert" className="mb-3 rounded-md border border-danger p-3 text-danger">{error}</p>}
-      {loading ? (
+      {loading && data === null ? (
         <p className="py-6 text-muted">Загрузка заказов…</p>
       ) : data === null ? (
         <p className="py-6 text-muted">Список заказов недоступен.</p>
       ) : data.items.length === 0 ? (
         <p className="rounded-xl border border-line bg-surface p-5 text-muted">Заказов по выбранным условиям нет. Измените фильтры или создайте новый заказ.</p>
       ) : (
-        <>
+        <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
           {/* Телефон: карточки вместо таблицы — всё главное видно без прокрутки вбок */}
           <ul className="space-y-2 md:hidden">
             {data.items.map((order) => {
@@ -335,7 +344,7 @@ export default function OrdersPage() {
                 {data.items.map((order) => {
                   const overdue = order.deadline && new Date(order.deadline).getTime() < Date.now() && order.status.group !== 'closed'
                   return (
-                    <tr key={order.id} className={`border-t border-line hover:bg-canvas ${order.is_deleted ? 'text-muted line-through decoration-[#98a2b3] [&_td]:opacity-70' : ''}`}>
+                    <tr key={order.id} {...rowLink(`/orders/${order.id}`)} className={`cursor-pointer border-t border-line hover:bg-canvas ${order.is_deleted ? 'text-muted line-through decoration-[#98a2b3] [&_td]:opacity-70' : ''}`}>
                       <td className="px-3 py-2">
                         <Link to={`/orders/${order.id}`} className={`font-medium hover:underline ${order.is_deleted ? 'text-muted' : 'text-accent'}`}>{order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" title="Срочный" className="mr-1 text-danger">●</span>}{order.number}</Link>
                         {order.is_deleted && <span className="ml-2 inline-block rounded bg-[#fef3f2] px-1.5 py-0.5 text-xs font-medium text-danger no-underline [text-decoration:none]">удалён</span>}
@@ -365,7 +374,7 @@ export default function OrdersPage() {
               <button disabled={currentPage >= pageCount} className="text-ink disabled:opacity-40" onClick={() => setParam('page', String(currentPage + 1))}>Далее</button>
             </span>
           </footer>
-        </>
+        </div>
       )}
     </section>
   )

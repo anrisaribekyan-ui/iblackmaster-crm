@@ -6,7 +6,6 @@ import { useAuth } from '../auth'
 import Modal from '../components/Modal'
 import TaskForm, { type TaskEmployee, type TaskFormValues } from '../components/TaskForm'
 import { escapeHtml, openPrint } from '../print'
-import QRCode from 'qrcode'
 import OrderSms from '../components/OrderSms'
 import OrderPhotos from '../components/OrderPhotos'
 import OrderChecklistCard, { checklistHtml, signatureHtml, type Signatures } from '../components/OrderChecklistCard'
@@ -498,7 +497,7 @@ export default function OrderDetailPage() {
     if (!detailOrderId) return
     let cancelled = false
     api.get<{ code: string }>(`/orders/${detailOrderId}/tracking`)
-      .then(({ code }) => QRCode.toString(`${window.location.origin}/track/${code}`, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' }))
+      .then(async ({ code }) => (await import('qrcode')).default.toString(`${window.location.origin}/track/${code}`, { type: 'svg', margin: 0, errorCorrectionLevel: 'M' }))
       .then((svg) => { if (!cancelled) setTrackQr(svg) })
       .catch(() => undefined)
     return () => { cancelled = true }

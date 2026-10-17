@@ -24,6 +24,7 @@ export function getToken(): string | null {
 }
 
 export function setToken(token: string | null) {
+  references.clear() // другой пользователь — другие права и справочники
   try {
     if (token) localStorage.setItem(TOKEN_KEY, token)
     else localStorage.removeItem(TOKEN_KEY)
@@ -96,14 +97,56 @@ async function requestRaw(method: string, path: string, body?: FormData): Promis
   return res
 }
 
+// --- Быстрее на медленном интернете ------------------------------------------------------
+// 1) Одинаковые GET-запросы, ушедшие одновременно, выполняются один раз (карточка заказа просила сотрудников трижды).
+// 2) Справочники (точки, статусы, сотрудники…) живут 5 минут: при каждом переходе их не перекачиваем.
+//    Любое изменение (POST/PUT/DELETE) сбрасывает справочники — правки в настройках видны сразу.
+const REFERENCE_PATHS = [
+  '/locations', '/order-statuses', '/order-types', '/employees/short', '/how-knows', '/cash-registers',
+  '/stores', '/settings/checklist', '/problems', '/complete-sets', '/roles', '/quick-orders',
+]
+const REFERENCE_TTL = 5 * 60 * 1000
+const inFlight = new Map<string, Promise<unknown>>()
+const references = new Map<string, { at: number; data: unknown }>()
+const isReference = (path: string) => REFERENCE_PATHS.some((p) => path === p || path.startsWith(`${p}?`) || path.startsWith(`${p}/`))
+
+function cachedGet<T>(path: string): Promise<T> {
+  if (isReference(path)) {
+    const hit = references.get(path)
+    if (hit && Date.now() - hit.at < REFERENCE_TTL) return Promise.resolve(hit.data as T)
+  }
+  const pending = inFlight.get(path)
+  if (pending) return pending as Promise<T>
+  const promise = request<T>('GET', path)
+    .then((data) => {
+      if (isReference(path)) references.set(path, { at: Date.now(), data })
+      return data
+    })
+    .finally(() => inFlight.delete(path))
+  inFlight.set(path, promise)
+  return promise
+}
+
+function mutate<T>(method: string, path: string, body?: unknown): Promise<T> {
+  references.clear()
+  return request<T>(method, path, body)
+}
+
+export function clearApiCache() {
+  references.clear()
+}
+
 export const api = {
   /** Файл с токеном (фото заказа): <img src> не умеет слать заголовок, поэтому берём blob. */
   blob: async (path: string) => (await requestRaw('GET', path)).blob(),
   /** Загрузка файлов: FormData уходит как multipart, Content-Type ставит браузер. */
-  upload: async <T>(path: string, form: FormData) => (await requestRaw('POST', path, form)).json() as Promise<T>,
-  get: <T>(path: string) => request<T>('GET', path),
+  upload: async <T>(path: string, form: FormData) => {
+    references.clear()
+    return (await requestRaw('POST', path, form)).json() as Promise<T>
+  },
+  get: <T>(path: string) => cachedGet<T>(path),
   getHtml: requestHtml,
-  post: <T>(path: string, body?: unknown) => request<T>('POST', path, body ?? {}),
-  put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body ?? {}),
-  del: <T = void>(path: string, body?: unknown) => request<T>('DELETE', path, body),
+  post: <T>(path: string, body?: unknown) => mutate<T>('POST', path, body ?? {}),
+  put: <T>(path: string, body?: unknown) => mutate<T>('PUT', path, body ?? {}),
+  del: <T = void>(path: string, body?: unknown) => mutate<T>('DELETE', path, body),
 }

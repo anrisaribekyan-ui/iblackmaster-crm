@@ -4,7 +4,9 @@
 День группировки day — «YYYY-MM-DD» по Москве.
 """
 
-from datetime import datetime, timezone
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
+from typing import Literal
 from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
@@ -12,6 +14,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids, require
+from app.errors import Forbidden
 from app.models import (
     CashItem,
     CashRegister,
@@ -22,6 +25,7 @@ from app.models import (
     OrderPosition,
     OrderStatus,
     OrderType,
+    SalaryEvent,
     Sale,
     SalePosition,
     StockBalance,
@@ -332,3 +336,131 @@ def report_stock_value(
         )
     return result
 
+
+
+# --- Прибыль: валовая и чистая по периодам --------------------------------------------------
+
+# Не расходы бизнеса: перемещения денег, инкассация, закупка товара (она в себестоимости, когда товар
+# продан/установлен), выплата зарплаты (зарплату берём по начислениям), возвраты клиентам (это не затраты).
+NOT_EXPENSE_TYPES = {
+    "move", "productMoveFrom", "collection", "purchase", "salary", "orderReturn", "saleReturn", "bankPercent",
+}
+# Выдачи учредителю/работнику — это движение денег владельца и подотчёт, а не расход
+NOT_EXPENSE_NAMES = ("учредител", "работник")
+
+
+def _bucket(value: datetime, group_by: str) -> str:
+    day = value.astimezone(MSK).date()
+    if group_by == "month":
+        return day.replace(day=1).isoformat()
+    if group_by == "week":
+        return (day - timedelta(days=day.weekday())).isoformat()  # понедельник недели
+    return day.isoformat()
+
+
+@router.get("/profit", dependencies=[Depends(require("reportAccess"))])
+def report_profit(
+    db: DbSession,
+    me: CurrentEmployee,
+    date_from: datetime = Query(...),
+    date_to: datetime = Query(...),
+    location_id: int | None = None,
+    group_by: Literal["day", "week", "month"] = "day",
+):
+    """Выручка (выданные заказы + чеки) → валовая прибыль (минус себестоимость) → чистая прибыль
+    (минус начисленная зарплата, комиссия банка и расходы по кассам)."""
+    if not has_permission(me, "marginPriceAccess"):
+        raise Forbidden("Нет права видеть себестоимость и прибыль")
+    allowed = _allowed(db, me, location_id)
+    period_from = _ensure_utc(date_from)
+    period_to = _ensure_utc(date_to)
+
+    empty = lambda: {k: Decimal("0") for k in ("revenue", "cost", "salary", "bank_fee", "expenses")} | {"orders": 0, "sales": 0}
+    buckets: dict[str, dict] = defaultdict(empty)
+
+    order_query = select(Order.closed_at, Order.total_price, Order.total_purchase).where(
+        Order.is_deleted.is_(False), Order.closed_at >= period_from, Order.closed_at < period_to
+    )
+    if allowed:
+        order_query = order_query.where(Order.location_id.in_(allowed))
+    for closed_at, total, cost in db.execute(order_query):
+        b = buckets[_bucket(closed_at, group_by)]
+        b["revenue"] += total
+        b["cost"] += cost
+        b["orders"] += 1
+
+    sale_query = select(Sale.date, Sale.total_price, Sale.total_purchase).where(
+        Sale.is_deleted.is_(False), Sale.date >= period_from, Sale.date < period_to
+    )
+    if allowed:
+        sale_query = sale_query.where(Sale.location_id.in_(allowed))
+    for date_, total, cost in db.execute(sale_query):
+        b = buckets[_bucket(date_, group_by)]
+        b["revenue"] += total
+        b["cost"] += cost
+        b["sales"] += 1
+
+    salary_query = select(SalaryEvent.date, SalaryEvent.amount).where(SalaryEvent.date >= period_from, SalaryEvent.date < period_to)
+    if location_id is not None:
+        salary_query = salary_query.where(SalaryEvent.location_id == location_id)
+    elif allowed:
+        salary_query = salary_query.where(or_(SalaryEvent.location_id.is_(None), SalaryEvent.location_id.in_(allowed)))
+    for date_, amount in db.execute(salary_query):
+        buckets[_bucket(date_, group_by)]["salary"] += amount
+
+    tx_query = (
+        select(Transaction.date, Transaction.amount, CashItem.name, CashItem.type)
+        .join(CashItem, CashItem.id == Transaction.cash_item_id)
+        .where(
+            Transaction.is_deleted.is_(False),
+            Transaction.is_income.is_(False),
+            Transaction.date >= period_from,
+            Transaction.date < period_to,
+        )
+    )
+    # По одной точке — только её расходы; общие (без точки) видны в отчёте по всем точкам
+    if location_id is not None:
+        tx_query = tx_query.where(Transaction.location_id == location_id)
+    elif allowed:
+        tx_query = tx_query.where(or_(Transaction.location_id.is_(None), Transaction.location_id.in_(allowed)))
+    expense_items: dict[str, Decimal] = defaultdict(Decimal)
+    skipped_items: dict[str, Decimal] = defaultdict(Decimal)
+    for date_, amount, name, type_ in db.execute(tx_query):
+        b = buckets[_bucket(date_, group_by)]
+        if type_ == "bankPercent":
+            b["bank_fee"] += amount
+        elif type_ in NOT_EXPENSE_TYPES or any(word in name.lower() for word in NOT_EXPENSE_NAMES):
+            skipped_items[name] += amount
+        else:
+            b["expenses"] += amount
+            expense_items[name] += amount
+
+    def finish(key: str, b: dict) -> dict:
+        gross = b["revenue"] - b["cost"]
+        net = gross - b["salary"] - b["bank_fee"] - b["expenses"]
+        return {
+            "key": key,
+            "orders": b["orders"],
+            "sales": b["sales"],
+            "revenue": _money(b["revenue"]),
+            "cost": _money(b["cost"]),
+            "gross": _money(gross),
+            "salary": _money(b["salary"]),
+            "bank_fee": _money(b["bank_fee"]),
+            "expenses": _money(b["expenses"]),
+            "net": _money(net),
+            "margin": round(float(net / b["revenue"] * 100), 1) if b["revenue"] else None,
+        }
+
+    rows = [finish(key, buckets[key]) for key in sorted(buckets)]
+    total = empty()
+    for b in buckets.values():
+        for k in total:
+            total[k] += b[k]
+    return {
+        "group_by": group_by,
+        "rows": rows,
+        "total": finish("total", total),
+        "expense_items": sorted(({"name": n, "amount": _money(a)} for n, a in expense_items.items()), key=lambda x: -x["amount"]),
+        "not_counted": sorted(({"name": n, "amount": _money(a)} for n, a in skipped_items.items()), key=lambda x: -x["amount"]),
+    }

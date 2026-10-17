@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useRowLink } from '../components/rowLink'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 
@@ -31,6 +32,7 @@ function DaysBadge({ days }: { days: number }) {
 
 /** Готовые, но не забранные аппараты (ТЗ этап 3, E1). Деньги, которые лежат на полке. */
 export default function ForgottenPage() {
+  const rowLink = useRowLink()
   const [data, setData] = useState<Data | null>(null)
   const [days, setDays] = useState<number | null>(null)
   const [locations, setLocations] = useState<Location[]>([])
@@ -105,7 +107,7 @@ export default function ForgottenPage() {
               {data.items.map((item) => {
                 const phone = firstPhone(item.phones)
                 return (
-                  <li key={item.id} className="rounded-xl border border-line bg-surface p-3">
+                  <li key={item.id} {...rowLink(`/orders/${item.id}`)} className="cursor-pointer rounded-xl border border-line bg-surface p-3 hover:border-accent/50">
                     <div className="flex items-center gap-2">
                       <Link to={`/orders/${item.id}`} className="font-semibold text-accent">{item.number}</Link>
                       <span className="truncate text-sm text-muted">{item.status}</span>

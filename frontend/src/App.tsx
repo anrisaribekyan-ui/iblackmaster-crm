@@ -1,43 +1,43 @@
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
 import Layout from './components/Layout'
-import HowKnowsPage from './pages/HowKnowsPage'
+const HowKnowsPage = lazy(() => import('./pages/HowKnowsPage'))
 import LoginPage from './pages/LoginPage'
-import SettingsLayout from './pages/settings/SettingsLayout'
-import LocationsPage from './pages/settings/LocationsPage'
-import StatusesPage from './pages/settings/StatusesPage'
-import TrackPage from './pages/TrackPage'
-import ForgottenPage from './pages/ForgottenPage'
-import NotificationsPage from './pages/settings/NotificationsPage'
-import QuickOrdersPage from './pages/settings/QuickOrdersPage'
-import ChecklistSettingsPage from './pages/settings/ChecklistSettingsPage'
-import StaffPage from './pages/settings/StaffPage'
-import OrderTypesPage from './pages/settings/OrderTypesPage'
-import CompendiumsLayout from './pages/compendiums/CompendiumsLayout'
-import DevicesPage from './pages/compendiums/DevicesPage'
-import NomenclaturePage from './pages/compendiums/NomenclaturePage'
-import CounteragentsPage from './pages/compendiums/CounteragentsPage'
-import DictionaryPage from './components/DictionaryPage'
+const SettingsLayout = lazy(() => import('./pages/settings/SettingsLayout'))
+const LocationsPage = lazy(() => import('./pages/settings/LocationsPage'))
+const StatusesPage = lazy(() => import('./pages/settings/StatusesPage'))
+const TrackPage = lazy(() => import('./pages/TrackPage'))
+const ForgottenPage = lazy(() => import('./pages/ForgottenPage'))
+const NotificationsPage = lazy(() => import('./pages/settings/NotificationsPage'))
+const QuickOrdersPage = lazy(() => import('./pages/settings/QuickOrdersPage'))
+const ChecklistSettingsPage = lazy(() => import('./pages/settings/ChecklistSettingsPage'))
+const StaffPage = lazy(() => import('./pages/settings/StaffPage'))
+const OrderTypesPage = lazy(() => import('./pages/settings/OrderTypesPage'))
+const CompendiumsLayout = lazy(() => import('./pages/compendiums/CompendiumsLayout'))
+const DevicesPage = lazy(() => import('./pages/compendiums/DevicesPage'))
+const NomenclaturePage = lazy(() => import('./pages/compendiums/NomenclaturePage'))
+const CounteragentsPage = lazy(() => import('./pages/compendiums/CounteragentsPage'))
+const DictionaryPage = lazy(() => import('./components/DictionaryPage'))
 import OrdersPage from './pages/OrdersPage'
 import OrderCreatePage from './pages/OrderCreatePage'
 import OrderDetailPage from './pages/OrderDetailPage'
-import TasksPage from './pages/TasksPage'
-import BoardsPage from './pages/BoardsPage'
-import BoardPage from './pages/BoardPage'
+const TasksPage = lazy(() => import('./pages/TasksPage'))
+const BoardsPage = lazy(() => import('./pages/BoardsPage'))
+const BoardPage = lazy(() => import('./pages/BoardPage'))
 import DashboardPage from './pages/DashboardPage'
-import AnalyticsPage from './pages/AnalyticsPage'
-import FinanceLayout from './pages/finance/FinanceLayout'
-import FinanceCashesPage from './pages/finance/FinanceCashesPage'
-import FinanceTransactionsPage from './pages/finance/FinanceTransactionsPage'
-import SalaryPage from './pages/finance/SalaryPage'
-import SalaryEmployeePage from './pages/finance/SalaryEmployeePage'
-import CashItemsPage from './pages/compendiums/CashItemsPage'
-import SalesPage from './pages/SalesPage'
-import StoreLayout from './pages/store/StoreLayout'
-import RemainsPage from './pages/store/RemainsPage'
-import DocumentsPage from './pages/store/DocumentsPage'
-import InventoryPage from './pages/store/InventoryPage'
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'))
+const FinanceLayout = lazy(() => import('./pages/finance/FinanceLayout'))
+const FinanceCashesPage = lazy(() => import('./pages/finance/FinanceCashesPage'))
+const FinanceTransactionsPage = lazy(() => import('./pages/finance/FinanceTransactionsPage'))
+const SalaryPage = lazy(() => import('./pages/finance/SalaryPage'))
+const SalaryEmployeePage = lazy(() => import('./pages/finance/SalaryEmployeePage'))
+const CashItemsPage = lazy(() => import('./pages/compendiums/CashItemsPage'))
+const SalesPage = lazy(() => import('./pages/SalesPage'))
+const StoreLayout = lazy(() => import('./pages/store/StoreLayout'))
+const RemainsPage = lazy(() => import('./pages/store/RemainsPage'))
+const DocumentsPage = lazy(() => import('./pages/store/DocumentsPage'))
+const InventoryPage = lazy(() => import('./pages/store/InventoryPage'))
 
 function Protected({ children }: { children: ReactNode }) {
   const { me, loading, offline, retry } = useAuth()
@@ -69,6 +69,8 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        {/* Редкие разделы (аналитика, доски, настройки) грузятся при первом открытии — приложение стартует быстрее */}
+        <Suspense fallback={<div className="p-6 text-muted">Загрузка…</div>}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/track/:code" element={<TrackPage />} />
@@ -133,6 +135,7 @@ export default function App() {
             <Route path="*" element={<Stub title="Страница не найдена" task="—" />} />
           </Route>
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </AuthProvider>
   )

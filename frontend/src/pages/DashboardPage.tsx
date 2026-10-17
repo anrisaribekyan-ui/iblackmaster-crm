@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRowLink } from '../components/rowLink'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../auth'
@@ -58,6 +59,7 @@ function formatDate(value: string | null) {
 }
 
 export default function DashboardPage() {
+  const rowLink = useRowLink()
   const { can } = useAuth()
   const canPeriod = can('dashboardOrderPeriodAccess')
   const [locations, setLocations] = useState<Location[]>([])
@@ -262,7 +264,7 @@ export default function DashboardPage() {
             ) : (
               <ul className="divide-y divide-line">
                 {data.overdue.map((item) => (
-                  <li key={item.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <li key={item.id} {...rowLink(`/orders/${item.id}`)} className="-mx-2 flex cursor-pointer items-center justify-between gap-3 rounded px-2 py-2 text-sm hover:bg-canvas">
                     <Link className="font-medium text-accent hover:underline" to={`/orders/${item.id}`}>{item.number}</Link>
                     <span className="text-muted">{formatDate(item.deadline)}</span>
                     <span className="whitespace-nowrap rounded-full px-2 py-1 text-xs" style={{ color: item.status_color, backgroundColor: `${item.status_color}22` }}>{item.status_name}</span>

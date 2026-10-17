@@ -99,17 +99,23 @@ def phones_match(counteragent: Counteragent, normalized: str) -> bool:
     return any(phone.strip() == normalized for phone in (counteragent.phones or "").split(","))
 
 
-def visible_counteragents(db: DbSession, me: CurrentEmployee, is_vendor: bool | None = None):
+def visible_query(me: CurrentEmployee, is_vendor: bool | None = None):
+    """Запрос «какие контрагенты видны сотруднику» — фильтры и страницы дальше добавляет база, не Python."""
     require_order_read(me)
-    query = select(Counteragent).where(Counteragent.is_deleted.is_(False)).order_by(Counteragent.name, Counteragent.id)
+    query = select(Counteragent).where(Counteragent.is_deleted.is_(False))
     can_view_vendors = has_permission(me, "counteragentSellerAccess")
     if is_vendor is not None:
         if is_vendor and not can_view_vendors:
-            return []
+            return None
         query = query.where(Counteragent.is_vendor.is_(is_vendor))
     elif not can_view_vendors:
         query = query.where(Counteragent.is_vendor.is_(False))
-    return db.scalars(query).all()
+    return query
+
+
+def visible_counteragents(db: DbSession, me: CurrentEmployee, is_vendor: bool | None = None):
+    query = visible_query(me, is_vendor)
+    return [] if query is None else db.scalars(query.order_by(Counteragent.name, Counteragent.id)).all()
 
 
 @router.get("", response_model=CounteragentPage)
@@ -120,33 +126,34 @@ def list_counteragents(
     is_vendor: bool | None = None,
     page: int = Query(default=1, ge=1),
 ):
-    items = visible_counteragents(db, me, is_vendor)
-    if q:
-        term = q.strip().casefold()
+    query = visible_query(me, is_vendor)
+    if query is None:
+        return CounteragentPage(items=[], total=0, page=page)
+    if q and q.strip():
         normalized = normalize_phone(q)
         raw_digits = "".join(char for char in q if char.isdecimal())
         if normalized:
-            items = [item for item in items if phones_match(item, normalized)]
+            query = query.where(Counteragent.phones.contains(normalized, autoescape=True))
         elif len(raw_digits) >= 3:
-            items = [
-                item
-                for item in items
-                if any(raw_digits in phone.strip() for phone in (item.phones or "").split(","))
-            ]
+            query = query.where(Counteragent.phones.contains(raw_digits, autoescape=True))
         else:
-            items = [item for item in items if term in item.name.casefold()]
-    total = len(items)
-    return CounteragentPage(items=items[(page - 1) * 50 : page * 50], total=total, page=page)
+            query = query.where(Counteragent.name.icontains(q.strip(), autoescape=True))
+    total = db.scalar(query.with_only_columns(func.count(Counteragent.id))) or 0
+    items = db.scalars(query.order_by(Counteragent.name, Counteragent.id).offset((page - 1) * 50).limit(50)).all()
+    if q and normalize_phone(q):  # «содержит» в базе, точное совпадение номера — здесь
+        items = [item for item in items if phones_match(item, normalize_phone(q))]
+    return CounteragentPage(items=items, total=total, page=page)
 
 
 @router.get("/by-phone", response_model=CounteragentOut | None)
 def counteragent_by_phone(phone: str, db: DbSession, me: CurrentEmployee):
-    require_order_read(me)
+    """Вызывается на приёмке при наборе номера — ищем в базе, а не перебором всех клиентов."""
     normalized = normalize_phone(phone)
-    if normalized is None:
+    query = visible_query(me)
+    if normalized is None or query is None:
         return None
-    items = visible_counteragents(db, me)
-    return next((item for item in items if phones_match(item, normalized)), None)
+    candidates = db.scalars(query.where(Counteragent.phones.contains(normalized, autoescape=True)).order_by(Counteragent.id).limit(20))
+    return next((item for item in candidates if phones_match(item, normalized)), None)
 
 
 @router.get("/{counteragent_id}", response_model=CounteragentDetail)

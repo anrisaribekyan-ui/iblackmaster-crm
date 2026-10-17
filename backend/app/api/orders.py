@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids, require, scope_of
 from app.db import Rubles
@@ -408,45 +408,44 @@ def list_orders(
             or_(Order.deadline.is_(None), Order.deadline >= datetime.now(timezone.utc), OrderStatus.group == StatusGroup.CLOSED)
         )
 
-    rows = db.execute(query.order_by(Order.created_at.desc(), Order.id.desc())).all()
-    if q:
-        term = q.strip().casefold()
+    # Поиск, счётчики вкладок и страницы считает база: раньше сюда целиком грузились все заказы (13 тыс.) — 1,5 с на запрос
+    if q and q.strip():
+        term = q.strip()
         normalized = normalize_phone(q)
         raw_digits = "".join(char for char in q if char.isdecimal())
-
-        def matches(row) -> bool:
-            order, _, counteragent = row
-            if term in order.number.casefold() or term in (order.serial or "").casefold() or term in (order.model or "").casefold():
-                return True
-            if term in counteragent.name.casefold():
-                return True
-            phones = [phone.strip() for phone in (counteragent.phones or "").split(",")]
-            if normalized:
-                return any(phone == normalized for phone in phones)
-            return len(raw_digits) >= 3 and any(raw_digits in phone for phone in phones)
-
-        rows = [row for row in rows if matches(row)]
+        conditions = [
+            Order.number.icontains(term, autoescape=True),
+            Order.serial.icontains(term, autoescape=True),
+            Order.model.icontains(term, autoescape=True),
+            Counteragent.name.icontains(term, autoescape=True),
+        ]
+        if normalized:
+            conditions.append(Counteragent.phones.contains(normalized, autoescape=True))
+        elif len(raw_digits) >= 3:
+            conditions.append(Counteragent.phones.contains(raw_digits, autoescape=True))
+        query = query.where(or_(*conditions))
 
     counts = {group.value: 0 for group in StatusGroup}
-    for order_row, status, _ in rows:
-        if not order_row.is_deleted:
-            counts[StatusGroup(status.group).value] += 1
+    count_query = query.where(Order.is_deleted.is_(False)).with_only_columns(OrderStatus.group, func.count(Order.id)).group_by(OrderStatus.group)
+    for group, amount in db.execute(count_query):
+        counts[StatusGroup(group).value] = amount
 
     if tab != "all":
-        rows = [row for row in rows if StatusGroup(row[1].group).value == tab]
-    total = len(rows)
-    rows = rows[(page - 1) * 50 : page * 50]
+        query = query.where(OrderStatus.group == StatusGroup(tab))
+    total = db.scalar(query.with_only_columns(func.count(Order.id)).order_by(None)) or 0
+    rows = db.execute(query.order_by(Order.created_at.desc(), Order.id.desc()).offset((page - 1) * 50).limit(50)).all()
+    manager_ids = {order.manager_id for order, _, _ in rows if order.manager_id}
+    managers = dict(db.execute(select(Employee.id, Employee.short_name).where(Employee.id.in_(manager_ids))).all()) if manager_ids else {}
 
     items = []
     for order, status, counteragent in rows:
-        manager = db.get(Employee, order.manager_id) if order.manager_id else None
         items.append(
             {
                 "id": order.id,
                 "number": order.number,
                 "status": {"id": status.id, "group": status.group, "name": status.name, "color": status.color},
                 "deadline": order.deadline,
-                "manager": manager.short_name if manager else None,
+                "manager": managers.get(order.manager_id),
                 "created_at": order.created_at,
                 "order_type_id": order.order_type_id,
                 "device_type": order.device_type,
