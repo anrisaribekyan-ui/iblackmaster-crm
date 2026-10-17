@@ -140,8 +140,9 @@ export default function Layout() {
             <div className="truncate font-medium text-white">{me?.short_name}</div>
             <div className="truncate text-xs text-rail-muted">{me?.role_name}</div>
           </div>
-          <button onClick={logout} className="rounded-md p-1.5 text-rail-muted hover:bg-rail hover:text-white" aria-label="Выйти" title="Выйти">
+          <button onClick={logout} className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-rail-muted hover:bg-rail hover:text-white" title="Выйти из CRM на этом устройстве">
             <Icon name="logout" className="h-[18px] w-[18px]" />
+            Выйти
           </button>
         </div>
       </aside>
