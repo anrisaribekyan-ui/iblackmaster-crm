@@ -20,7 +20,8 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 def create_access_token(employee_id: int) -> str:
-    payload = {"sub": str(employee_id), "exp": utcnow() + timedelta(minutes=settings.jwt_expire_minutes)}
+    now = utcnow()
+    payload = {"sub": str(employee_id), "iat": int(now.timestamp()), "exp": now + timedelta(minutes=settings.jwt_expire_minutes)}
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
@@ -29,4 +30,13 @@ def decode_access_token(token: str) -> int | None:
         payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         return int(payload["sub"])
     except (jwt.PyJWTError, KeyError, ValueError):
+        return None
+
+
+def token_issued_at(token: str) -> int | None:
+    """Когда выдан вход (секунды). Нужен, чтобы после смены пароля старые входы перестали работать."""
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        return int(payload["iat"]) if "iat" in payload else None
+    except (jwt.PyJWTError, ValueError):
         return None

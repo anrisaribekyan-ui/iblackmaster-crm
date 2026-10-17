@@ -27,6 +27,14 @@ class Settings(BaseSettings):
     smsgate_password: str = ""
     sms_daily_limit: int = 150  # больше с обычной симки слать опасно — оператор заблокирует как спам
     uploads_dir: str = "uploads"  # фото и файлы заказов; на сервере — том docker uploads
+    # Почта для писем сотрудникам (коды сброса пароля, уведомления). Пусто — письма не отправляются.
+    # Яндекс 360 / Mail.ru для бизнеса: smtp.yandex.ru:465 или smtp.mail.ru:465, пароль приложения.
+    smtp_host: str = ""
+    smtp_port: int = 465
+    smtp_user: str = ""
+    smtp_password: str = ""
+    mail_from: str = ""  # пусто — как smtp_user
+    mail_from_name: str = "iBlackMaster"
     sms_worker: bool = True  # фоновая отправка (в тестах выключено)
 
 

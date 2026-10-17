@@ -1,6 +1,6 @@
 """Сотрудники и роли."""
 
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import JSON, Column, ForeignKey, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -48,6 +48,23 @@ class Employee(Base, TimestampMixin):
     is_owner: Mapped[bool] = mapped_column(default=False)
     is_active: Mapped[bool] = mapped_column(default=True)
     telegram_chat_id: Mapped[str | None] = mapped_column(String(50))
+    # Когда последний раз меняли пароль: входы, выданные раньше, перестают действовать
+    password_changed_at: Mapped[datetime | None]
 
     role: Mapped[Role] = relationship()
     locations: Mapped[list["Location"]] = relationship(secondary=employee_location)  # noqa: F821
+
+
+class EmailCode(Base):
+    """Одноразовый код из письма (сброс пароля). Храним только хэш — код из базы не украсть."""
+
+    __tablename__ = "email_code"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employee.id", ondelete="CASCADE"), index=True)
+    purpose: Mapped[str] = mapped_column(String(20), default="reset")
+    code_hash: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime]
+    expires_at: Mapped[datetime]
+    attempts: Mapped[int] = mapped_column(default=0)
+    used_at: Mapped[datetime | None]

@@ -31,6 +31,11 @@ services:
       PUBLIC_URL: ${PUBLIC_URL:-}
       SMSGATE_USER: ${SMSGATE_USER:-}
       SMSGATE_PASSWORD: ${SMSGATE_PASSWORD:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
       SMS_DAILY_LIMIT: ${SMS_DAILY_LIMIT:-150}
     volumes:
       - uploads:/app/uploads

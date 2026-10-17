@@ -92,7 +92,7 @@ def test_employee_crud_password_and_owner_protection(client, auth_headers, owner
         json={"password": "newpassword123"},
         headers=auth_headers,
     )
-    assert response.status_code == 204
+    assert response.status_code == 200
     login = client.post("/api/auth/login", json={"email": payload["email"], "password": "newpassword123"})
     assert login.status_code == 200
 

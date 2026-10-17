@@ -17,7 +17,7 @@ from app.db import get_db
 from app.errors import BusinessError, Forbidden
 from app.models import Employee
 from app.permissions import PERMISSIONS
-from app.security import decode_access_token
+from app.security import decode_access_token, token_issued_at
 
 DbSession = Annotated[Session, Depends(get_db)]
 
@@ -36,6 +36,11 @@ def get_current_employee(db: DbSession, authorization: Annotated[str | None, Hea
     employee = db.get(Employee, employee_id)
     if employee is None or not employee.is_active:
         raise Unauthorized()
+    if employee.password_changed_at is not None:
+        # Пароль сменили — все входы, выданные до этого (на чужом телефоне, в забытой вкладке), гаснут
+        issued = token_issued_at(authorization.split(" ", 1)[1])
+        if issued is None or issued < int(employee.password_changed_at.timestamp()):
+            raise Unauthorized()
     return employee
 
 

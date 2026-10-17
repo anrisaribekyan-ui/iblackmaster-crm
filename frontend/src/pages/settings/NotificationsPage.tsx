@@ -3,6 +3,7 @@ import { useRowLink } from '../../components/rowLink'
 import { api, ApiError } from '../../api/client'
 import ForgottenSettings from '../../components/ForgottenSettings'
 import Skeleton from '../../components/Skeleton'
+import MailStatus from '../../components/MailStatus'
 
 type Variable = { name: string; hint: string }
 type Template = {
@@ -225,6 +226,8 @@ export default function NotificationsPage() {
               </div>
             </div>
           )}
+
+          <MailStatus />
 
           <div>
             <h3 className="mb-1 font-semibold">Шаблоны по статусам</h3>

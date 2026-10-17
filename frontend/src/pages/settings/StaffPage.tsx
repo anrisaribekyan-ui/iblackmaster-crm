@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { api, ApiError } from '../../api/client'
+import { api, ApiError, setToken } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
 import Skeleton from '../../components/Skeleton'
@@ -112,7 +112,7 @@ export default function StaffPage() {
     void mutate(
       () => editor.employee
         ? api.put(`/employees/${editor.employee.id}`, payload)
-        : api.post('/employees', { ...payload, password: value('password') }),
+        : api.post('/employees', { ...payload, password: value('password'), send_welcome: values.get('send_welcome') === 'on' }),
       'Не удалось сохранить сотрудника',
     )
   }
@@ -122,7 +122,11 @@ export default function StaffPage() {
     if (!editor || editor.kind !== 'password') return
     const password = String(new FormData(event.currentTarget).get('password') ?? '')
     void mutate(
-      () => api.post(`/employees/${editor.employee.id}/password`, { password }),
+      async () => {
+        const result = await api.post<{ access_token: string | null }>(`/employees/${editor.employee.id}/password`, { password })
+        // Себе сменили пароль — остальные входы погасли, этому устройству сервер выдал новый
+        if (result?.access_token) setToken(result.access_token)
+      },
       'Не удалось сменить пароль',
     )
   }
@@ -271,6 +275,7 @@ export default function StaffPage() {
       {editor?.kind === 'password' && (
         <Modal title={`Сменить пароль · ${editor.employee.short_name}`} onClose={() => setEditor(null)}>
           <form onSubmit={changePassword} className="grid gap-3">
+            <p className="text-sm text-muted">Все входы сотрудника на других устройствах закроются, а на почту {editor.employee.email} придёт письмо «Пароль изменён».</p>
             <label className="grid gap-1 text-sm text-muted">Новый пароль (не менее 8 символов)
               <input className={inputClass} name="password" type="password" minLength={8} required autoComplete="new-password" />
             </label>
@@ -340,6 +345,12 @@ function EmployeeForm({
           {employee?.is_owner && <input type="hidden" name="role_id" value={employee.role_id} />}
         </label>
         {!employee && <label className="grid gap-1 text-sm text-muted">Пароль (не менее 8 символов)<input className={inputClass} name="password" type="password" minLength={8} required autoComplete="new-password" /></label>}
+        {!employee && (
+          <label className="flex items-start gap-2 text-sm sm:col-span-2">
+            <input type="checkbox" name="send_welcome" defaultChecked className="mt-0.5" />
+            <span>Отправить письмо «Добро пожаловать» с логином и ссылкой на CRM<small className="block text-muted">Пароль в письмо не попадает — его передаёте вы. Свой пароль сотрудник задаст через «Забыли пароль?».</small></span>
+          </label>
+        )}
         <fieldset className="grid gap-1 rounded-md border border-line p-3 sm:col-span-2">
           <legend className="px-1 text-sm text-muted">Доступные локации</legend>
           {locations.length === 0 ? <span className="text-sm text-muted">Нет доступных локаций.</span> : locations.map((location) => (

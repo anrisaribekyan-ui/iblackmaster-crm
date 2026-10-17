@@ -21,6 +21,7 @@ type AuthState = {
   offline: boolean
   retry: () => void
   login: (email: string, password: string) => Promise<void>
+  loginWithToken: (token: string) => Promise<void>
   logout: () => void
   /** Есть ли у текущего сотрудника право (код из backend/app/permissions.py) */
   can: (permission: string) => boolean
@@ -77,6 +78,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await loadMe()
   }
 
+  // Вход по токену, который выдал сервер после сброса пароля по коду
+  const loginWithToken = async (token: string) => {
+    setToken(token)
+    await loadMe()
+  }
+
   const logout = () => {
     setToken(null)
     setMe(null)
@@ -84,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const can = (permission: string) => !!me && (me.is_owner || me.permissions.includes(permission))
 
-  return <AuthContext.Provider value={{ me, loading, offline, retry, login, logout, can }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ me, loading, offline, retry, login, loginWithToken, logout, can }}>{children}</AuthContext.Provider>
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

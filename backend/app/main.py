@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 import app.models  # noqa: F401  — регистрирует все таблицы
 from app.api import (
     auth,
+    mail_settings,
     forgotten as forgotten_api,
     checklist,
     intake,
@@ -84,6 +85,7 @@ def health():
 
 # Все роутеры подключаются с префиксом /api. Новый роутер — добавь строку сюда.
 app.include_router(auth.router, prefix="/api")
+app.include_router(mail_settings.router, prefix="/api")
 app.include_router(how_knows.router, prefix="/api")
 app.include_router(locations.router, prefix="/api")
 app.include_router(stores.router, prefix="/api")

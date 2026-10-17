@@ -9,6 +9,7 @@ from app.api.deps import CurrentEmployee, DbSession, check_location, location_id
 from app.errors import BusinessError, NotFound
 from app.models import Employee, Location, Role
 from app.permissions import PERMISSIONS, SCOPES
+from app.db import utcnow
 from app.security import hash_password
 
 router = APIRouter(tags=["Сотрудники и роли"])
@@ -48,6 +49,7 @@ class EmployeeFields(BaseModel):
 
 class EmployeeCreate(EmployeeFields):
     password: str = Field(min_length=8)
+    send_welcome: bool = True  # письмо «вас добавили в CRM» на почту сотрудника
 
 
 class EmployeeUpdate(EmployeeFields):
@@ -197,7 +199,7 @@ def list_employees(db: DbSession):
 def create_employee(data: EmployeeCreate, db: DbSession, me: CurrentEmployee):
     role = get_role(db, data.role_id)
     locations = get_employee_locations(db, me, data.location_ids)
-    values = data.model_dump(exclude={"password", "location_ids"})
+    values = data.model_dump(exclude={"password", "location_ids", "send_welcome"})
     values["email"] = values["email"].strip().lower()
     employee = Employee(
         **values,
@@ -207,6 +209,12 @@ def create_employee(data: EmployeeCreate, db: DbSession, me: CurrentEmployee):
     )
     db.add(employee)
     db.commit()
+    if data.send_welcome:
+        from app.api.auth import first_name
+        from app.services import mail
+
+        mail.send(employee.email, "Ваш вход в CRM iBlackMaster", "welcome",
+                  name=first_name(employee), email=employee.email, role=role.name)
     return employee_out(employee)
 
 
@@ -231,16 +239,22 @@ def update_employee(employee_id: int, data: EmployeeUpdate, db: DbSession, me: C
 
 @router.post(
     "/employees/{employee_id}/password",
-    status_code=204,
     dependencies=[Depends(require("settingAccess"))],
 )
-def change_employee_password(employee_id: int, data: PasswordIn, db: DbSession):
+def change_employee_password(employee_id: int, data: PasswordIn, db: DbSession, me: CurrentEmployee):
     employee = db.get(Employee, employee_id)
     if employee is None:
         raise NotFound("Сотрудник")
     employee.password_hash = hash_password(data.password)
+    employee.password_changed_at = utcnow()
     db.commit()
-    return Response(status_code=204)
+    from app.api.auth import notify_password_changed
+
+    notify_password_changed(employee, f"администратор {me.short_name}" if me.id != employee.id else "вы сами, в настройках")
+    # Сменили пароль себе — прежние входы погасли, этому устройству выдаём новый, чтобы не выкинуло
+    from app.security import create_access_token
+
+    return {"access_token": create_access_token(employee.id) if me.id == employee.id else None}
 
 
 @router.delete("/employees/{employee_id}", status_code=204, dependencies=[Depends(require("settingAccess"))])
