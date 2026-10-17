@@ -117,10 +117,13 @@ body {
     outline-offset: 2px;
   }
   /* Таблицы: тихая шапка, строки с подсветкой при наведении */
+  /* Шапки всех таблиц одного размера, где бы их ни нарисовали */
   thead th {
+    font-size: 12px;
     font-weight: 500;
     color: var(--color-muted);
     letter-spacing: 0.01em;
+    white-space: nowrap;
   }
   tbody tr {
     transition: background-color 0.1s;

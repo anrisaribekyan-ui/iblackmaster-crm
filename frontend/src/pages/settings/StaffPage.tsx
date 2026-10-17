@@ -3,6 +3,7 @@ import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
 import Skeleton from '../../components/Skeleton'
+import { shortLocation } from '../shared'
 
 type Location = { id: number; name: string }
 type Role = {
@@ -194,22 +195,25 @@ export default function StaffPage() {
                     <th className="px-3 py-2 font-medium">Роль</th>
                     <th className="hidden px-3 py-2 font-medium md:table-cell">Локации</th>
                     <th className="hidden px-3 py-2 font-medium md:table-cell">Активен</th>
-                    <th className="px-3 py-2 font-medium">Действия</th>
+                    <th className="hidden px-3 py-2 font-medium md:table-cell"><span className="sr-only">Действия</span></th>
                   </tr>
                 </thead>
                 <tbody>
                   {employees.map((employee) => (
-                    <tr key={employee.id} className="border-t border-line">
+                    <tr key={employee.id} className={`border-t border-line ${can('settingAccess') ? 'cursor-pointer' : ''} ${employee.is_active ? '' : 'text-muted'}`} onClick={(e) => { if (can('settingAccess') && !(e.target as HTMLElement).closest('button')) setEditor({ kind: 'employee', employee }) }}>
                       <td className="px-3 py-2">{employee.short_name}{employee.is_owner && <small className="ml-1 text-muted">владелец</small>}</td>
                       <td className="hidden px-3 py-2 md:table-cell">{employee.email}</td>
                       <td className="px-3 py-2">{roleNames.get(employee.role_id) ?? '—'}</td>
-                      <td className="hidden px-3 py-2 md:table-cell">{employee.location_ids.map((id) => locationNames.get(id)).filter(Boolean).join(', ') || '—'}</td>
-                      <td className="hidden px-3 py-2 md:table-cell">{employee.is_active ? 'Да' : 'Нет'}</td>
-                      <td className="px-3 py-2">
+                      <td className="hidden px-3 py-2 md:table-cell">
+                        {locations.length > 0 && locations.every((l) => employee.location_ids.includes(l.id))
+                          ? <span className="text-muted">все точки</span>
+                          : <span className="flex flex-wrap gap-1">{employee.location_ids.map((id) => <span key={id} className="rounded bg-canvas px-1.5 py-0.5 text-xs">{shortLocation(locationNames.get(id))}</span>)}</span>}
+                      </td>
+                      <td className="hidden px-3 py-2 md:table-cell">{employee.is_active ? 'Да' : 'Отключён'}</td>
+                      <td className="hidden px-3 py-2 md:table-cell">
                         {can('settingAccess') && (
                           <span className="flex gap-2 whitespace-nowrap text-sm">
-                            <button className="text-muted" onClick={() => setEditor({ kind: 'employee', employee })}>Изменить</button>
-                            <button className="text-muted" onClick={() => setEditor({ kind: 'password', employee })}>Пароль</button>
+                                                        <button className="text-muted" onClick={() => setEditor({ kind: 'password', employee })}>Пароль</button>
                             {employee.is_active && !employee.is_owner && <button className="text-danger" onClick={() => void deactivate(employee)}>Отключить</button>}
                           </span>
                         )}

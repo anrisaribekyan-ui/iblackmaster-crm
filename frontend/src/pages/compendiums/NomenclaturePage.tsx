@@ -172,19 +172,19 @@ export default function NomenclaturePage({ isWork }: { isWork: boolean }) {
                   <th className="hidden px-3 py-2 md:table-cell">Группа</th>
                   <th className="hidden px-3 py-2 md:table-cell">Ед.</th>
                   {priceTypes.map((priceType) => <th key={priceType.id} className="hidden px-3 py-2 md:table-cell">{priceType.name}</th>)}
-                  {canEdit && <th className="px-3 py-2">Действия</th>}
+                  {canEdit && <th className="hidden px-3 py-2 md:table-cell"><span className="sr-only">Действия</span></th>}
                 </tr>
               </thead>
               <tbody>
                 {pageData.items.map((item) => (
-                  <tr key={item.id} className="border-t border-line">
+                  <tr key={item.id} className={`border-t border-line ${canEdit ? 'cursor-pointer' : ''}`} onClick={(e) => { if (canEdit && !(e.target as HTMLElement).closest('button')) setEditing(item) }}>
                     <td className="px-3 py-2 num">{item.code}</td>
                     <td className="hidden px-3 py-2 md:table-cell">{item.article || '—'}</td>
-                    <td className="px-3 py-2 font-medium">{item.name}</td>
-                    <td className="hidden px-3 py-2 md:table-cell">{groups.find((group) => group.id === item.group_id)?.label ?? '—'}</td>
+                    <td className="min-w-[16rem] px-3 py-2 font-medium">{item.name}</td>
+                    <td className="hidden max-w-[12rem] truncate px-3 py-2 text-muted md:table-cell" title={groups.find((group) => group.id === item.group_id)?.label}>{groups.find((group) => group.id === item.group_id)?.label.split(' / ').slice(-1)[0] ?? '—'}</td>
                     <td className="hidden px-3 py-2 md:table-cell">{measures.find((measure) => measure.id === item.measure_id)?.name ?? '—'}</td>
                     {priceTypes.map((priceType) => <td key={priceType.id} className="hidden px-3 py-2 num md:table-cell">{priceLabel(priceType, item)}</td>)}
-                    {canEdit && <td className="px-3 py-2"><span className="flex gap-2 whitespace-nowrap"><button className="text-muted" onClick={() => setEditing(item)}>Изменить</button><button className="text-danger" onClick={() => void remove(item)}>Удалить</button></span></td>}
+                    {canEdit && <td className="hidden px-3 py-2 text-right md:table-cell"><button className="rounded px-1.5 text-sm text-muted hover:text-danger" onClick={() => void remove(item)} aria-label={`Удалить ${item.name}`}>Удалить</button></td>}
                   </tr>
                 ))}
               </tbody>

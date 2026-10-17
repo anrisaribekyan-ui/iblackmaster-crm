@@ -435,6 +435,23 @@ export default function SalesPage() {
         </div>
       )}
 
+      {/* Телефон: итог и «Пробить» всегда под пальцем, над нижним меню — не надо листать до кнопки */}
+      {lines.length > 0 && (
+        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+3.6rem)] z-30 px-3 pb-2 lg:hidden">
+          <div className="pop-in flex items-center gap-3 rounded-2xl bg-rail p-2 pl-4 text-white shadow-xl">
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="num text-lg font-semibold">{money(total)}</p>
+              {error && <p className="truncate text-xs text-[#ff8a72]">{error}</p>}
+              <p className="truncate text-xs text-white/60">{lines.reduce((s2, l) => s2 + Number(l.quantity || 0), 0)} поз. · {split ? 'раздельная оплата' : options.find((o) => o.id === payId)?.label ?? '—'}</p>
+            </div>
+            <button disabled={busy} onClick={() => void submit()} className="rounded-xl bg-accent px-5 py-3 font-semibold text-accent-ink disabled:opacity-60">
+              {busy ? '…' : 'Пробить'}
+            </button>
+          </div>
+        </div>
+      )}
+      {lines.length > 0 && <div className="h-20 lg:hidden" aria-hidden />}
+
       {quick && (
         <QuickItemModal
           suggestions={(top ?? []).filter((t) => t.nomenclature_id === null).map((t) => t.name)}

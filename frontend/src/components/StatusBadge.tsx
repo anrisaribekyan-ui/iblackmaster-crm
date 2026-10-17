@@ -43,6 +43,7 @@ export default function StatusBadge({ name, color, className = '' }: { name: str
   const c = statusColors(color)
   return (
     <span
+      title={name}
       className={`inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${className}`}
       style={{ color: c.text, backgroundColor: c.bg }}
     >

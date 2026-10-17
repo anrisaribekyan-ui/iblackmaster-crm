@@ -512,7 +512,7 @@ function DynamicField({
       <MultiValueInput
         value={selected}
         suggestions={suggestions}
-        placeholder={field.is_only_dictionary ? 'Выберите из списка' : 'Введите значение и нажмите Enter'}
+        placeholder={field.is_only_dictionary ? 'Выберите из списка' : 'Добавить и Enter'}
         onChange={onChange}
       />
     )

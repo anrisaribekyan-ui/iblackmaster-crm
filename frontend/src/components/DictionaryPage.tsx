@@ -107,7 +107,7 @@ export default function DictionaryPage({ config }: { config: DictionaryConfig })
       ) : (
         <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
           {items.map((item) => (
-            <li key={item.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
+            <li key={item.id} className="group flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-canvas">
               <span>
                 {item.name}
                 {config.fields?.map((field) => (
@@ -119,7 +119,7 @@ export default function DictionaryPage({ config }: { config: DictionaryConfig })
                 ))}
               </span>
               {canEdit && (
-                <span className="flex shrink-0 gap-3 text-sm">
+                <span className="flex shrink-0 gap-3 text-sm md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:group-focus-within:opacity-100">
                   <button className="text-muted hover:text-ink" onClick={() => setEditor(item)}>Изменить</button>
                   <button className="text-danger" onClick={() => void remove(item)}>Удалить</button>
                 </span>

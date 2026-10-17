@@ -173,7 +173,7 @@ export default function DashboardPage() {
         {hasClosed && (
           <StatTile label={`Выдано, ${periodName}`} value={orders.closed!} format={count} previous={previous.closed} trend={last14.map((t) => t.closed ?? 0)} />
         )}
-        <div className="flex min-h-28 flex-col justify-between rounded-xl border border-line bg-surface p-4">
+        <div className="col-span-2 flex min-h-28 flex-col justify-between rounded-xl border border-line bg-surface p-4 xl:col-span-1">
           <p className="text-sm text-muted">Сейчас в работе</p>
           <div>
             <p className="text-[28px] font-semibold leading-none">{count(orders.in_work)}</p>

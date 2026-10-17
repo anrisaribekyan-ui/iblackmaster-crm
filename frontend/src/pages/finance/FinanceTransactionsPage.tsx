@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import { downloadCsv } from '../../csv'
+import Skeleton from '../../components/Skeleton'
+import { shortLocation } from '../shared'
 
 type Location = { id: number; name: string }
 type CashRegister = { id: number; location_id: number | null; name: string }
@@ -48,6 +50,7 @@ export default function FinanceTransactionsPage() {
   const [cashItems, setCashItems] = useState<CashItem[]>([])
   const [data, setData] = useState<TransactionPage | null>(null)
   const [filters, setFilters] = useState<Filters>({ locationId: '', registerId: '', itemId: '', dateFrom: '', dateTo: '', deleted: false })
+  const [filtersOpen, setFiltersOpen] = useState(false) // на телефоне фильтры спрятаны за кнопкой
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -160,7 +163,10 @@ export default function FinanceTransactionsPage() {
         <p role="alert" className="rounded-md border border-danger p-3 text-danger">Нет права просматривать журнал транзакций.</p>
       ) : (
         <>
-          <form onSubmit={submitFilters} className="mb-4 grid gap-2 rounded-xl border border-line bg-surface p-3 sm:grid-cols-2 xl:grid-cols-6">
+          <button type="button" className="mb-3 rounded-md border border-line bg-surface px-3 py-2 text-sm md:hidden" onClick={() => setFiltersOpen((v) => !v)} aria-expanded={filtersOpen}>
+            {filtersOpen ? 'Скрыть фильтры' : `Фильтры${Object.entries(filters).some(([, v]) => v) ? ' · заданы' : ''}`}
+          </button>
+          <form onSubmit={(e) => { submitFilters(e); setFiltersOpen(false) }} className={`mb-4 gap-2 rounded-xl border border-line bg-surface p-3 sm:grid-cols-2 md:grid xl:grid-cols-6 ${filtersOpen ? 'grid' : 'hidden'}`}>
             <select className={inputClass} name="location_id" defaultValue={filters.locationId} aria-label="Локация">
               <option value="">Все локации</option>
               {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
@@ -181,11 +187,11 @@ export default function FinanceTransactionsPage() {
                 Удалённые
               </label>
             )}
-            <button className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink sm:col-span-2 xl:col-span-6">Применить фильтры</button>
+            <button className="rounded-md border border-ink bg-ink px-4 py-2 font-medium text-white hover:opacity-90 sm:col-span-2 xl:col-span-6 xl:justify-self-end">Показать</button>
           </form>
           {error && <p role="alert" className="mb-3 rounded-md border border-danger p-3 text-danger">{error}</p>}
           {loading ? (
-            <p className="text-muted">Загрузка транзакций…</p>
+            <Skeleton />
           ) : data === null ? (
             <p className="text-muted">Не удалось загрузить журнал.</p>
           ) : data.items.length === 0 ? (
@@ -202,7 +208,7 @@ export default function FinanceTransactionsPage() {
                       <th className="hidden px-3 py-2 md:table-cell">Тип</th>
                       <th className="px-3 py-2 text-right">Сумма</th>
                       <th className="hidden px-3 py-2 md:table-cell">Комментарий</th>
-                      {canChange && <th className="px-3 py-2">Действие</th>}
+                      {canChange && <th className="hidden px-3 py-2 md:table-cell"><span className="sr-only">Действие</span></th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-line">
@@ -211,7 +217,7 @@ export default function FinanceTransactionsPage() {
                       return (
                         <tr key={transaction.id} className={transaction.is_deleted ? 'text-muted' : ''}>
                           <td className="whitespace-nowrap px-3 py-2">{formatDate(transaction.date)}</td>
-                          <td className="hidden px-3 py-2 md:table-cell">{locationLabel(transaction.location_id)} · {transaction.cash_register_name ?? 'Касса'}</td>
+                          <td className="hidden px-3 py-2 md:table-cell">{transaction.cash_register_name ?? 'Касса'}<small className="block text-xs text-muted">{shortLocation(locationLabel(transaction.location_id))}</small></td>
                           <td className="px-3 py-2">{transaction.cash_item_name ?? '—'}</td>
                           <td className="hidden px-3 py-2 md:table-cell">{transaction.is_bank ? 'Безнал' : 'Наличные'}</td>
                           <td className={`num whitespace-nowrap px-3 py-2 text-right font-medium ${transaction.is_income ? 'text-success' : 'text-danger'}`}>
@@ -219,7 +225,7 @@ export default function FinanceTransactionsPage() {
                           </td>
                           <td className="hidden max-w-64 truncate px-3 py-2 md:table-cell">{transaction.note || '—'}</td>
                           {canChange && (
-                            <td className="whitespace-nowrap px-3 py-2">
+                            <td className="hidden whitespace-nowrap px-3 py-2 md:table-cell">
                               {filters.deleted ? (
                                 <button disabled={actionId === transaction.id} className="text-accent disabled:opacity-60" onClick={() => void updateTransaction(transaction, true)}>
                                   Восстановить

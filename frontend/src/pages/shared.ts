@@ -57,3 +57,10 @@ export function useLocationsAndRegisters() {
   }, [])
   return { locations, registers, error }
 }
+
+/** «iBlackMaster (ТК Панфиловский)» → «Панфиловский»: в таблицах и чипах полное название — шум. */
+export function shortLocation(name: string | null | undefined): string {
+  if (!name) return '—'
+  const inner = /\(([^)]+)\)/.exec(name)?.[1] ?? name
+  return inner.replace(/^ТК\s+/i, '').trim()
+}

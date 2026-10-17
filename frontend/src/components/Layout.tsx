@@ -148,7 +148,7 @@ export default function Layout() {
       {/* На телефоне прокручивается вся страница (прячется адресная строка, работает «потянуть — обновить»),
           на компьютере — только рабочая область справа от меню */}
       <main ref={mainRef} className="min-w-0 flex-1 px-3 pb-24 sm:px-8 md:overflow-auto md:py-6 md:pb-6">
-        <header className={`top-0 z-20 ${onOrders ? 'max-md:static' : 'sticky'} -mx-3 mb-3 flex items-center gap-2 bg-canvas/95 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur sm:-mx-8 sm:px-8 md:static md:mx-0 md:mb-4 md:justify-end md:bg-transparent md:p-0 md:backdrop-blur-none`}>
+        <header className={`top-0 z-20 ${onOrders ? 'max-md:static md:hidden' : 'sticky'} -mx-3 mb-3 flex items-center gap-2 bg-canvas/95 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur sm:-mx-8 sm:px-8 md:static md:mx-0 md:mb-4 md:justify-end md:bg-transparent md:p-0 md:backdrop-blur-none`}>
           <form onSubmit={(event) => void submitSearch(event)} className={`${onOrders ? 'max-md:hidden' : ''} relative min-w-0 flex-1 md:max-w-md md:flex-none md:basis-[28rem]`}>
             <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input

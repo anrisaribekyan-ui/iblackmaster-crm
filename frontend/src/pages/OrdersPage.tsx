@@ -333,40 +333,60 @@ export default function OrdersPage() {
             })}
           </ul>
           <div className="hidden overflow-x-auto rounded-xl border border-line bg-surface md:block">
-            <table className="w-full text-left text-sm">
+            {/* Строка — одна мысль: заказ, статус, что за аппарат и с чем пришёл, чей, сколько. Второстепенное — мелко под главным */}
+            <table className="w-full table-fixed text-left text-sm">
+              <colgroup>
+                <col className="w-[7.5rem]" />
+                <col className="w-[11.5rem]" />
+                <col />
+                <col className="w-[13rem]" />
+                <col className="hidden w-[8rem] xl:table-column" />
+                <col className="hidden w-[8.5rem] 2xl:table-column" />
+                <col className="w-[8rem]" />
+              </colgroup>
               <thead className="bg-canvas text-xs text-muted">
                 <tr>
                   <th className="px-3 py-2 font-medium">Заказ</th>
                   <th className="px-3 py-2 font-medium">Статус</th>
-                  <th className="hidden px-3 py-2 font-medium md:table-cell">Крайний срок</th>
-                  <th className="hidden px-3 py-2 font-medium md:table-cell">Менеджер</th>
-                  <th className="hidden px-3 py-2 font-medium md:table-cell">Создан</th>
-                  <th className="hidden px-3 py-2 font-medium md:table-cell">Тип заказа</th>
-                  <th className="hidden px-3 py-2 font-medium md:table-cell">Устройство</th>
-                  <th className="hidden px-3 py-2 font-medium md:table-cell">Неисправность</th>
-                  <th className="hidden px-3 py-2 font-medium md:table-cell">Контрагент</th>
+                  <th className="px-3 py-2 font-medium">Устройство</th>
+                  <th className="px-3 py-2 font-medium">Клиент</th>
+                  <th className="hidden px-3 py-2 font-medium xl:table-cell">Срок</th>
+                  <th className="hidden px-3 py-2 font-medium 2xl:table-cell">Менеджер</th>
                   <th className="px-3 py-2 text-right font-medium">Сумма</th>
                 </tr>
               </thead>
               <tbody>
                 {data.items.map((order) => {
                   const overdue = order.deadline && new Date(order.deadline).getTime() < Date.now() && order.status.group !== 'closed'
+                  const device = [order.brand, order.model].filter(Boolean).join(' ')
+                  const type = orderTypes.find((t) => t.id === order.order_type_id)?.name
                   return (
-                    <tr key={order.id} {...rowLink(`/orders/${order.id}`)} className={`cursor-pointer border-t border-line hover:bg-canvas ${order.is_deleted ? 'text-muted line-through decoration-[#98a2b3] [&_td]:opacity-70' : ''}`}>
-                      <td className="px-3 py-2">
-                        <Link to={`/orders/${order.id}`} className={`font-medium hover:underline ${order.is_deleted ? 'text-muted' : 'text-accent'}`}>{order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" title="Срочный" className="mr-1 text-danger">●</span>}{order.number}</Link>
-                        {order.is_deleted && <span className="ml-2 inline-block rounded bg-[#fef3f2] px-1.5 py-0.5 text-xs font-medium text-danger no-underline [text-decoration:none]">удалён</span>}
+                    <tr key={order.id} {...rowLink(`/orders/${order.id}`)} className={`cursor-pointer border-t border-line align-top hover:bg-canvas ${order.is_deleted ? 'text-muted line-through decoration-[#98a2b3] [&_td]:opacity-70' : ''}`}>
+                      <td className="px-3 py-2.5">
+                        <Link to={`/orders/${order.id}`} className={`num font-semibold hover:underline ${order.is_deleted ? 'text-muted' : 'text-accent'}`}>{order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" title="Срочный" className="mr-1 text-danger">●</span>}{order.number}</Link>
+                        <small className="block whitespace-nowrap text-xs text-muted" title={formatDate(order.created_at)}>{ago(order.created_at) ?? formatDate(order.created_at).split(',')[0]}</small>
+                        {order.is_deleted && <span className="mt-1 inline-block rounded bg-[#fef3f2] px-1.5 py-0.5 text-xs font-medium text-danger [text-decoration:none]">удалён</span>}
                       </td>
-                      <td className="px-3 py-2"><StatusBadge name={order.status.name} color={order.status.color} /></td>
-                      <td className={`hidden px-3 py-2 whitespace-nowrap md:table-cell ${overdue ? 'font-medium text-danger' : ''}`}>{formatDate(order.deadline)}</td>
-                      <td className="hidden px-3 py-2 md:table-cell">{order.manager ?? '—'}</td>
-                      <td className="hidden px-3 py-2 whitespace-nowrap md:table-cell" title={formatDate(order.created_at)}>{ago(order.created_at) ?? formatDate(order.created_at)}</td>
-                      <td className="hidden px-3 py-2 md:table-cell">{orderTypes.find((type) => type.id === order.order_type_id)?.name ?? '—'}</td>
-                      <td className="hidden px-3 py-2 md:table-cell">{[order.brand, order.model].filter(Boolean).join(' ') || '—'}</td>
-                      <td className="hidden px-3 py-2 md:table-cell">{order.problems?.join(', ') || '—'}</td>
-                      <td className="hidden px-3 py-2 md:table-cell">{order.counteragent.name}<small className="block text-muted">{formatPhone(order.counteragent.phones)}</small></td>
-                      <td className="px-3 py-2 whitespace-nowrap text-right num">{Number(order.total_price) > 0
-                        ? <>{formatMoney(order.total_price)}<small className="block text-muted">Оплачено {formatMoney(order.paid)}</small></>
+                      <td className="px-3 py-2.5"><StatusBadge name={order.status.name} color={order.status.color} /></td>
+                      <td className="min-w-0 px-3 py-2.5">
+                        <p className="truncate font-medium" title={device}>{device || <span className="text-muted">Не указано</span>}</p>
+                        <p className="truncate text-xs text-muted" title={order.problems?.join(', ')}>
+                          {order.problems?.join(', ') || '—'}{type && type !== 'Негарантийный' && <span className="ml-1.5 rounded bg-accent-soft px-1 text-accent">{type}</span>}
+                        </p>
+                      </td>
+                      <td className="min-w-0 px-3 py-2.5">
+                        <p className="truncate" title={order.counteragent.name}>{order.counteragent.name}</p>
+                        <p className="truncate text-xs text-muted num">{formatPhone(order.counteragent.phones?.split(',')[0]) || '—'}</p>
+                      </td>
+                      <td className={`hidden whitespace-nowrap px-3 py-2.5 xl:table-cell ${overdue ? 'font-medium text-danger' : 'text-muted'}`}>{order.deadline ? formatDate(order.deadline).split(',')[0] : '—'}</td>
+                      <td className="hidden truncate px-3 py-2.5 text-muted 2xl:table-cell">{order.manager ?? '—'}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-right num">{Number(order.total_price) > 0
+                        ? <>
+                            <span className="font-medium">{formatMoney(order.total_price)}</span>
+                            {Number(order.paid) < Number(order.total_price)
+                              ? <small className="block text-xs text-danger">долг {formatMoney(String(Number(order.total_price) - Number(order.paid)))}</small>
+                              : <small className="block text-xs text-muted">оплачен</small>}
+                          </>
                         : <span className="text-muted">{order.approximate_price ? `≈ ${order.approximate_price}` : '—'}</span>}</td>
                     </tr>
                   )

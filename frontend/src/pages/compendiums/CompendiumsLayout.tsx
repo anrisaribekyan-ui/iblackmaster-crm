@@ -24,7 +24,7 @@ export default function CompendiumsLayout() {
               key={link.to}
               to={link.to}
               className={({ isActive }) =>
-                `whitespace-nowrap rounded-md px-3 py-2 ${isActive ? 'bg-accent text-accent-ink' : 'text-ink hover:bg-surface'}`
+                `whitespace-nowrap rounded-md px-3 py-2 ${isActive ? 'bg-ink font-medium text-white' : 'text-ink hover:bg-surface'}`
               }
             >
               {link.label}

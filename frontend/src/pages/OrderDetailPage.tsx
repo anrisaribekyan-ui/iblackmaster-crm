@@ -766,16 +766,28 @@ export default function OrderDetailPage() {
             </section>
           ) : (
             <section className="rounded-xl border border-line bg-surface p-4">
-              <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="font-semibold">Работы и материалы</h2>
-                <strong className="num">{formatMoney(detail.order.total_price)}</strong>
-              </header>
+              <h2 className="sr-only">Работы и материалы</h2>
               {detail.positions.length === 0 ? (
                 <p className="mb-4 text-sm text-muted">Позиций пока нет. Добавьте работу или материал через поиск ниже.</p>
               ) : (
-                <div className="mb-4 overflow-x-auto">
+                <>
+                {/* Телефон: позиции карточками — таблица в 7 колонок на 390 px не читается */}
+                <ul className="mb-4 divide-y divide-line md:hidden">
+                  {detail.positions.map((position) => (
+                    <PositionCard
+                      key={position.id}
+                      position={position}
+                      canEdit={can('changeOrderPositionAccess') && !isClosed}
+                      canViewMargin={can('marginPriceAccess')}
+                      canViewCost={canSeeCost}
+                      onSavePrice={(price) => void editPositionPrice(position, price)}
+                      onDelete={() => void removePosition(position)}
+                    />
+                  ))}
+                </ul>
+                <div className="mb-4 hidden overflow-x-auto md:block">
                   <table className="w-full min-w-[740px] text-left text-sm">
-                    <thead className="bg-canvas text-muted"><tr>{['Позиция', 'Тип', 'Количество', 'Цена', ...(canSeeCost ? ['Себестоимость'] : []), 'Итого', ...(can('marginPriceAccess') ? ['Прибыль'] : []), ''].map((item) => <th key={item} className="px-2 py-2 font-medium">{item}</th>)}</tr></thead>
+                    <thead className="bg-canvas text-muted"><tr>{['Позиция', 'Тип', 'Кол-во', 'Цена', ...(canSeeCost ? ['Себестоимость'] : []), 'Итого', ...(can('marginPriceAccess') ? ['Прибыль'] : []), ''].map((item) => <th key={item} className="px-2 py-2 font-medium">{item}</th>)}</tr></thead>
                     <tbody>
                       {detail.positions.map((position) => (
                         <PositionRow
@@ -793,6 +805,7 @@ export default function OrderDetailPage() {
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
               {can('changeOrderPositionAccess') && !isClosed && (
                 <div className="mb-5 rounded-lg border border-line p-3">
@@ -1075,6 +1088,41 @@ function PositionRow({
       {canViewMargin && <td className="px-2 py-2 num">{position.margin === null ? '—' : formatMoney(position.margin)}</td>}
       <td className="px-2 py-2">{canEdit && <button className="text-danger" onClick={onDelete}>Удалить</button>}</td>
     </tr>
+  )
+}
+
+function PositionCard({ position, canEdit, canViewMargin, canViewCost, onSavePrice, onDelete }: {
+  position: Position
+  canEdit: boolean
+  canViewMargin: boolean
+  canViewCost: boolean
+  onSavePrice: (price: string) => void
+  onDelete: () => void
+}) {
+  const [price, setPrice] = useState(position.price)
+  useEffect(() => setPrice(position.price), [position.price])
+  const qtyNum = Number(position.quantity)
+  return (
+    <li className="py-3">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="[overflow-wrap:anywhere]">{position.name}</p>
+          <p className="text-xs text-muted">
+            {position.is_work ? 'работа' : 'материал'}{qtyNum !== 1 && ` · ${qtyNum.toLocaleString('ru-RU')} шт`}
+            {canViewCost && position.purchase_price !== null && ` · себест. ${formatMoney(position.purchase_price)}`}
+            {canViewMargin && position.margin !== null && <span className="text-success"> · +{formatMoney(position.margin)}</span>}
+          </p>
+        </div>
+        <p className="num whitespace-nowrap font-semibold">{formatMoney(position.total)}</p>
+        {canEdit && <button className="-mr-1 grid h-8 w-8 place-items-center rounded-md text-lg text-muted hover:text-danger" onClick={onDelete} aria-label={`Удалить ${position.name}`}>×</button>}
+      </div>
+      {canEdit && (
+        <label className="mt-2 flex items-center gap-2 text-xs text-muted">Цена
+          <input className="h-9 w-28 rounded-md border border-line bg-surface px-2 text-right text-sm text-ink num" inputMode="numeric" value={price}
+            onChange={(event) => setPrice(event.target.value.replace(/[^\d]/g, ''))} onBlur={() => { if (price !== position.price) onSavePrice(price) }} />
+        </label>
+      )}
+    </li>
   )
 }
 

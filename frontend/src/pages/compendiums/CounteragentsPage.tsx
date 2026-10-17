@@ -223,17 +223,17 @@ export default function CounteragentsPage() {
                   <th className="hidden px-3 py-2 font-medium md:table-cell">Телефоны</th>
                   <th className="hidden px-3 py-2 font-medium md:table-cell">Тип</th>
                   <th className="px-3 py-2 font-medium">Баланс</th>
-                  <th className="px-3 py-2" />
+                  <th className="hidden px-3 py-2 md:table-cell" />
                 </tr>
               </thead>
               <tbody>
                 {data.items.map((item) => (
-                  <tr key={item.id} className="border-t border-line">
-                    <td className="px-3 py-2"><button className="font-medium text-accent hover:underline" onClick={() => void openCard(item)}>{item.name}</button>{item.is_vendor && <small className="ml-2 text-muted">поставщик</small>}</td>
+                  <tr key={item.id} className="group cursor-pointer border-t border-line" onClick={(e) => { if (!(e.target as HTMLElement).closest('button')) void openCard(item) }}>
+                    <td className="px-3 py-2"><button className="text-left font-medium hover:underline" onClick={() => void openCard(item)}>{item.name}</button>{item.is_vendor && <small className="ml-2 text-muted">поставщик</small>}</td>
                     <td className="hidden px-3 py-2 md:table-cell">{formatPhoneList(item.phones) || '—'}</td>
                     <td className="hidden px-3 py-2 md:table-cell">{typeNames.get(item.type_id ?? -1) ?? '—'}</td>
-                    <td className="px-3 py-2 num">{Number(item.balance).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽</td>
-                    <td className="px-3 py-2">{canEdit && <span className="flex gap-2 whitespace-nowrap"><button className="text-muted" onClick={() => setEditor(item)}>Изменить</button><button className="text-danger" onClick={() => void remove(item)}>Удалить</button></span>}</td>
+                    <td className={`px-3 py-2 num ${Number(item.balance) < 0 ? 'text-danger' : Number(item.balance) === 0 ? 'text-muted' : ''}`}>{Number(item.balance).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽</td>
+                    <td className="hidden px-3 py-2 md:table-cell">{canEdit && <span className="flex justify-end gap-2 whitespace-nowrap opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"><button className="text-muted" onClick={() => setEditor(item)}>Изменить</button><button className="text-danger" onClick={() => void remove(item)}>Удалить</button></span>}</td>
                   </tr>
                 ))}
               </tbody>
