@@ -53,6 +53,10 @@ def _dec(value) -> Decimal | None:
 
 
 def read_rows(path: str) -> list[dict]:
+    import os
+
+    if not os.path.exists(path):
+        sys.exit(f"Файл «{path}» не найден. Сначала скопируйте его в контейнер: docker compose cp <файл> backend:/app/stock.xlsx")
     sheet = load_workbook(path, read_only=True, data_only=True).worksheets[0]
     rows = sheet.iter_rows(values_only=True)
     header = [str(h).strip() if h else "" for h in next(rows)]
