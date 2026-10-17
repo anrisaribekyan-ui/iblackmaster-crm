@@ -172,7 +172,8 @@ export default function OrderDetailPage() {
     api.get<{ id: number; name: string }[]>('/how-knows').then(setHowKnows).catch(() => setHowKnows([]))
   }, [])
   const [managers, setManagers] = useState<Employee[]>([])
-  const [tab, setTab] = useState<'info' | 'positions'>('info')
+  // Как в LiveSklad: заказ открывается на работах и материалах, информация — по вкладке
+  const [tab, setTab] = useState<'info' | 'positions'>('positions')
   const [editingInfo, setEditingInfo] = useState(false)
   const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null)
   const [closeAfterPay, setCloseAfterPay] = useState(false)
@@ -692,8 +693,8 @@ export default function OrderDetailPage() {
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0">
           <nav className="mb-3 flex gap-1 border-b border-line">
-            <button className={`border-b-2 px-3 py-2 ${tab === 'info' ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab('info')}>Информация</button>
             <button className={`border-b-2 px-3 py-2 ${tab === 'positions' ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab('positions')}>Работы и материалы</button>
+            <button className={`border-b-2 px-3 py-2 ${tab === 'info' ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab('info')}>Информация</button>
           </nav>
           {tab === 'info' ? (
             <section className="rounded-xl border border-line bg-surface p-4">
