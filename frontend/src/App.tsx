@@ -19,9 +19,9 @@ const DevicesPage = lazy(() => import('./pages/compendiums/DevicesPage'))
 const NomenclaturePage = lazy(() => import('./pages/compendiums/NomenclaturePage'))
 const CounteragentsPage = lazy(() => import('./pages/compendiums/CounteragentsPage'))
 const DictionaryPage = lazy(() => import('./components/DictionaryPage'))
-import OrdersPage from './pages/OrdersPage'
-import OrderCreatePage from './pages/OrderCreatePage'
-import OrderDetailPage from './pages/OrderDetailPage'
+const OrdersPage = lazy(() => import('./pages/OrdersPage'))
+const OrderCreatePage = lazy(() => import('./pages/OrderCreatePage'))
+const OrderDetailPage = lazy(() => import('./pages/OrderDetailPage'))
 const TasksPage = lazy(() => import('./pages/TasksPage'))
 const BoardsPage = lazy(() => import('./pages/BoardsPage'))
 const BoardPage = lazy(() => import('./pages/BoardPage'))
