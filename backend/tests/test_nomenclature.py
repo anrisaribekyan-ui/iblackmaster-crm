@@ -136,6 +136,10 @@ def test_nomenclature_search_update_and_soft_delete(client, auth_headers, db):
     assert found.status_code == 200
     assert [item["id"] for item in found.json()] == [item_id]
 
+    # По-русски поиск не зависит от регистра (в SQLite для этого своя lower).
+    by_name = client.get("/api/nomenclature/search", params={"q": "НОЧНАЯ"}, headers=auth_headers)
+    assert [item["id"] for item in by_name.json()] == [item_id]
+
     updated = client.put(
         f"/api/nomenclature/{item_id}",
         json={"name": "Ночная позиция 2", "article": "NIGHT-2", "is_work": True},

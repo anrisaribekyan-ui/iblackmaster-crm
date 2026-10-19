@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, or_, select
+from sqlalchemy import String, cast, func, or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, require
 from app.db import Rubles
@@ -237,18 +237,18 @@ def list_nomenclature(
         query = query.where(Nomenclature.is_work.is_(is_work))
     if group_id is not None:
         query = query.where(Nomenclature.group_id == group_id)
-    items = db.scalars(query).all()
-    if q:
-        term = q.strip().casefold()
-        items = [
-            item
-            for item in items
-            if term in item.name.casefold()
-            or term in (item.article or "").casefold()
-            or term in str(item.code)
-        ]
-    total = len(items)
-    page_items = items[(page - 1) * 50 : page * 50]
+    if q and q.strip():
+        # Фильтруем и считаем в базе, а не тащим весь справочник в Python.
+        term = q.strip()
+        query = query.where(
+            or_(
+                Nomenclature.name.icontains(term, autoescape=True),
+                Nomenclature.article.icontains(term, autoescape=True),
+                cast(Nomenclature.code, String).icontains(term, autoescape=True),
+            )
+        )
+    total = db.scalar(query.with_only_columns(func.count(Nomenclature.id)).order_by(None)) or 0
+    page_items = db.scalars(query.offset((page - 1) * 50).limit(50)).all()
     return NomenclaturePage(
         items=serialize_items(db, page_items, location_id, has_permission(me, "purchasePriceAccess")),
         total=total,
@@ -314,17 +314,16 @@ def search_nomenclature(db: DbSession, me: CurrentEmployee, q: str = "", locatio
     if location_id is not None:
         check_location(me, location_id)
     query = select(Nomenclature).where(Nomenclature.is_deleted.is_(False)).order_by(Nomenclature.code)
-    items = db.scalars(query).all()
-    term = q.strip().casefold()
+    term = q.strip()
     if term:
-        items = [
-            item
-            for item in items
-            if term in item.name.casefold()
-            or term in (item.article or "").casefold()
-            or term in str(item.code)
-        ]
-    items = items[:20]
+        query = query.where(
+            or_(
+                Nomenclature.name.icontains(term, autoescape=True),
+                Nomenclature.article.icontains(term, autoescape=True),
+                cast(Nomenclature.code, String).icontains(term, autoescape=True),
+            )
+        )
+    items = db.scalars(query.limit(20)).all()
     return serialize_items(db, items, location_id, has_permission(me, "purchasePriceAccess"))
 
 

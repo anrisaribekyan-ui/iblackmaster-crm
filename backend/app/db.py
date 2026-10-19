@@ -73,10 +73,15 @@ def make_engine(url: str):
         kwargs["poolclass"] = StaticPool  # одна общая in-memory БД (для тестов)
     engine = create_engine(url, **kwargs)
     if url.startswith("sqlite"):
-        # В SQLite внешние ключи по умолчанию выключены.
+        # В SQLite внешние ключи по умолчанию выключены, а lower() не знает кириллицу.
         @event.listens_for(engine, "connect")
-        def _fk_on(dbapi_conn, _):
+        def _sqlite_setup(dbapi_conn, _):
             dbapi_conn.execute("PRAGMA foreign_keys=ON")
+            # В Postgres lower()/ILIKE работают с Unicode, в SQLite — только с ASCII.
+            # Подменяем lower() на casefold(), чтобы поиск по-русски не зависел от регистра.
+            dbapi_conn.create_function(
+                "lower", 1, lambda value: value.casefold() if isinstance(value, str) else value
+            )
 
     return engine
 
