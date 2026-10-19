@@ -60,3 +60,16 @@ def test_name_field_cannot_be_made_optional(client, auth_headers):
 
     assert response.status_code == 400
     assert response.json()["message"] == "Поле имени клиента должно оставаться обязательным"
+
+def test_order_type_update_and_soft_delete(client, auth_headers):
+    created = client.post("/api/order-types", json={"name": "Ночной тип", "sort": 500}, headers=auth_headers)
+    assert created.status_code == 200, created.text
+    type_id = created.json()["id"]
+
+    updated = client.put(f"/api/order-types/{type_id}", json={"name": "Ночной тип 2", "sort": 501}, headers=auth_headers)
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "Ночной тип 2"
+
+    assert client.delete(f"/api/order-types/{type_id}", headers=auth_headers).status_code == 204
+    assert type_id not in [item["id"] for item in client.get("/api/order-types", headers=auth_headers).json()]
+    assert client.get(f"/api/order-types/{type_id}/fields", headers=auth_headers).status_code == 404

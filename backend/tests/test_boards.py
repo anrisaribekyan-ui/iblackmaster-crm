@@ -61,3 +61,36 @@ def test_rights(client, db, auth_headers):
 
     nobody = login(client, db, "nobody@example.test", [], {"tasks": "none"})
     assert client.get("/api/boards/spaces", headers=nobody).status_code == 403
+
+def test_space_board_and_column_lifecycle(client, auth_headers):
+    space = client.post("/api/boards/spaces", json={"name": "Ночное"}, headers=auth_headers)
+    assert space.status_code == 200, space.text
+    space_id = space.json()["id"]
+
+    updated = client.put(f"/api/boards/spaces/{space_id}", json={"name": "Ночное 2"}, headers=auth_headers)
+    assert updated.status_code == 200
+    detail = client.get(f"/api/boards/spaces/{space_id}", headers=auth_headers).json()
+    assert detail["name"] == "Ночное 2"
+
+    board = client.post(f"/api/boards/spaces/{space_id}/boards", json={"name": "Вторая"}, headers=auth_headers)
+    assert board.status_code == 200, board.text
+    board_id = board.json()["id"]
+    renamed = client.put(f"/api/boards/{board_id}", json={"name": "Вторая доска"}, headers=auth_headers)
+    assert renamed.status_code == 200
+    assert renamed.json()["name"] == "Вторая доска"
+    assert client.post(f"/api/boards/{board_id}/move", json={"index": 0}, headers=auth_headers).status_code == 200
+    detail = client.get(f"/api/boards/spaces/{space_id}", headers=auth_headers).json()
+    assert detail["boards"][0]["id"] == board_id
+
+    column = client.post(f"/api/boards/{board_id}/columns", json={"name": "Колонка"}, headers=auth_headers)
+    assert column.status_code == 200, column.text
+    column_id = column.json()["id"]
+    assert client.post(f"/api/boards/columns/{column_id}/move", json={"index": 0}, headers=auth_headers).status_code == 200
+    assert client.delete(f"/api/boards/columns/{column_id}", headers=auth_headers).status_code == 204
+    detail = client.get(f"/api/boards/spaces/{space_id}", headers=auth_headers).json()
+    assert column_id not in [c["id"] for b in detail["boards"] for c in b["columns"]]
+
+    assert client.delete(f"/api/boards/{board_id}", headers=auth_headers).status_code == 204
+    assert board_id not in [b["id"] for b in client.get(f"/api/boards/spaces/{space_id}", headers=auth_headers).json()["boards"]]
+    assert client.delete(f"/api/boards/spaces/{space_id}", headers=auth_headers).status_code == 204
+    assert client.get(f"/api/boards/spaces/{space_id}", headers=auth_headers).status_code == 404

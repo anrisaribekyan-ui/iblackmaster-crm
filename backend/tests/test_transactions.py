@@ -90,3 +90,43 @@ def test_past_manual_transaction_requires_cash_date_permission(client, db):
     )
 
     assert response.status_code == 403
+
+def test_cash_items_crud_and_transaction_journal(client, auth_headers, db):
+    assert client.get("/api/cash-items", headers=auth_headers).status_code == 200
+
+    created = client.post(
+        "/api/cash-items",
+        json={"name": "Ночная статья", "is_income": False, "affects_balance": True},
+        headers=auth_headers,
+    )
+    assert created.status_code == 200, created.text
+    item_id = created.json()["id"]
+    assert item_id in [item["id"] for item in client.get("/api/cash-items", headers=auth_headers).json()]
+
+    updated = client.put(
+        f"/api/cash-items/{item_id}",
+        json={"name": "Ночная статья 2", "is_income": True, "affects_balance": True},
+        headers=auth_headers,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "Ночная статья 2"
+
+    register = db.scalars(select(CashRegister).where(CashRegister.is_active.is_(True))).first()
+    transaction = client.post(
+        "/api/transactions",
+        json={"cash_register_id": register.id, "cash_item_id": item_id, "amount": "10"},
+        headers=auth_headers,
+    )
+    assert transaction.status_code == 200, transaction.text
+    journal = client.get("/api/transactions", headers=auth_headers)
+    assert journal.status_code == 200
+    assert transaction.json()["id"] in [row["id"] for row in journal.json()["items"]]
+
+    assert client.delete(f"/api/transactions/{transaction.json()['id']}", headers=auth_headers).status_code == 204
+    assert transaction.json()["id"] not in [row["id"] for row in client.get("/api/transactions", headers=auth_headers).json()["items"]]
+    restored = client.post(f"/api/transactions/{transaction.json()['id']}/restore", headers=auth_headers)
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["is_deleted"] is False
+
+    assert client.delete(f"/api/cash-items/{item_id}", headers=auth_headers).status_code == 204
+    assert item_id not in [item["id"] for item in client.get("/api/cash-items", headers=auth_headers).json()]

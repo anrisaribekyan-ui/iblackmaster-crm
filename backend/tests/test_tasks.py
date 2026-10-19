@@ -154,3 +154,12 @@ def test_task_bound_to_order_writes_history(client, auth_headers, db):
 
     history = db.scalars(select(OrderHistory).where(OrderHistory.order_id == order.id)).all()
     assert any(h.text == "Задача: Позвонить клиенту" for h in history)
+
+def test_task_soft_delete(client, auth_headers):
+    created = client.post("/api/tasks", json={"title": "Удаляемая задача"}, headers=auth_headers)
+    assert created.status_code == 200, created.text
+    task_id = created.json()["id"]
+
+    assert client.delete(f"/api/tasks/{task_id}", headers=auth_headers).status_code == 204
+    assert task_id not in [task["id"] for task in client.get("/api/tasks", headers=auth_headers).json()["items"]]
+    assert client.delete(f"/api/tasks/{task_id}", headers=auth_headers).status_code == 404

@@ -92,3 +92,30 @@ def test_counteragent_history_requires_order_read(client, db):
     headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
     response = client.get(f"/api/counteragents/{counteragent.id}/history", headers=headers)
     assert response.status_code == 403
+
+def test_counteragent_detail_update_and_soft_delete(client, auth_headers, db):
+    created = client.post(
+        "/api/counteragents",
+        json={"name": "Клиент на карточке", "phones": "8 (916) 000-00-01"},
+        headers=auth_headers,
+    )
+    assert created.status_code == 200, created.text
+    counteragent_id = created.json()["id"]
+
+    detail = client.get(f"/api/counteragents/{counteragent_id}", headers=auth_headers)
+    assert detail.status_code == 200
+    assert detail.json()["orders_count"] == 0
+
+    updated = client.put(
+        f"/api/counteragents/{counteragent_id}",
+        json={"name": "Клиент переименован", "phones": "8 (916) 000-00-02"},
+        headers=auth_headers,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "Клиент переименован"
+    assert updated.json()["phones"] == "79160000002"
+
+    assert client.delete(f"/api/counteragents/{counteragent_id}", headers=auth_headers).status_code == 204
+    assert client.get(f"/api/counteragents/{counteragent_id}", headers=auth_headers).status_code == 404
+    stored = db.get(Counteragent, counteragent_id)
+    assert stored is not None and stored.is_deleted is True

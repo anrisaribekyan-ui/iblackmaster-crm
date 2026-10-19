@@ -122,3 +122,52 @@ def test_nomenclature_card_history_and_days_left(client, auth_headers, db):
     assert card["days_left"] == 70
     assert card["history"][0]["kind"] == "sale" and Decimal(str(card["history"][0]["quantity"])) == -3
     assert card["balances"][0]["store_id"] == store.id
+
+def test_nomenclature_search_update_and_soft_delete(client, auth_headers, db):
+    created = client.post(
+        "/api/nomenclature",
+        json={"name": "Ночная позиция", "article": "NIGHT-1", "is_work": True},
+        headers=auth_headers,
+    )
+    assert created.status_code == 200, created.text
+    item_id = created.json()["id"]
+
+    found = client.get("/api/nomenclature/search", params={"q": "night-1"}, headers=auth_headers)
+    assert found.status_code == 200
+    assert [item["id"] for item in found.json()] == [item_id]
+
+    updated = client.put(
+        f"/api/nomenclature/{item_id}",
+        json={"name": "Ночная позиция 2", "article": "NIGHT-2", "is_work": True},
+        headers=auth_headers,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "Ночная позиция 2"
+
+    assert client.delete(f"/api/nomenclature/{item_id}", headers=auth_headers).status_code == 204
+    assert client.get("/api/nomenclature/search", params={"q": "night-2"}, headers=auth_headers).json() == []
+    assert db.get(Nomenclature, item_id).is_deleted is True
+
+
+def test_nomenclature_group_update_and_delete(client, auth_headers, db):
+    parent = client.post("/api/nomenclature-groups", json={"name": "Ночная группа"}, headers=auth_headers)
+    assert parent.status_code == 200, parent.text
+    parent_id = parent.json()["id"]
+    child = client.post(
+        "/api/nomenclature-groups",
+        json={"name": "Ночная подгруппа", "parent_id": parent_id},
+        headers=auth_headers,
+    )
+    assert child.status_code == 200, child.text
+    child_id = child.json()["id"]
+
+    updated = client.put(
+        f"/api/nomenclature-groups/{child_id}",
+        json={"name": "Ночная подгруппа 2", "parent_id": parent_id},
+        headers=auth_headers,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "Ночная подгруппа 2"
+
+    assert client.delete(f"/api/nomenclature-groups/{child_id}", headers=auth_headers).status_code == 204
+    assert client.delete(f"/api/nomenclature-groups/{parent_id}", headers=auth_headers).status_code == 204

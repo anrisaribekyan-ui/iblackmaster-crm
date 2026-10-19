@@ -50,3 +50,31 @@ def test_device_suggest_matches_brand_and_model(client, auth_headers, db):
     assert by_brand.status_code == 200
     assert by_brand.json()[0]["name"] == "Samsung Galaxy S25"
     assert by_model.json()[0]["id"] == model.id
+
+def test_device_types_list_and_update(client, auth_headers):
+    created = client.post("/api/device-types", json={"name": "Планшет"}, headers=auth_headers)
+    assert created.status_code == 200, created.text
+    device_type_id = created.json()["id"]
+    assert device_type_id in [item["id"] for item in client.get("/api/device-types", headers=auth_headers).json()]
+
+    updated = client.put(
+        f"/api/device-types/{device_type_id}",
+        json={"name": "Планшетный компьютер"},
+        headers=auth_headers,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["name"] == "Планшетный компьютер"
+
+    brand = client.post(
+        "/api/brands",
+        json={"name": "Lenovo", "device_type_id": device_type_id},
+        headers=auth_headers,
+    )
+    assert brand.status_code == 200, brand.text
+    renamed = client.put(
+        f"/api/brands/{brand.json()['id']}",
+        json={"name": "Lenovo Tab", "device_type_id": device_type_id},
+        headers=auth_headers,
+    )
+    assert renamed.status_code == 200
+    assert renamed.json()["name"] == "Lenovo Tab"

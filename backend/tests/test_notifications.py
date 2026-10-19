@@ -144,3 +144,52 @@ def test_templates_manual_sms_and_public_tracking(client, auth_headers, db, owne
     assert "purchase" not in str(body) and "master" not in str(body)
     assert client.get("/api/track/N-1").status_code == 404  # по номеру заказа — нельзя
     assert client.get(f"/api/track/{code[:-1]}x").status_code == 404
+
+def test_notification_journal_status_and_mail_status(client, auth_headers):
+    journal = client.get("/api/notifications", headers=auth_headers)
+    assert journal.status_code == 200
+    assert isinstance(journal.json()["items"], list)
+
+    status = client.get("/api/notifications/status", headers=auth_headers)
+    assert status.status_code == 200
+    assert {"configured", "sent_24h", "daily_limit", "queued"} <= set(status.json())
+
+    mail = client.get("/api/settings/mail", headers=auth_headers)
+    assert mail.status_code == 200
+    assert "configured" in mail.json()
+
+
+def test_test_sms_endpoint_queues_and_rejects_bad_phone(client, auth_headers, db):
+    response = client.post(
+        "/api/notifications/test",
+        json={"phone": "+7 (916) 000-00-03", "text": "Проверка"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["state"] == "queued"
+    stored = db.get(Notification, response.json()["id"])
+    assert stored.phone == "+79160000003"
+    assert stored.text == "Проверка"
+
+    bad = client.post("/api/notifications/test", json={"phone": "----------", "text": "Проверка"}, headers=auth_headers)
+    assert bad.status_code == 400
+
+
+def test_mail_test_endpoint_sends_without_real_smtp(client, auth_headers, owner, monkeypatch):
+    from app.services import mail
+
+    sent = {}
+
+    def fake_send(to, subject, template, *, wait=False, **values):
+        sent.update(to=to, subject=subject, template=template, wait=wait)
+        return True
+
+    monkeypatch.setattr(mail, "configured", lambda: True)
+    monkeypatch.setattr(mail, "send", fake_send)
+
+    response = client.post("/api/settings/mail/test", headers=auth_headers)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["sent_to"] == owner.email
+    assert sent == {"to": owner.email, "subject": "Проверка почты CRM iBlackMaster", "template": "test", "wait": True}

@@ -77,3 +77,17 @@ def test_quick_order_is_archived_not_deleted(client, auth_headers, db):
     assert stored is not None
     assert stored.is_active is False
     assert client.delete(f"/api/quick-orders/{quick_id}", headers=auth_headers).status_code == 404
+
+def test_quick_order_update(client, auth_headers):
+    created = client.post("/api/quick-orders", json=TEMPLATE, headers=auth_headers)
+    assert created.status_code == 200, created.text
+    quick_id = created.json()["id"]
+
+    updated = client.put(
+        f"/api/quick-orders/{quick_id}",
+        json=TEMPLATE | {"name": "Замена АКБ iPhone 12"},
+        headers=auth_headers,
+    )
+
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["name"] == "Замена АКБ iPhone 12"

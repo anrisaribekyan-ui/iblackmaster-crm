@@ -112,3 +112,17 @@ def test_own_scope_sees_only_self_and_none_is_forbidden(client, db):
 
     token2 = client.post("/api/auth/login", json={"email": other.email, "password": "password123"}).json()["access_token"]
     assert client.get(f"/api/salary/summary?year={year}&month={month}", headers={"Authorization": f"Bearer {token2}"}).status_code == 403
+
+def test_salary_kinds_payouts_and_recalc(client, auth_headers, owner):
+    kinds = client.get("/api/salary/kinds", headers=auth_headers)
+    assert kinds.status_code == 200
+    assert "workOrder" in [kind["code"] for kind in kinds.json()]
+
+    payouts = client.get(f"/api/salary/employees/{owner.id}/payouts", headers=auth_headers)
+    assert payouts.status_code == 200
+    assert isinstance(payouts.json(), list)
+
+    year, month = month_now()
+    recalc = client.post("/api/salary/recalc", json={"year": year, "month": month}, headers=auth_headers)
+    assert recalc.status_code == 200, recalc.text
+    assert isinstance(recalc.json()["documents"], int)

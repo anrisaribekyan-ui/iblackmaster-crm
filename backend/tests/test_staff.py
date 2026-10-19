@@ -138,3 +138,14 @@ def test_employee_short_filters_by_role_permission(client, auth_headers, db):
     assert {employee["id"] for employee in managers.json()} == expected_managers
     assert master.id in expected_masters
     assert manager.id in expected_managers
+
+def test_roles_and_employees_lists(client, auth_headers, owner):
+    roles = client.get("/api/roles", headers=auth_headers)
+    assert roles.status_code == 200
+    assert owner.role_id in [role["id"] for role in roles.json()]
+
+    employees = client.get("/api/employees", headers=auth_headers)
+    assert employees.status_code == 200
+    row = next(employee for employee in employees.json() if employee["id"] == owner.id)
+    assert row["is_owner"] is True
+    assert row["role_id"] == owner.role_id
