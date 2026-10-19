@@ -4,6 +4,7 @@ import { api, ApiError } from '../../api/client'
 import ForgottenSettings from '../../components/ForgottenSettings'
 import Skeleton from '../../components/Skeleton'
 import MailStatus from '../../components/MailStatus'
+import { formatDateTime, smsParts, smsStateClass, type Sms } from '../../components/sms'
 
 type Variable = { name: string; hint: string }
 type Template = {
@@ -16,45 +17,8 @@ type Template = {
   saved: boolean
 }
 type GatewayStatus = { configured: boolean; sent_24h: number; daily_limit: number; queued: number; public_url: string | null }
-export type Sms = {
-  id: number
-  created_at: string
-  sent_at: string | null
-  order_id: number | null
-  order_number: string | null
-  kind: 'status' | 'manual' | 'test'
-  phone: string
-  text: string
-  state: 'queued' | 'sending' | 'sent' | 'delivered' | 'failed' | 'cancelled'
-  state_title: string
-  error: string | null
-}
-
-export const smsStateClass: Record<Sms['state'], string> = {
-  queued: 'bg-canvas text-muted',
-  sending: 'bg-canvas text-muted',
-  sent: 'bg-accent-soft text-ink',
-  delivered: 'bg-success/15 text-success',
-  failed: 'bg-danger/10 text-danger',
-  cancelled: 'bg-canvas text-muted line-through',
-}
-
 const field = 'w-full rounded-md border border-line bg-surface px-3 py-2'
 const groupOrder = ['new', 'inWork', 'wait', 'finish', 'closed']
-
-export function formatDateTime(value: string | null) {
-  if (!value) return ''
-  return new Date(value.endsWith('Z') || value.includes('+') ? value : `${value}Z`).toLocaleString('ru-RU', {
-    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-  })
-}
-
-/** Подсчёт длины SMS: кириллица — 70 знаков в одном SMS, 67 в каждой части длинного. */
-export function smsParts(text: string) {
-  const len = [...text].length
-  if (len === 0) return 0
-  return len <= 70 ? 1 : Math.ceil(len / 67)
-}
 
 function TemplateRow({ item, variables, onSaved }: { item: Template; variables: Variable[]; onSaved: () => void }) {
   const [text, setText] = useState(item.text)

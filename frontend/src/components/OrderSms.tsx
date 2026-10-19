@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../api/client'
 import Modal from './Modal'
-import { formatDateTime, smsParts, smsStateClass, type Sms } from '../pages/settings/NotificationsPage'
+import { formatDateTime, smsParts, smsStateClass, type Sms } from './sms'
 
 const quick = [
   'Здравствуйте, {имя}! Ваш {устройство} готов, к оплате {долг} руб. {адрес}, {часы}',
