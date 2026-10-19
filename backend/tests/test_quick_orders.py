@@ -62,3 +62,18 @@ def test_suggestions_from_history_skip_existing(client, auth_headers, db, owner)
 
     items = client.get("/api/quick-orders/suggestions", headers=auth_headers).json()
     assert [(i["name"], i["price"], i["count"], i["guarantee_days"]) for i in items] == [("Замена дисплея iPhone 11", 6500, 4, 30)]
+
+
+def test_quick_order_is_archived_not_deleted(client, auth_headers, db):
+    created = client.post("/api/quick-orders", json=TEMPLATE, headers=auth_headers)
+    assert created.status_code == 200, created.text
+    quick_id = created.json()["id"]
+
+    response = client.delete(f"/api/quick-orders/{quick_id}", headers=auth_headers)
+
+    assert response.status_code == 204
+    assert client.get("/api/quick-orders", headers=auth_headers).json() == []
+    stored = db.get(QuickOrder, quick_id)
+    assert stored is not None
+    assert stored.is_active is False
+    assert client.delete(f"/api/quick-orders/{quick_id}", headers=auth_headers).status_code == 404
