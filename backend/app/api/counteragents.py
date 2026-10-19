@@ -6,7 +6,7 @@ from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, has_permission, location_ids, require, scope_of
 from app.errors import Forbidden, NotFound
-from app.models import Counteragent, CounteragentType, Employee, HowKnow, Order, Sale, Transaction
+from app.models import CashItem, Counteragent, CounteragentType, Employee, HowKnow, Order, OrderStatus, Sale, Transaction
 from app.utils.phone import normalize_phone
 
 router = APIRouter(prefix="/counteragents", tags=["Контрагенты"])
@@ -180,7 +180,11 @@ def counteragent_history(counteragent_id: int, db: DbSession, me: CurrentEmploye
         raise NotFound("Контрагент")
 
     scope = scope_of(me, "orders")
-    orders_query = select(Order).where(Order.counteragent_id == item.id, Order.is_deleted.is_(False))
+    orders_query = (
+        select(Order, OrderStatus)
+        .join(OrderStatus, OrderStatus.id == Order.status_id)
+        .where(Order.counteragent_id == item.id, Order.is_deleted.is_(False))
+    )
     allowed = location_ids(me)
     if allowed:
         orders_query = orders_query.where(Order.location_id.in_(allowed))
@@ -188,7 +192,7 @@ def counteragent_history(counteragent_id: int, db: DbSession, me: CurrentEmploye
         orders_query = orders_query.where(
             or_(Order.master_id == me.id, Order.manager_id == me.id, Order.created_by_id == me.id)
         )
-    orders = db.scalars(orders_query.order_by(Order.created_at.desc(), Order.id.desc()).limit(100)).all()
+    orders = db.execute(orders_query.order_by(Order.created_at.desc(), Order.id.desc()).limit(100)).all()
 
     sales = db.scalars(
         select(Sale)
@@ -197,8 +201,9 @@ def counteragent_history(counteragent_id: int, db: DbSession, me: CurrentEmploye
         .limit(100)
     ).all()
 
-    transactions = db.scalars(
-        select(Transaction)
+    transactions = db.execute(
+        select(Transaction, CashItem)
+        .join(CashItem, CashItem.id == Transaction.cash_item_id)
         .where(Transaction.counteragent_id == item.id, Transaction.is_deleted.is_(False))
         .order_by(Transaction.date.desc(), Transaction.id.desc())
         .limit(100)
@@ -210,13 +215,13 @@ def counteragent_history(counteragent_id: int, db: DbSession, me: CurrentEmploye
                 "id": order.id,
                 "number": order.number,
                 "created_at": order.created_at,
-                "status_name": order.status.name if order.status else None,
-                "status_color": order.status.color if order.status else None,
+                "status_name": status.name,
+                "status_color": status.color,
                 "device": " ".join(part for part in [order.device_type, order.brand, order.model] if part) or None,
                 "total_price": order.total_price,
                 "paid": order.paid,
             }
-            for order in orders
+            for order, status in orders
         ],
         "sales": [
             {"id": sale.id, "number": sale.number, "date": sale.date, "total_price": sale.total_price}
@@ -228,10 +233,10 @@ def counteragent_history(counteragent_id: int, db: DbSession, me: CurrentEmploye
                 "date": tx.date,
                 "amount": tx.amount,
                 "is_income": tx.is_income,
-                "cash_item_name": tx.cash_item.name if tx.cash_item else None,
+                "cash_item_name": cash_item.name,
                 "note": tx.note,
             }
-            for tx in transactions
+            for tx, cash_item in transactions
         ],
     }
 
