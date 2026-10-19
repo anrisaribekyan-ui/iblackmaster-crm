@@ -77,23 +77,39 @@ def _overdue_block(db: DbSession, allowed: set[int]) -> list[dict]:
     if allowed:
         query = query.where(Order.location_id.in_(allowed))
     rows = db.execute(query.order_by(Order.deadline).limit(20)).all()
-    result = []
-    for order, status in rows:
-        master = db.get(Employee, order.master_id) if order.master_id else None
-        result.append(
-            {
-                "id": order.id,
-                "number": order.number,
-                "deadline": order.deadline,
-                "status_name": status.name,
-                "status_color": status.color,
-                "master_name": master.short_name if master else None,
-            }
+    master_ids = {order.master_id for order, _ in rows if order.master_id}
+    masters = (
+        dict(db.execute(select(Employee.id, Employee.short_name).where(Employee.id.in_(master_ids))).all())
+        if master_ids
+        else {}
+    )
+    return [
+        {
+            "id": order.id,
+            "number": order.number,
+            "deadline": order.deadline,
+            "status_name": status.name,
+            "status_color": status.color,
+            "master_name": masters.get(order.master_id),
+        }
+        for order, status in rows
+    ]
+
+
+def _internal_cash_item_ids(db: DbSession) -> set[int]:
+    """Статьи перемещений/инкассации: их расход — не расход бизнеса. Один запрос на весь дашборд."""
+    return set(
+        db.scalars(
+            select(CashItem.id).where(
+                CashItem.type.in_([CashItemType.MOVE_FROM, CashItemType.PRODUCT_MOVE_FROM, CashItemType.COLLECTION])
+            )
         )
-    return result
+    )
 
 
-def _finance_block(db: DbSession, allowed: set[int], period_from: datetime, period_to: datetime) -> dict:
+def _finance_block(
+    db: DbSession, allowed: set[int], period_from: datetime, period_to: datetime, internal: set[int]
+) -> dict:
     register_query = select(CashRegister).where(CashRegister.is_active.is_(True))
     if allowed:
         register_query = register_query.where(or_(CashRegister.location_id.is_(None), CashRegister.location_id.in_(allowed)))
@@ -111,14 +127,6 @@ def _finance_block(db: DbSession, allowed: set[int], period_from: datetime, peri
     income = sum(
         (t.amount for t in transactions if t.is_income and (t.order_id is not None or t.sale_id is not None)),
         Decimal("0"),
-    )
-    # Перемещения между кассами и инкассация — не расход бизнеса
-    internal = set(
-        db.scalars(
-            select(CashItem.id).where(
-                CashItem.type.in_([CashItemType.MOVE_FROM, CashItemType.PRODUCT_MOVE_FROM, CashItemType.COLLECTION])
-            )
-        )
     )
     expense = sum((t.amount for t in transactions if not t.is_income and t.cash_item_id not in internal), Decimal("0"))
 
@@ -145,11 +153,8 @@ def _how_know_block(db: DbSession, allowed: set[int], period_from: datetime, per
     if allowed:
         query = query.where(Order.location_id.in_(allowed))
     rows = db.execute(query.group_by(Order.how_know_id).order_by(func.count().desc())).all()
-    result = []
-    for how_know_id, count in rows:
-        how_know = db.get(HowKnow, how_know_id)
-        result.append({"name": how_know.name if how_know else "—", "count": count})
-    return result
+    names = dict(db.execute(select(HowKnow.id, HowKnow.name)).all())
+    return [{"name": names.get(how_know_id, "—"), "count": count} for how_know_id, count in rows]
 
 
 def _masters_block(db: DbSession, allowed: set[int]) -> list[dict]:
@@ -165,18 +170,20 @@ def _masters_block(db: DbSession, allowed: set[int]) -> list[dict]:
     if allowed:
         query = query.where(Order.location_id.in_(allowed))
     rows = db.execute(query.group_by(Order.master_id).order_by(func.count().desc())).all()
-    result = []
-    for master_id, count in rows:
-        master = db.get(Employee, master_id)
-        result.append({"employee_id": master_id, "name": master.short_name if master else "—", "orders_in_work": count})
-    return result
+    names = dict(db.execute(select(Employee.id, Employee.short_name)).all())
+    return [
+        {"employee_id": master_id, "name": names.get(master_id, "—"), "orders_in_work": count}
+        for master_id, count in rows
+    ]
 
 
 def _msk_day(value: datetime) -> str:
     return _ensure_utc(value).astimezone(MSK).strftime("%Y-%m-%d")
 
 
-def _trend_block(db: DbSession, me: CurrentEmployee, allowed: set[int], days: int = 30) -> list[dict]:
+def _trend_block(
+    db: DbSession, me: CurrentEmployee, allowed: set[int], internal: set[int], days: int = 30
+) -> list[dict]:
     """Динамика за последние N дней по Москве: заказы создано/выдано, приход/расход по дням."""
     _, today_end = _day_bounds_msk()
     start = today_end - timedelta(days=days)
@@ -232,13 +239,6 @@ def _trend_block(db: DbSession, me: CurrentEmployee, allowed: set[int], days: in
                 rows[key]["revenue"] += total
                 if can_margin:
                     rows[key]["profit"] += total - cost
-        internal = set(
-            db.scalars(
-                select(CashItem.id).where(
-                    CashItem.type.in_([CashItemType.MOVE_FROM, CashItemType.PRODUCT_MOVE_FROM, CashItemType.COLLECTION])
-                )
-            )
-        )
         query = select(Transaction).where(Transaction.is_deleted.is_(False), Transaction.date >= start, Transaction.date < today_end)
         if allowed:
             query = query.where(or_(Transaction.location_id.is_(None), Transaction.location_id.in_(allowed)))
@@ -267,7 +267,25 @@ def _revenue(db: DbSession, allowed: set[int], period_from: datetime, period_to:
     return Decimal(str(db.scalar(orders) or 0)) + Decimal(str(db.scalar(sales) or 0))
 
 
-def _previous_block(db: DbSession, me: CurrentEmployee, allowed: set[int], period_from: datetime, period_to: datetime) -> dict:
+def _income(
+    db: DbSession, allowed: set[int], period_from: datetime, period_to: datetime
+) -> Decimal:
+    """Приход по заказам и чекам за период — без загрузки касс и всех транзакций."""
+    query = select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+        Transaction.is_deleted.is_(False),
+        Transaction.date >= period_from,
+        Transaction.date < period_to,
+        Transaction.is_income.is_(True),
+        or_(Transaction.order_id.is_not(None), Transaction.sale_id.is_not(None)),
+    )
+    if allowed:
+        query = query.where(or_(Transaction.location_id.is_(None), Transaction.location_id.in_(allowed)))
+    return Decimal(str(db.scalar(query) or 0))
+
+
+def _previous_block(
+    db: DbSession, me: CurrentEmployee, allowed: set[int], period_from: datetime, period_to: datetime
+) -> dict:
     """Те же показатели за предыдущий период такой же длины — для «+12% к прошлому периоду» на плитках."""
     length = period_to - period_from
     prev_from, prev_to = period_from - length, period_from
@@ -286,7 +304,7 @@ def _previous_block(db: DbSession, me: CurrentEmployee, allowed: set[int], perio
         ) or 0
     income = revenue = None
     if has_permission(me, "dashboardFinanceAccess"):
-        income = _finance_block(db, allowed, prev_from, prev_to)["income"]
+        income = _income(db, allowed, prev_from, prev_to)
         revenue = _revenue(db, allowed, prev_from, prev_to)
     return {"created": created, "closed": closed, "income": income, "revenue": revenue}
 
@@ -312,17 +330,19 @@ def get_dashboard(
     if not has_permission(me, "dashboardOrderPeriodAccess"):
         orders_from, orders_to = _day_bounds_msk()
 
+    can_finance = has_permission(me, "dashboardFinanceAccess")
+    internal = _internal_cash_item_ids(db) if can_finance else set()
     return {
         "orders": _orders_block(db, me, allowed, orders_from, orders_to),
         "overdue": _overdue_block(db, allowed) if has_permission(me, "dashboardDeadlineAccess") else None,
         "finance": (
-            {**_finance_block(db, allowed, period_from, period_to), "revenue": _revenue(db, allowed, period_from, period_to)}
-            if has_permission(me, "dashboardFinanceAccess")
+            {**_finance_block(db, allowed, period_from, period_to, internal), "revenue": _revenue(db, allowed, period_from, period_to)}
+            if can_finance
             else None
         ),
         "how_know": _how_know_block(db, allowed, period_from, period_to) if has_permission(me, "dashboardHowKnowAccess") else None,
         "masters": _masters_block(db, allowed),
-        "trend": _trend_block(db, me, allowed),
+        "trend": _trend_block(db, me, allowed, internal),
         "previous": _previous_block(db, me, allowed, orders_from, orders_to),
     }
 
