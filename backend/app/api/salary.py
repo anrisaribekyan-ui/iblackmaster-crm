@@ -376,7 +376,10 @@ def rule_dict(db: DbSession, rule: SalaryRule) -> dict:
         "order_type_name": order_type.name if order_type else None,
         "base": rule.base,
         "value_type": rule.value_type,
-        "steps": rule.steps,
+        "steps": [
+            {"from": str(s.get("from", 0)), "value": str(s.get("value", 0))}
+            for s in (rule.steps or [])
+        ],
         "accrue_on": rule.accrue_on,
         "discount_by": rule.discount_by,
         "subtract_negative_margin": rule.subtract_negative_margin,
@@ -408,7 +411,8 @@ def _apply_rule_data(db: DbSession, rule: SalaryRule, data: RuleIn) -> None:
     if duplicate:
         raise BusinessError("Такое начисление уже настроено — измените его")
     values = data.model_dump(by_alias=True)
-    values["steps"] = [{"from": float(s["from"]), "value": float(s["value"])} for s in values["steps"]]
+    # Ступени храним строками: Decimal в JSON не сериализуется, а float теряет точность.
+    values["steps"] = [{"from": str(s["from"]), "value": str(s["value"])} for s in values["steps"]]
     for field, value in values.items():
         setattr(rule, field, value)
 

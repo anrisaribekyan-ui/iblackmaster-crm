@@ -5,7 +5,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.db import utcnow
-from app.models import CashRegister, Employee, Role
+from app.models import CashRegister, Employee, Role, SalaryRule
 from app.security import hash_password
 
 
@@ -20,13 +20,49 @@ def test_rules_crud_and_duplicate(client, auth_headers, db, owner):
     r = client.post("/api/salary/rules", json=body, headers=auth_headers)
     assert r.status_code == 200, r.text
     rule_id = r.json()["id"]
-    assert r.json()["steps"] == [{"from": 0.0, "value": 50.0}]
+    assert r.json()["steps"] == [{"from": "0", "value": "50"}]
     dup = client.post("/api/salary/rules", json=body, headers=auth_headers)
     assert dup.status_code == 400
     upd = client.put(f"/api/salary/rules/{rule_id}", json={**body, "accrue_on": "close"}, headers=auth_headers)
     assert upd.status_code == 200 and upd.json()["accrue_on"] == "close"
     assert len(client.get(f"/api/salary/rules?employee_id={owner.id}", headers=auth_headers).json()) == 1
     assert client.delete(f"/api/salary/rules/{rule_id}", headers=auth_headers).status_code == 204
+
+
+def test_rule_steps_stored_without_float_and_old_float_steps_read(client, auth_headers, db, owner):
+    body = {
+        "employee_id": owner.id,
+        "kind": "workOrder",
+        "steps": [{"from": "0", "value": "50.5"}, {"from": "1000.25", "value": "12.5"}],
+    }
+    response = client.post("/api/salary/rules", json=body, headers=auth_headers)
+
+    assert response.status_code == 200, response.text
+    assert response.json()["steps"] == [{"from": "0", "value": "50.5"}, {"from": "1000.25", "value": "12.5"}]
+    stored = db.get(SalaryRule, response.json()["id"])
+    assert stored.steps == [{"from": "0", "value": "50.5"}, {"from": "1000.25", "value": "12.5"}]
+    assert all(isinstance(step["from"], str) and isinstance(step["value"], str) for step in stored.steps)
+
+    # Старые правила, сохранённые ещё с float, должны читаться и считаться.
+    old = SalaryRule(
+        employee_id=owner.id,
+        kind="newOrder",
+        base="summ",
+        value_type="percent",
+        steps=[{"from": 0.0, "value": 50.0}, {"from": 1000.25, "value": 12.5}],
+    )
+    db.add(old)
+    db.commit()
+
+    listed = client.get(f"/api/salary/rules?employee_id={owner.id}", headers=auth_headers)
+    assert listed.status_code == 200, listed.text
+    old_row = next(rule for rule in listed.json() if rule["id"] == old.id)
+    assert old_row["steps"] == [{"from": "0.0", "value": "50.0"}, {"from": "1000.25", "value": "12.5"}]
+
+    from app.services import salary
+
+    amount, _ = salary.apply_rule(old, Decimal("2000"))
+    assert amount == Decimal("250")
 
 
 def test_bonus_penalty_payout_summary(client, auth_headers, db, owner):

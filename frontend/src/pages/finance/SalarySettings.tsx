@@ -7,7 +7,7 @@ import Skeleton from '../../components/Skeleton'
 type Kind = { code: string; title: string }
 type Location = { id: number; name: string }
 type OrderType = { id: number; name: string }
-type Step = { from: number; value: number }
+type Step = { from: string | number; value: string | number }
 type Rule = {
   id: number
   employee_id: number
@@ -154,7 +154,7 @@ export default function SalarySettings({ employeeId }: { employeeId: number }) {
       accrue_on: draft.accrue_on,
       discount_by: draft.discount_by,
       value_type: draft.value_type,
-      steps: draft.steps.map((s) => ({ from: Number(s.from), value: Number(s.value) })),
+      steps: draft.steps.map((s) => ({ from: s.from || '0', value: s.value || '0' })),
       max_amount: draft.max_amount === '' ? null : draft.max_amount,
       subtract_negative_margin: draft.subtract_negative_margin,
       keep_on_return: draft.keep_on_return,
