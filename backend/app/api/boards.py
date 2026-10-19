@@ -176,8 +176,21 @@ def archive_space(space_id: int, db: DbSession, me: CurrentEmployee):
 def get_space(space_id: int, db: DbSession, me: CurrentEmployee):
     """Всё пространство одним запросом: доски → колонки → карточки (как экран Kaiten)."""
     space = _space(db, me, space_id)
-    boards = [b for b in space.boards if not b.is_archived]
-    columns = [c for b in boards for c in b.columns if not c.is_archived]
+    # Доски и колонки — двумя запросами, а не ленивой загрузкой на каждую доску.
+    boards = list(
+        db.scalars(
+            select(Board)
+            .where(Board.space_id == space.id, Board.is_archived.is_(False))
+            .order_by(Board.sort, Board.id)
+        )
+    )
+    columns = list(
+        db.scalars(
+            select(BoardColumn)
+            .where(BoardColumn.board_id.in_([b.id for b in boards] or [0]), BoardColumn.is_archived.is_(False))
+            .order_by(BoardColumn.sort, BoardColumn.id)
+        )
+    )
     cards = (
         db.scalars(
             select(Card)
@@ -207,8 +220,8 @@ def get_space(space_id: int, db: DbSession, me: CurrentEmployee):
                 "sort": b.sort,
                 "columns": [
                     {"id": c.id, "name": c.name, "sort": c.sort, "cards": by_column.get(c.id, [])}
-                    for c in b.columns
-                    if not c.is_archived
+                    for c in columns
+                    if c.board_id == b.id
                 ],
             }
             for b in boards
