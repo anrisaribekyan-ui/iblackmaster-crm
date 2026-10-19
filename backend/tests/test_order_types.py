@@ -1,6 +1,6 @@
 from sqlalchemy import select
 
-from app.models import FormField, OrderType
+from app.models import OrderType
 
 
 def test_creating_order_type_copies_first_form(client, auth_headers, db):

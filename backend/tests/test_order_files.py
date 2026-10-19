@@ -1,14 +1,12 @@
 """Фото при приёме (C9): загрузка с уменьшением, превью, доступ, удаление."""
 
 import io
-from datetime import timedelta
 
 import pytest
 from PIL import Image
 from sqlalchemy import select
 
 from app.config import settings
-from app.db import utcnow
 from app.models import Counteragent, Location, Order, OrderFile, OrderHistory, OrderStatus, OrderType
 
 

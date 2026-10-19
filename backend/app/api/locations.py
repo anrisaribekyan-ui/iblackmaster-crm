@@ -5,7 +5,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentEmployee, DbSession, location_ids, require
 from app.errors import BusinessError, NotFound
-from app.models import Location, Store
+from app.models import Location
 
 router = APIRouter(prefix="/locations", tags=["Настройки"])
 

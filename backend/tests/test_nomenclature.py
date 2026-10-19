@@ -7,7 +7,6 @@ from app.models import (
     Location,
     Nomenclature,
     NomenclatureGroup,
-    NomenclaturePrice,
     PriceType,
     Role,
     Store,

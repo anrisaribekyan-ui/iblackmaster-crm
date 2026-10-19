@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, has_permission, location_ids, require, scope_of
-from app.errors import BusinessError, Forbidden, NotFound
+from app.errors import Forbidden, NotFound
 from app.models import Counteragent, CounteragentType, Employee, HowKnow, Order, Sale, Transaction
 from app.utils.phone import normalize_phone
 

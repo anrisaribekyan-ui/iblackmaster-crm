@@ -4,7 +4,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.db import utcnow
-from app.models import CashItem, CashRegister, Counteragent, Employee, Location, Order, OrderStatus, OrderType, Role, Transaction, StatusGroup
+from app.models import CashItem, CashRegister, Counteragent, Employee, Location, Order, OrderStatus, OrderType, Role, StatusGroup
 from app.security import hash_password
 
 

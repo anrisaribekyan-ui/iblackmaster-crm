@@ -70,7 +70,6 @@ def test_code_burns_after_five_mistakes(client, owner, outbox):
 
 
 def test_old_sessions_die_after_password_change(client, owner, auth_headers, db):
-    import time
 
     from app.db import utcnow
     from datetime import timedelta

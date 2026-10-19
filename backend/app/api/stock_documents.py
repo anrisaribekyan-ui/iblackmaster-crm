@@ -1,11 +1,11 @@
 from decimal import Decimal
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 
-from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids, require
+from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids
 from app.errors import BusinessError, Forbidden, NotFound
 from app.models import (
     CashRegister,

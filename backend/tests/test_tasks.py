@@ -5,7 +5,7 @@ from datetime import timedelta
 from sqlalchemy import select
 
 from app.db import utcnow
-from app.models import Counteragent, Employee, Location, Order, OrderStatus, OrderType, Role, Task
+from app.models import Counteragent, Employee, Location, Order, OrderStatus, OrderType, Role
 from app.security import hash_password
 
 
@@ -68,11 +68,11 @@ def test_create_and_list_tasks(client, auth_headers, db):
 
 def test_own_vs_all_scope(client, db, auth_headers):
     location = db.scalars(select(Location).order_by(Location.sort)).first()
-    worker = make_employee(
+    make_employee(
         db, name="Работник", email="worker@x.test",
         permissions=["createTaskAccess"], scopes={"tasks": "own"}, location=location,
     )
-    other = make_employee(
+    make_employee(
         db, name="Другой", email="other@x.test",
         permissions=["createTaskAccess"], scopes={"tasks": "own"}, location=location,
     )
@@ -121,11 +121,11 @@ def test_forbidden_without_create_access(client, db):
 
 def test_cannot_edit_foreign_without_change_all(client, db):
     location = db.scalars(select(Location).order_by(Location.sort)).first()
-    worker = make_employee(
+    make_employee(
         db, name="Автор", email="author@x.test",
         permissions=["createTaskAccess"], scopes={"tasks": "own"}, location=location,
     )
-    other = make_employee(
+    make_employee(
         db, name="Чужой", email="intruder@x.test",
         permissions=["createTaskAccess"], scopes={"tasks": "all"}, location=location,
     )
@@ -140,7 +140,7 @@ def test_cannot_edit_foreign_without_change_all(client, db):
 
 
 def test_task_bound_to_order_writes_history(client, auth_headers, db):
-    from app.models import Counteragent, OrderHistory
+    from app.models import OrderHistory
 
     order = make_order(db)
     r = client.post(

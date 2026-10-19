@@ -148,8 +148,6 @@ def top_positions(db: DbSession, me: CurrentEmployee, location_id: int, store_id
     Позиции из справочника — по номенклатуре, свободные — по названию. Цена и себестоимость — из последней продажи."""
     from datetime import timedelta
 
-    from sqlalchemy import func
-
     from app.db import utcnow
     from app.models import StockBalance
 
