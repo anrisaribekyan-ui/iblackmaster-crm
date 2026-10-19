@@ -81,7 +81,7 @@ def recalc_totals(order: Order) -> None:
     order.total_purchase = purchase.quantize(CENT)
 
 
-def _ensure_editable(order: Order) -> None:
+def ensure_editable(order: Order) -> None:
     if order.is_deleted:
         raise BusinessError("Заказ удалён")
     if order.status.group == StatusGroup.CLOSED:
@@ -111,7 +111,7 @@ def add_position(
     purchase_price — себестоимость единицы, заданная вручную (право orderPurchasePriceAccess проверяет роутер).
     Для запчасти со склада по умолчанию берётся средняя цена склада.
     """
-    _ensure_editable(order)
+    ensure_editable(order)
     qty = stock.to_qty(quantity)
     nom = db.get(Nomenclature, nomenclature_id) if nomenclature_id else None
     if nomenclature_id and nom is None:
@@ -162,7 +162,7 @@ def add_position(
 
 
 def remove_position(db: Session, order: Order, position: OrderPosition, employee: Employee) -> None:
-    _ensure_editable(order)
+    ensure_editable(order)
     if position.order_id != order.id:
         raise BusinessError("Позиция не из этого заказа")
     if position.store_id and position.nomenclature_id:
@@ -181,7 +181,7 @@ def update_position_price(
     db: Session, order: Order, position: OrderPosition, employee: Employee, *, price=None, sold_price=None, purchase_price=None
 ) -> None:
     """Меняет цену / цену со скидкой / себестоимость. Права (minPriceAccess, orderPurchasePriceAccess) проверяет роутер."""
-    _ensure_editable(order)
+    ensure_editable(order)
     if purchase_price is not None:
         value = money.to_money(purchase_price)
         if value < 0:

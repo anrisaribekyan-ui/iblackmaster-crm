@@ -783,6 +783,7 @@ def delete_order_position(order_id: int, position_id: int, db: DbSession, me: Cu
 @router.put("/{order_id}/discount", dependencies=[Depends(require("discountSaleAccess"))])
 def update_order_discount(order_id: int, data: OrderDiscount, db: DbSession, me: CurrentEmployee):
     order = get_order_for_employee(db, order_id, me)
+    order_service.ensure_editable(order)
     previous_percent = order.discount_percent
     previous_sum = order.discount_sum
     order.discount_percent = data.discount_percent or Decimal("0")

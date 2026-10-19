@@ -484,6 +484,43 @@ def test_order_discount_recalculates_total(client, auth_headers, db, owner):
     assert Decimal(str(response.json()["total_price"])) == Decimal("900.00")
 
 
+def test_order_discount_rejected_for_closed_order(client, auth_headers, db, owner):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    status = db.scalars(select(OrderStatus).where(OrderStatus.group == StatusGroup.CLOSED)).first()
+    customer = Counteragent(name="Скидка закрытому")
+    db.add(customer)
+    db.flush()
+    order = add_order(
+        db,
+        owner=owner,
+        location=location,
+        order_type=order_type,
+        counteragent=customer,
+        status=status,
+        number="DISCOUNT-CLOSED",
+    )
+    db.add(
+        OrderPosition(
+            order_id=order.id,
+            is_work=True,
+            name="Ремонт",
+            quantity=Decimal("1"),
+            price=Decimal("1000.00"),
+            sold_price=Decimal("1000.00"),
+        )
+    )
+    db.commit()
+
+    response = client.put(f"/api/orders/{order.id}/discount", json={"discount_percent": "10"}, headers=auth_headers)
+
+    assert response.status_code == 400
+    assert "выдан" in response.json()["message"].lower()
+    db.refresh(order)
+    assert order.discount_percent == Decimal("0")
+    assert order.discount_sum == Decimal("0")
+
+
 def test_order_status_required_comment_and_history(client, auth_headers, db, owner):
     location = db.scalars(select(Location).order_by(Location.sort)).first()
     order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
