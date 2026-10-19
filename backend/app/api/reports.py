@@ -58,11 +58,9 @@ def _allowed(db: DbSession, me: CurrentEmployee, location_id: int | None) -> set
     return allowed
 
 
-def _name_or(db: DbSession, employee_id: int | None, default: str) -> str:
-    if employee_id is None:
-        return default
-    employee = db.get(Employee, employee_id)
-    return employee.short_name if employee else default
+def _employee_names(db: DbSession) -> dict[int, str]:
+    """Имена сотрудников одним запросом — иначе отчёт делает запрос на каждую строку."""
+    return dict(db.execute(select(Employee.id, Employee.short_name)).all())
 
 
 def _with_margin(item: dict, can_margin: bool) -> dict:
@@ -96,29 +94,32 @@ def report_orders(
     orders = db.scalars(query.order_by(Order.closed_at)).all()
 
     can_margin = has_permission(me, "marginPriceAccess")
+    employee_names = _employee_names(db) if group_by not in ("order_type", "status", "how_know", "day") else {}
+    order_types = (
+        dict(db.execute(select(OrderType.id, OrderType.name)).all()) if group_by == "order_type" else {}
+    )
+    status_names = dict(db.execute(select(OrderStatus.id, OrderStatus.name)).all()) if group_by == "status" else {}
+    how_knows = dict(db.execute(select(HowKnow.id, HowKnow.name)).all()) if group_by == "how_know" else {}
     groups: dict[str, dict] = {}
     for order in orders:
         if group_by == "manager":
             key = f"m:{order.manager_id}"
-            name = _name_or(db, order.manager_id, "—")
+            name = employee_names.get(order.manager_id, "—")
         elif group_by == "order_type":
             key = f"t:{order.order_type_id}"
-            order_type = db.get(OrderType, order.order_type_id) if order.order_type_id else None
-            name = order_type.name if order_type else "—"
+            name = order_types.get(order.order_type_id, "—")
         elif group_by == "status":
             key = f"s:{order.status_id}"
-            status = db.get(OrderStatus, order.status_id)
-            name = status.name if status else "—"
+            name = status_names.get(order.status_id, "—")
         elif group_by == "how_know":
             key = f"h:{order.how_know_id}"
-            how_know = db.get(HowKnow, order.how_know_id) if order.how_know_id else None
-            name = how_know.name if how_know else "—"
+            name = how_knows.get(order.how_know_id, "—") if order.how_know_id else "—"
         elif group_by == "day":
             key = _moscow_day(order.closed_at)
             name = key
         else:
             key = f"m:{order.master_id}"
-            name = _name_or(db, order.master_id, "—")
+            name = employee_names.get(order.master_id, "—")
 
         item = groups.setdefault(key, {"key": key, "name": name, "count": 0, "revenue": Decimal("0"), "cost": Decimal("0")})
         item["count"] += 1
@@ -164,15 +165,18 @@ def report_works(
     positions = db.scalars(query).all()
 
     can_margin = has_permission(me, "marginPriceAccess")
+    employee_names = _employee_names(db) if group_by != "nomenclature" else {}
+    nomenclatures = (
+        dict(db.execute(select(Nomenclature.id, Nomenclature.name)).all()) if group_by == "nomenclature" else {}
+    )
     groups: dict[str, dict] = {}
     for position in positions:
         if group_by == "nomenclature":
             key = f"n:{position.nomenclature_id}"
-            nomenclature = db.get(Nomenclature, position.nomenclature_id) if position.nomenclature_id else None
-            name = nomenclature.name if nomenclature else position.name
+            name = nomenclatures.get(position.nomenclature_id, position.name) if position.nomenclature_id else position.name
         else:
             key = f"p:{position.performer_id}"
-            name = _name_or(db, position.performer_id, "—")
+            name = employee_names.get(position.performer_id, "—")
 
         item = groups.setdefault(key, {"key": key, "name": name, "quantity": Decimal("0"), "revenue": Decimal("0"), "cost": Decimal("0")})
         item["quantity"] += position.quantity
@@ -218,22 +222,23 @@ def report_sales(
             positions = db.scalars(select(SalePosition).where(SalePosition.sale_id.in_(sale_ids))).all()
         else:
             positions = []
+        nomenclatures = dict(db.execute(select(Nomenclature.id, Nomenclature.name)).all())
         for position in positions:
             key = f"n:{position.nomenclature_id}"
-            nomenclature = db.get(Nomenclature, position.nomenclature_id) if position.nomenclature_id else None
-            name = nomenclature.name if nomenclature else position.name
+            name = nomenclatures.get(position.nomenclature_id, position.name) if position.nomenclature_id else position.name
             item = groups.setdefault(key, {"key": key, "name": name, "count": 0, "revenue": Decimal("0"), "cost": Decimal("0")})
             item["count"] += 1
             item["revenue"] += position.sold_price * position.quantity
             item["cost"] += position.purchase_price * position.quantity
     else:
+        employee_names = _employee_names(db) if group_by != "day" else {}
         for sale in sales:
             if group_by == "day":
                 key = _moscow_day(sale.date)
                 name = key
             else:
                 key = f"s:{sale.seller_id}"
-                name = _name_or(db, sale.seller_id, "—")
+                name = employee_names.get(sale.seller_id, "—")
             item = groups.setdefault(key, {"key": key, "name": name, "count": 0, "revenue": Decimal("0"), "cost": Decimal("0")})
             item["count"] += 1
             item["revenue"] += sale.total_price
@@ -270,19 +275,19 @@ def report_cashflow(
         query = query.where(or_(Transaction.location_id.is_(None), Transaction.location_id.in_(allowed)))
     transactions = db.scalars(query).all()
 
+    registers = dict(db.execute(select(CashRegister.id, CashRegister.name)).all()) if group_by == "cash_register" else {}
+    cash_items = dict(db.execute(select(CashItem.id, CashItem.name)).all()) if group_by not in ("cash_register", "day") else {}
     groups: dict[str, dict] = {}
     for tx in transactions:
         if group_by == "cash_register":
             key = f"r:{tx.cash_register_id}"
-            register = db.get(CashRegister, tx.cash_register_id)
-            name = register.name if register else "—"
+            name = registers.get(tx.cash_register_id, "—")
         elif group_by == "day":
             key = _moscow_day(tx.date)
             name = key
         else:
             key = f"i:{tx.cash_item_id}"
-            item = db.get(CashItem, tx.cash_item_id)
-            name = item.name if item else "—"
+            name = cash_items.get(tx.cash_item_id, "—")
 
         row = groups.setdefault(key, {"key": key, "name": name, "income": Decimal("0"), "expense": Decimal("0")})
         if tx.is_income:
