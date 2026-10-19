@@ -54,7 +54,7 @@ function Sparkline({ values }: { values: number[] }) {
   return (
     <svg width={w + 6} height={h} aria-hidden className="shrink-0 overflow-visible">
       <polyline points={values.map(pt).join(' ')} fill="none" stroke="var(--viz-quiet)" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={w} cy={lastY} r={3.5} fill="var(--viz-1)" stroke="#fff" strokeWidth={2} />
+      <circle cx={w} cy={lastY} r={3.5} fill="var(--viz-1)" stroke="var(--color-surface)" strokeWidth={2} />
     </svg>
   )
 }

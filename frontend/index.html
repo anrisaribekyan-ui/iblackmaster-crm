@@ -12,6 +12,15 @@
     <meta name="apple-mobile-web-app-title" content="iBlackMaster" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>iBlackMaster CRM</title>
+    <script>
+      // Тема ставится до отрисовки — без белой вспышки в тёмном режиме
+      try {
+        var m = localStorage.getItem('theme') || 'auto'
+        var t = m === 'auto' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : m
+        document.documentElement.dataset.theme = t
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'light' ? '#eef0f3' : t === 'dark' ? '#0e1013' : '#0b0c0e')
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -6,6 +6,7 @@ import { useAuth } from '../auth'
 import BarList from '../components/charts/BarList'
 import ChartCard from '../components/charts/ChartCard'
 import StatTile from '../components/charts/StatTile'
+import HeroRevenue, { Ring } from '../components/charts/HeroRevenue'
 import MyEarnings from '../components/MyEarnings'
 import ForgottenBanner from '../components/ForgottenBanner'
 import TimeChart from '../components/charts/TimeChart'
@@ -159,13 +160,12 @@ export default function DashboardPage() {
       <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         {hasMoney && (
           <div className="col-span-2 xl:col-span-1">
-            <StatTile
-              hero
+            <HeroRevenue
               label={`Выручка, ${periodName}`}
               value={Number(data.finance!.revenue)}
-              format={rub}
+              norm={revenueNorm(trend, canPeriod ? period : 'today', customFrom, customTo)}
               previous={previous.revenue === null ? null : Number(previous.revenue)}
-              trend={last14.map((t) => Number(t.revenue ?? 0))}
+              summary={daySummary(orders.ready, data.overdue?.length ?? null)}
             />
           </div>
         )}
@@ -173,13 +173,19 @@ export default function DashboardPage() {
         {hasClosed && (
           <StatTile label={`Выдано, ${periodName}`} value={orders.closed!} format={count} previous={previous.closed} trend={last14.map((t) => t.closed ?? 0)} />
         )}
-        <div className="col-span-2 flex min-h-28 flex-col justify-between rounded-xl border border-line bg-surface p-4 xl:col-span-1">
-          <p className="text-sm text-muted">Сейчас в работе</p>
-          <div>
-            <p className="text-[28px] font-semibold leading-none">{count(orders.in_work)}</p>
-            <p className="mt-2 text-xs text-muted">из них готово к выдаче: <strong className="num text-ink">{orders.ready}</strong></p>
+        <Link to="/orders" className="lift col-span-2 flex min-h-28 items-center justify-between gap-4 rounded-xl border border-line bg-surface p-4 xl:col-span-1">
+          <div className="flex h-full flex-col justify-between">
+            <p className="text-sm text-muted">Сейчас в работе</p>
+            <div>
+              <p className="num text-[28px] font-semibold leading-none">{count(orders.in_work)}</p>
+              <p className="mt-2 text-xs text-muted">готово к выдаче: <strong className="num text-ink">{orders.ready}</strong></p>
+            </div>
           </div>
-        </div>
+          <div className="relative grid place-items-center">
+            <Ring part={orders.ready} total={orders.in_work} size={72} />
+            <span className="num absolute text-sm font-semibold">{orders.in_work ? Math.round((orders.ready / orders.in_work) * 100) : 0}%</span>
+          </div>
+        </Link>
       </div>
 
       <div className="mb-4 grid gap-4 xl:grid-cols-2">
@@ -284,13 +290,43 @@ export default function DashboardPage() {
 
 
 
+/** Обычная выручка за период: средняя за день по прошедшим дням графика (без сегодняшнего) × длина периода. */
+function revenueNorm(trend: Dashboard['trend'], period: Period, customFrom: string, customTo: string): number | null {
+  const past = trend.slice(0, -1).map((t) => Number(t.revenue ?? 0))
+  const worked = past.filter((v) => v > 0)
+  if (worked.length < 3) return null
+  const avg = past.reduce((a, b) => a + b, 0) / past.length
+  let days = 1
+  if (period === 'week') days = 7
+  else if (period === 'month') days = moscowNow().d
+  else if (period === 'custom') {
+    if (!customFrom || !customTo) return null
+    days = Math.round((Date.parse(customTo) - Date.parse(customFrom)) / 86_400_000) + 1
+  }
+  return avg * days
+}
+
+function plural(n: number, one: string, few: string, many: string) {
+  const m10 = n % 10
+  const m100 = n % 100
+  if (m10 === 1 && m100 !== 11) return one
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few
+  return many
+}
+
+function daySummary(ready: number, overdue: number | null): string {
+  const parts = [`${ready} ${plural(ready, 'готов', 'готовы', 'готовы')} к выдаче`]
+  if (overdue !== null) parts.push(overdue ? `${overdue} ${plural(overdue, 'просрочен', 'просрочены', 'просрочены')}` : 'просрочек нет')
+  return parts.join(' · ')
+}
+
 /** Плитки главных действий дня: на компьютере — сразу под заголовком, на телефоне их дублирует «+». */
 function QuickActions({ canCreate }: { canCreate: boolean }) {
-  const tile = 'group flex items-center gap-3 rounded-xl border border-line bg-surface p-3 transition hover:border-ink/30 hover:shadow-sm active:scale-[0.99]'
+  const tile = 'lift group flex items-center gap-3 rounded-xl border border-line bg-surface p-3 hover:border-ink/30 active:scale-[0.99]'
   return (
     <div className="mb-4 hidden gap-3 md:grid md:grid-cols-3">
       {canCreate && (
-        <Link to="/orders/new" className="group flex items-center gap-3 rounded-xl bg-ink p-3 text-white transition hover:opacity-90 active:scale-[0.99]">
+        <Link to="/orders/new" className="lift group flex items-center gap-3 rounded-xl bg-ink p-3 text-white active:scale-[0.99]">
           <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent text-xl">+</span>
           <span><b className="block font-semibold">Новый заказ</b><small className="text-white/60">принять устройство · N</small></span>
         </Link>

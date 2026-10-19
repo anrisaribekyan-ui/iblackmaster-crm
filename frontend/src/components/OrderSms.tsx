@@ -64,18 +64,27 @@ export default function OrderSms({ orderId, hasPhone, disabled, onSent }: { orde
       {items.length === 0 ? (
         <p className="text-sm text-muted">{hasPhone ? 'Сообщений по заказу ещё не было.' : 'У клиента нет мобильного номера.'}</p>
       ) : (
-        <ul className="space-y-2">
-          {items.slice(0, 5).map((i) => (
-            <li key={i.id} className="text-sm">
-              <div className="flex items-center gap-2">
-                <span className={`rounded px-1.5 py-0.5 text-xs ${smsStateClass[i.state]}`}>{i.state_title}</span>
-                <small className="tabular-nums text-muted">{formatDateTime(i.sent_at ?? i.created_at)}</small>
-              </div>
-              <p className="mt-1">{i.text}</p>
-              {i.error && i.state !== 'cancelled' && <small className="text-danger">{i.error}</small>}
-            </li>
-          ))}
-        </ul>
+        // Переписка как в мессенджере: старые сверху, новые снизу, наши сообщения — справа
+        <ol className="flex flex-col gap-3">
+          {items.slice(0, 5).reverse().map((i) => {
+            const failed = i.state === 'failed' || (i.error && i.state !== 'cancelled' && i.state !== 'delivered')
+            return (
+              <li key={i.id} className="flex flex-col items-end">
+                <p className={`max-w-[88%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md px-3.5 py-2 text-sm leading-snug ${
+                  failed ? 'border border-danger/40 bg-danger/10 text-ink' : i.state === 'cancelled' ? 'bg-canvas text-muted line-through' : 'sms-bubble'
+                }`}>
+                  {i.text}
+                </p>
+                <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted">
+                  <span className="num">{formatDateTime(i.sent_at ?? i.created_at)}</span>
+                  <span aria-hidden>·</span>
+                  <span className={`rounded px-1 ${smsStateClass[i.state]}`}>{i.state_title}</span>
+                </div>
+                {failed && i.error && <small className="mt-0.5 max-w-[88%] text-right text-xs text-danger">{i.error}</small>}
+              </li>
+            )
+          })}
+        </ol>
       )}
       {open && (
         <Modal title="SMS клиенту" onClose={() => setOpen(false)}>

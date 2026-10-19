@@ -685,7 +685,7 @@ export default function OrderDetailPage() {
         </div>
       </header>
       {isDeleted && (
-        <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#fecdca] bg-[#fef3f2] px-4 py-3">
+        <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3">
           <div className="text-sm">
             <p className="font-medium text-danger">Заказ удалён</p>
             <p className="text-ink">

@@ -1,3 +1,4 @@
+import type React from 'react'
 /**
  * Бейдж статуса заказа. Цвета статусов заданы в настройках и бывают светлыми (салатовый «В пайке»,
  * серый «Отказ») — как текст они бледнеют. Поэтому текст затемняем, пока он не станет читаемым
@@ -41,11 +42,12 @@ export function statusColors(color: string | null | undefined): { text: string; 
 
 export default function StatusBadge({ name, color, className = '' }: { name: string; color: string | null | undefined; className?: string }) {
   const c = statusColors(color)
+  // Цвета через переменные: в тёмных темах CSS берёт светлый текст и полупрозрачный фон того же оттенка
   return (
     <span
       title={name}
-      className={`inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${className}`}
-      style={{ color: c.text, backgroundColor: c.bg }}
+      className={`status-badge inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${className}`}
+      style={{ '--sb-text': c.text, '--sb-bg': c.bg, '--sb-dot': c.dot } as React.CSSProperties}
     >
       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: c.dot }} aria-hidden />
       <span className="truncate">{name}</span>

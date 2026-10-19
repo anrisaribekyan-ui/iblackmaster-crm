@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import { useAuth } from '../auth'
 import Icon from './icons'
 import InstallApp from './InstallApp'
+import ThemeSwitch from './ThemeSwitch'
 import Skeleton from './Skeleton'
 
 /** Меню как в LiveSklad. permission — право, без которого пункт скрыт (пусто — виден всем). */
@@ -132,6 +133,7 @@ export default function Layout() {
           ))}
         </nav>
         <InstallApp />
+        <ThemeSwitch />
         <div className="m-3 flex items-center gap-3 rounded-lg bg-rail-hover px-3 py-2.5">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#3a3f47] text-sm font-medium text-white" aria-hidden>
             {(me?.short_name ?? '?').slice(0, 1)}
@@ -142,7 +144,7 @@ export default function Layout() {
           </div>
           <button onClick={logout} className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-rail-muted hover:bg-rail hover:text-white" title="Выйти из CRM на этом устройстве">
             <Icon name="logout" className="h-[18px] w-[18px]" />
-            Выйти
+            <span className="md:sr-only">Выйти</span>
           </button>
         </div>
       </aside>

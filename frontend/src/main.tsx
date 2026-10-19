@@ -4,6 +4,9 @@ import '@fontsource-variable/onest'
 import './index.css'
 import App from './App.tsx'
 
+import { watchSystem } from './theme'
+watchSystem()
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

@@ -230,7 +230,7 @@ export default function SalesPage() {
             <button
               type="button"
               onClick={() => setQuick(true)}
-              className="flex min-h-24 flex-col justify-between rounded-xl bg-ink p-3 text-left text-white shadow-sm transition active:scale-[0.98] hover:opacity-90"
+              className="lift flex min-h-24 flex-col justify-between rounded-xl bg-ink p-3 text-left text-white shadow-sm active:scale-[0.98] hover:opacity-90"
             >
               <span className="grid h-8 w-8 place-items-center rounded-full bg-accent text-xl leading-none">+</span>
               <span className="font-medium leading-tight">Своя позиция<small className="block font-normal text-white/60">название, себестоимость, цена</small></span>
@@ -246,7 +246,7 @@ export default function SalesPage() {
                     type="button"
                     title={`Пробивали ${t.count} раз за 90 дней`}
                     onClick={() => addLine({ nomenclatureId: t.nomenclature_id, name: t.name, isWork: t.is_work, price: String(Number(t.price)), cost: String(Number(t.purchase_price)), stock })}
-                    className={`relative flex min-h-24 flex-col justify-between rounded-xl border bg-surface p-3 text-left shadow-sm transition active:scale-[0.98] hover:border-ink/40 ${inCart ? 'border-accent ring-1 ring-accent' : 'border-line'}`}
+                    className={`lift relative flex min-h-24 flex-col justify-between rounded-xl border bg-surface p-3 text-left shadow-sm active:scale-[0.98] hover:border-ink/40 ${inCart ? 'border-accent ring-1 ring-accent' : 'border-line'}`}
                   >
                     {inCart && <span className="absolute right-2 top-2 grid h-6 min-w-6 place-items-center rounded-full bg-accent px-1.5 text-xs font-semibold text-white num">{qty(inCart.quantity)}</span>}
                     <span className="line-clamp-2 pr-6 text-sm leading-snug">{t.name}</span>

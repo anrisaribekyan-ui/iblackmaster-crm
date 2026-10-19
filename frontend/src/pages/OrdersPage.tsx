@@ -304,7 +304,7 @@ export default function OrdersPage() {
                         {order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" className="mr-1 text-danger">●</span>}
                         {order.number}
                       </span>
-                      {order.is_deleted && <span className="rounded bg-[#fef3f2] px-1.5 py-0.5 text-xs font-medium text-danger">удалён</span>}
+                      {order.is_deleted && <span className="rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger">удалён</span>}
                       <StatusBadge className="ml-auto" name={order.status.name} color={order.status.color} />
                     </div>
                     <p className="mt-1.5 truncate font-medium">{device || 'Устройство не указано'}</p>
@@ -365,7 +365,7 @@ export default function OrdersPage() {
                       <td className="px-3 py-2.5">
                         <Link to={`/orders/${order.id}`} className={`num font-semibold hover:underline ${order.is_deleted ? 'text-muted' : 'text-accent'}`}>{order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" title="Срочный" className="mr-1 text-danger">●</span>}{order.number}</Link>
                         <small className="block whitespace-nowrap text-xs text-muted" title={formatDate(order.created_at)}>{ago(order.created_at) ?? formatDate(order.created_at).split(',')[0]}</small>
-                        {order.is_deleted && <span className="mt-1 inline-block rounded bg-[#fef3f2] px-1.5 py-0.5 text-xs font-medium text-danger [text-decoration:none]">удалён</span>}
+                        {order.is_deleted && <span className="mt-1 inline-block rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger [text-decoration:none]">удалён</span>}
                       </td>
                       <td className="px-3 py-2.5"><StatusBadge name={order.status.name} color={order.status.color} /></td>
                       <td className="min-w-0 px-3 py-2.5">

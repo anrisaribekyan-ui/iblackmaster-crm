@@ -20,6 +20,9 @@
   --color-rail-ink: #c9ced6;
   --color-rail-muted: #7d8590;
   --color-rail-hover: #272b31;
+  --color-placeholder: #98a2b3;
+  --color-line-strong: #c5cad3;
+  --color-row-hover: #f6f7f9;
   --font-sans: "Onest Variable", "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --radius-md: 0.5rem;
 }
@@ -85,12 +88,12 @@ body {
   }
   input::placeholder,
   textarea::placeholder {
-    color: #98a2b3;
+    color: var(--color-placeholder);
   }
   input:not([type="checkbox"]):not([type="radio"]):hover,
   select:hover,
   textarea:hover {
-    border-color: #c5cad3;
+    border-color: var(--color-line-strong);
   }
   input:focus,
   select:focus,
@@ -129,7 +132,7 @@ body {
     transition: background-color 0.1s;
   }
   tbody tr:hover {
-    background-color: #f8f9fb;
+    background-color: var(--color-row-hover);
   }
   h1 {
     letter-spacing: -0.015em;
@@ -142,8 +145,8 @@ body {
 }
 /* Вторичные кнопки с рамкой — чуть подсвечиваются */
 button.border-line:not(:disabled):hover {
-  background-color: #f6f7f9;
-  border-color: #c5cad3;
+  background-color: var(--color-row-hover);
+  border-color: var(--color-line-strong);
 }
 /* Карточки-блоки: едва заметная тень, чтобы белое читалось на сером */
 .rounded-xl.border-line.bg-surface {
@@ -172,11 +175,11 @@ td .num {
 /* Графики (метод dataviz): цвета по ролям, палитра проверена validate_palette.js на белом фоне.
    Серии: 1 — синий, 2 — оранжевый (порядок фиксированный, по рангу не перекрашиваем). */
 :root {
-  --viz-1: #2a78d6;
-  --viz-2: #eb6834;
-  --viz-1-wash: rgba(42, 120, 214, 0.1);
-  --viz-seq: #3987e5; /* одна шкала «больше = темнее» для рейтингов */
-  --viz-seq-track: #e8f0fb;
+  --viz-1: #2b2f36; /* графит — основная серия (выручка, валовая) */
+  --viz-2: #e64823; /* фирменный оранжевый — вторая (прибыль, чистая) */
+  --viz-1-wash: rgba(43, 47, 54, 0.08);
+  --viz-seq: #3a3f47; /* одна шкала «больше = темнее» для рейтингов */
+  --viz-seq-track: #eceef1;
   --viz-grid: #ecebe6;
   --viz-axis: #c3c2b7;
   --viz-label: #898781;
@@ -260,3 +263,177 @@ input, textarea {
 }
 .dark-select:focus { border-color: transparent; box-shadow: 0 0 0 3px rgb(255 255 255 / 0.2); }
 .dark-select option, .dark-select optgroup { color: var(--color-ink); background: var(--color-surface); }
+
+
+/* ══ Режимы оформления: Светлый · Тёмный · Стекло. Переключаются атрибутом data-theme на <html>.
+   Все цвета компонентов идут через токены выше, поэтому тема — это просто другие значения токенов. */
+html[data-theme="dark"],
+html[data-theme="glass"] {
+  color-scheme: dark;
+  --color-surface: #17191d;
+  --color-canvas: #0e1013;
+  --color-ink: #eceef1;
+  --color-muted: #9aa3b2;
+  --color-line: #2a2e35;
+  --color-line-strong: #3d424b;
+  --color-row-hover: #1e2126;
+  --color-placeholder: #5f6773;
+  --color-accent: #ff5a33;
+  --color-accent-hover: #ff7350;
+  --color-accent-soft: #3a1c13;
+  --color-danger: #f97066;
+  --color-success: #32d583;
+  --color-warning: #fdb022;
+  --color-rail: #0a0b0d;
+  --color-rail-hover: #1b1e23;
+  --viz-1: #c9ced6;
+  --viz-2: #ff5a33;
+  --viz-1-wash: rgba(201, 206, 214, 0.08);
+  --viz-seq: #9aa3b2;
+  --viz-seq-track: #23272e;
+  --viz-grid: #262a31;
+  --viz-axis: #3a3f47;
+  --viz-label: #8b93a1;
+  --viz-ink: #eceef1;
+  --viz-ink-2: #b5bcc7;
+  --viz-quiet: #4a505a;
+  --viz-good: #32d583;
+  --viz-bad: #f97066;
+}
+html[data-theme="dark"] .rounded-xl.border-line.bg-surface,
+html[data-theme="glass"] .rounded-xl.border-line.bg-surface {
+  box-shadow: none;
+}
+/* Тёмные «таблетки» (активная вкладка, выбранная оплата) в тёмной теме становятся светлыми — как в макете */
+html[data-theme="dark"] .bg-ink,
+html[data-theme="glass"] .bg-ink {
+  background-color: #eceef1;
+}
+html[data-theme="dark"] .bg-ink.text-white, html[data-theme="dark"] .bg-ink .text-white,
+html[data-theme="glass"] .bg-ink.text-white, html[data-theme="glass"] .bg-ink .text-white {
+  color: #0e1013;
+}
+html[data-theme="dark"] .bg-ink .text-white\/60,
+html[data-theme="glass"] .bg-ink .text-white\/60 {
+  color: rgb(14 16 19 / 0.55);
+}
+html[data-theme="dark"] .border-ink, html[data-theme="glass"] .border-ink { border-color: #eceef1; }
+/* Графитовые плашки (бирка заказа, плашка «Пробить») отделяем от фона тонкой рамкой */
+html[data-theme="dark"] .bg-rail, html[data-theme="glass"] .bg-rail {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+/* Стекло: тёмные осколки на фоне, карточки — матовое стекло поверх */
+html[data-theme="glass"] body {
+  background: #0b0c0e url("/bg-shards.svg") center / cover fixed no-repeat;
+}
+html[data-theme="glass"] {
+  --color-canvas: transparent;
+  --color-surface: rgb(28 31 36 / 0.55);
+  --color-line: rgb(255 255 255 / 0.09);
+  --color-line-strong: rgb(255 255 255 / 0.18);
+  --color-row-hover: rgb(255 255 255 / 0.04);
+  --color-rail: rgb(10 11 13 / 0.62);
+  --color-rail-hover: rgb(255 255 255 / 0.06);
+}
+html[data-theme="glass"] :is(.rounded-xl, .rounded-2xl).bg-surface,
+html[data-theme="glass"] .modal-panel,
+html[data-theme="glass"] aside.bg-rail,
+html[data-theme="glass"] nav.bg-surface\/95 {
+  -webkit-backdrop-filter: blur(18px) saturate(1.25);
+  backdrop-filter: blur(18px) saturate(1.25);
+}
+html[data-theme="glass"] .modal-panel { background-color: rgb(22 24 28 / 0.82); }
+html[data-theme="glass"] :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
+  background-color: rgb(255 255 255 / 0.04);
+}
+html[data-theme="glass"] .bg-canvas { background-color: rgb(255 255 255 / 0.04); }
+html[data-theme="glass"] header.bg-canvas\/95 { background-color: transparent; }
+
+/* Смена темы: новая тема раскрывается кругом от кнопки (View Transitions). Редкое действие — можно красиво. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-new(root) {
+  animation: theme-reveal 520ms var(--ease-in-out);
+}
+@keyframes theme-reveal {
+  from { clip-path: circle(0 at var(--tx, 50%) var(--ty, 50%)); }
+  to { clip-path: circle(var(--tr, 150vmax) at var(--tx, 50%) var(--ty, 50%)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-new(root) { animation: none; }
+}
+
+/* Кликабельные плитки чуть приподнимаются под мышью (только мышь — на телефоне «залипает») */
+@media (hover: hover) and (pointer: fine) {
+  .lift { transition: transform 200ms var(--ease-out), box-shadow 200ms var(--ease-out), border-color 150ms ease; }
+  .lift:hover { transform: translateY(-2px); box-shadow: 0 8px 24px -12px rgb(16 24 40 / 0.25); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lift:hover { transform: none; }
+}
+
+/* Бейдж статуса: светлая тема — затемнённый текст на светлом тоне; тёмные — осветлённый на прозрачном */
+.status-badge { color: var(--sb-text); background-color: var(--sb-bg); }
+html[data-theme="dark"] .status-badge,
+html[data-theme="glass"] .status-badge {
+  color: color-mix(in srgb, var(--sb-dot) 62%, white);
+  background-color: color-mix(in srgb, var(--sb-dot) 20%, transparent);
+}
+
+/* Главная плитка дня: фирменный оранжевый градиент (как «hero card» у референса), в тёмных темах — чуть глубже */
+.hero-card {
+  background: radial-gradient(120% 140% at 100% 0%, #ff8a5c 0%, #f05a2a 38%, #d8401b 100%);
+  box-shadow: 0 18px 40px -22px rgb(230 72 35 / 0.75);
+}
+html[data-theme="dark"] .hero-card,
+html[data-theme="glass"] .hero-card {
+  background: radial-gradient(120% 140% at 100% 0%, #ff7a48 0%, #e9501f 40%, #a92e10 100%);
+  box-shadow: 0 18px 50px -24px rgb(255 90 51 / 0.6);
+}
+.hero-bar { transform-origin: left; transition: transform 900ms var(--ease-out); }
+@media (prefers-reduced-motion: reduce) {
+  .hero-bar { transition: none; }
+}
+
+/* Ввод кода: шесть ячеек, активная — в рамке акцента; после успеха ячейки съезжаются в одну и превращаются в галочку */
+.otp-cell {
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 160ms var(--ease-out);
+}
+.otp-cell[data-active="true"] {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+.otp-cell[data-filled="true"] { animation: otp-pop 160ms var(--ease-out); }
+@keyframes otp-pop { from { transform: scale(0.92); } }
+.otp-error .otp-cell { border-color: var(--color-danger); animation: otp-shake 320ms var(--ease-out); }
+@keyframes otp-shake {
+  20% { transform: translateX(-5px); }
+  45% { transform: translateX(4px); }
+  70% { transform: translateX(-2px); }
+}
+.otp-done .otp-cell {
+  transform: translateX(var(--to-center)) scale(0.6);
+  opacity: 0;
+  transition: transform 380ms var(--ease-in-out), opacity 260ms ease 120ms;
+}
+.otp-check {
+  animation: otp-check-in 360ms var(--ease-out) 300ms both;
+}
+.otp-check path {
+  stroke-dasharray: 30;
+  animation: otp-draw 360ms var(--ease-out) 520ms both;
+}
+@keyframes otp-check-in { from { opacity: 0; transform: scale(0.6); } }
+@keyframes otp-draw { from { stroke-dashoffset: 30; } to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .otp-done .otp-cell { transform: none; }
+}
+
+/* SMS клиенту — пузырь исходящего сообщения: графит в светлой теме, тёплый акцентный в тёмных */
+.sms-bubble { background: var(--color-ink); color: var(--color-surface); }
+html[data-theme="dark"] .sms-bubble,
+html[data-theme="glass"] .sms-bubble { background: color-mix(in srgb, var(--color-accent) 85%, black); color: #fff; }

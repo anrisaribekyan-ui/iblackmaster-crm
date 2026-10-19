@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../auth'
+import OtpInput from '../components/OtpInput'
 
 type Mode = 'login' | 'forgot' | 'code'
 
@@ -18,6 +19,8 @@ export default function LoginPage() {
   })
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
+  const [codeError, setCodeError] = useState(false)
+  const [done, setDone] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
@@ -73,9 +76,17 @@ export default function LoginPage() {
   const submitReset = (e: FormEvent) => {
     e.preventDefault()
     void run(async () => {
-      const { access_token } = await api.post<{ access_token: string }>('/auth/reset', { email, code, password: newPassword })
-      try { localStorage.setItem('login:email', email) } catch { /* приватный режим */ }
-      await loginWithToken(access_token)
+      try {
+        const { access_token } = await api.post<{ access_token: string }>('/auth/reset', { email, code, password: newPassword })
+        try { localStorage.setItem('login:email', email) } catch { /* приватный режим */ }
+        // Даём увидеть «Пароль обновлён» — это единственный момент радости во всём сценарии
+        setDone(true)
+        await new Promise((r) => setTimeout(r, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 400 : 1300))
+        await loginWithToken(access_token)
+      } catch (err) {
+        if (err instanceof ApiError && /код/i.test(err.message)) setCodeError(true)
+        throw err
+      }
     })
   }
 
@@ -98,7 +109,7 @@ export default function LoginPage() {
               <button type="button" className="text-sm text-muted hover:text-accent" onClick={() => go('forgot')}>Забыли пароль?</button>
             </div>
             <input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className={`mb-5 ${field}`} required />
-            {error && <p role="alert" className="mb-4 rounded-lg bg-[#fef3f2] px-3 py-2 text-sm text-danger">{error}</p>}
+            {error && <p role="alert" className="mb-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
             <button type="submit" disabled={busy} className="h-11 w-full rounded-lg bg-accent px-3 font-medium text-accent-ink disabled:opacity-60">
               {busy ? 'Входим…' : 'Войти'}
             </button>
@@ -111,7 +122,7 @@ export default function LoginPage() {
             <p className="mb-6 mt-1 text-sm text-muted">Пришлём шестизначный код на рабочую почту — с ним зададите новый пароль.</p>
             <label className="mb-1.5 block text-sm font-medium" htmlFor="forgot-email">Email</label>
             <input id="forgot-email" type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} className={`mb-5 ${field}`} required autoFocus />
-            {error && <p role="alert" className="mb-4 rounded-lg bg-[#fef3f2] px-3 py-2 text-sm text-danger">{error}</p>}
+            {error && <p role="alert" className="mb-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
             <button type="submit" disabled={busy} className="h-11 w-full rounded-lg bg-accent px-3 font-medium text-accent-ink disabled:opacity-60">
               {busy ? 'Отправляем…' : 'Прислать код'}
             </button>
@@ -124,19 +135,9 @@ export default function LoginPage() {
             <h1 className="text-xl font-semibold">Код из письма</h1>
             <p className="mb-5 mt-1 text-sm text-muted">{notice || <>Отправили на <span className="text-ink">{email}</span>. Код действует 15 минут.</>}</p>
             <label className="sr-only" htmlFor="code">Код из письма</label>
-            <input
-              id="code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              pattern="\d{6}"
-              maxLength={6}
-              placeholder="••••••"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="num mb-4 w-full border px-3 py-3 text-center text-3xl font-semibold tracking-[0.5em] placeholder:tracking-[0.5em]"
-              autoFocus
-              required
-            />
+            <div className="mb-5">
+              <OtpInput id="code" value={code} onChange={(v) => { setCode(v); setCodeError(false) }} error={codeError} done={done} doneLabel="Пароль обновлён" />
+            </div>
             <label className="mb-1.5 block text-sm font-medium" htmlFor="new-password">Новый пароль</label>
             <div className="relative mb-1">
               <input id="new-password" type={showPassword ? 'text' : 'password'} autoComplete="new-password" minLength={8} value={newPassword}
@@ -146,9 +147,9 @@ export default function LoginPage() {
               </button>
             </div>
             <p className={`mb-5 text-xs ${newPassword && newPassword.length < 8 ? 'text-danger' : 'text-muted'}`}>Не короче 8 символов{newPassword.length > 0 && newPassword.length < 8 ? ` — ещё ${8 - newPassword.length}` : ''}</p>
-            {error && <p role="alert" className="mb-4 rounded-lg bg-[#fef3f2] px-3 py-2 text-sm text-danger">{error}</p>}
-            <button type="submit" disabled={busy || code.length !== 6 || newPassword.length < 8} className="h-11 w-full rounded-lg bg-accent px-3 font-medium text-accent-ink disabled:opacity-50">
-              {busy ? 'Сохраняем…' : 'Сохранить и войти'}
+            {error && <p role="alert" className="mb-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p>}
+            <button type="submit" disabled={busy || done || code.length !== 6 || newPassword.length < 8} className="h-11 w-full rounded-lg bg-accent px-3 font-medium text-accent-ink disabled:opacity-50">
+              {done ? 'Входим…' : busy ? 'Сохраняем…' : 'Сохранить и войти'}
             </button>
             <div className="mt-4 flex justify-between text-sm">
               <button type="button" className="text-muted hover:text-ink" onClick={() => go('login')}>← Ко входу</button>

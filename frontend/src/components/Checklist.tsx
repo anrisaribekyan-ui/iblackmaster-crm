@@ -105,7 +105,7 @@ export function SignaturePad({ onChange }: { onChange: (dataUrl: string | null) 
       <div className="relative">
         <canvas
           ref={canvas}
-          className="h-36 w-full touch-none rounded-lg border border-dashed border-line bg-surface"
+          className="h-36 w-full touch-none rounded-lg border border-dashed border-line bg-white"
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId)
             drawing.current = true
