@@ -100,9 +100,9 @@ def update_quick_order(quick_id: int, data: QuickOrderIn, db: DbSession):
 @router.delete("/{quick_id}", status_code=204, dependencies=[Depends(require("settingAccess"))])
 def delete_quick_order(quick_id: int, db: DbSession):
     q = db.get(QuickOrder, quick_id)
-    if q is None or not q.is_active:
+    if q is None:
         raise NotFound("Быстрый заказ")
-    q.is_active = False
+    db.delete(q)
     db.commit()
 
 
