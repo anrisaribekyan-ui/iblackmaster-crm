@@ -6,6 +6,7 @@ const P: Record<string, string> = {
   store: 'M3 8l9-5 9 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zM3 8l9 5 9-5M12 13v8',
   tasks: 'M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM8 12l3 3 5-6',
   boards: 'M4 4h4v16H4zM10 4h4v10h-4zM16 4h4v13h-4z',
+  cart: 'M6 7h14l-1.5 8.5a1 1 0 0 1-1 .8H8.6a1 1 0 0 1-1-.8L5.5 4H3M9.5 20.5h.01M16.5 20.5h.01',
   finance: 'M3 7a2 2 0 0 1 2-2h12v4M3 7v10a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1V10a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2zM16 14h.01',
   analytics: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
   books: 'M5 4h9a2 2 0 0 1 2 2v14H7a2 2 0 0 1-2-2zM5 18a2 2 0 0 1 2-2h9M19 6v14',

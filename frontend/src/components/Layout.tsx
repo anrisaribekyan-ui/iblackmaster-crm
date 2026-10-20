@@ -15,6 +15,7 @@ export const MENU: { to: string; label: string; icon: string; permission?: strin
   { to: '/store/remains', icon: 'store', label: 'Склад', permission: 'remainAccess' },
   { to: '/tasks', icon: 'tasks', label: 'Задачи' },
   { to: '/boards', icon: 'boards', label: 'Доски' },
+  { to: '/zakupki', icon: 'cart', label: 'Закупки' },
   { to: '/finance/cashes', icon: 'finance', label: 'Финансы' },
   { to: '/analytics', icon: 'analytics', label: 'Аналитика', permission: 'reportAccess' },
   { to: '/compendiums/how-knows', icon: 'books', label: 'Справочники' },
