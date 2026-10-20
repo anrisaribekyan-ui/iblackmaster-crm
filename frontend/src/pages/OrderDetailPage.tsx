@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { formatPhone, isoToLocalInput, localInputToIso } from '../format'
 import { useAuth } from '../auth'
@@ -153,6 +153,10 @@ function displayValue(field: FormField, detail: OrderDetail, masters: Employee[]
   if (Array.isArray(value)) return value.join(', ') || '—'
   if (value === null || value === undefined || value === '') return '—'
   if (field.key === 'deadline') return formatDate(String(value))
+  if (field.key === 'approximatePrice' && detail.order.is_price_agreed) {
+    const terms = detail.order.price_terms ? ` · ${String(detail.order.price_terms)}` : ''
+    return `${String(value)} ₽ — согласована${terms}`
+  }
   return String(value)
 }
 
@@ -195,6 +199,9 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // Заказ создан, но шаг после создания не прошёл (например, предоплата) — предупреждение с формы приёмки
+  const routerLocation = useLocation()
+  const [flash, setFlash] = useState(() => (routerLocation.state as { flash?: string } | null)?.flash ?? '')
   const [tasks, setTasks] = useState<TaskRow[]>([])
   const [taskEmployees, setTaskEmployees] = useState<TaskEmployee[]>([])
   const [taskCreating, setTaskCreating] = useState(false)
@@ -540,7 +547,9 @@ export default function OrderDetailPage() {
       <p>Неисправность: ${escapeHtml(problems || '—')}</p>
       <p>Комплектация: ${escapeHtml(completeSet || '—')}</p>
       <p>Внешний вид: ${escapeHtml(appearance || '—')}</p>
-      <p>Ориентировочная цена: ${escapeHtml(str(orderFields.approximate_price) || '—')}</p>
+      ${orderFields.is_price_agreed
+        ? `<p><b>Согласованная цена: ${escapeHtml(str(orderFields.approximate_price))} ₽</b></p>${orderFields.price_terms ? `<p>Что входит: ${escapeHtml(str(orderFields.price_terms))}</p>` : ''}`
+        : `<p>Ориентировочная цена: ${escapeHtml(str(orderFields.approximate_price) || '—')}</p>`}
       <p>Предоплата: ${escapeHtml(prepayment)}</p>
       <p>Мастер: ${escapeHtml(detail.master?.short_name ?? '—')}</p>
       ${orderFields.note ? `<p>Примечание: ${escapeHtml(String(orderFields.note))}</p>` : ''}
@@ -715,6 +724,12 @@ export default function OrderDetailPage() {
             </div>
           </div>
         </Modal>
+      )}
+      {flash && (
+        <p role="alert" className="mb-4 flex items-start justify-between gap-3 rounded-md border border-danger p-3 text-danger">
+          {flash}
+          <button type="button" aria-label="Скрыть" className="text-muted hover:text-ink" onClick={() => setFlash('')}>×</button>
+        </p>
       )}
       {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">

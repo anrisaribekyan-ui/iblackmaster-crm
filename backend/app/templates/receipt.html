@@ -52,7 +52,12 @@
   <p>Неисправность: {{ order.problems | join(', ') or '—' }}</p>
   <p>Комплектация: {{ order.complete_set | join(', ') or '—' }}</p>
   <p>Внешний вид: {{ order.appearance | join(', ') or '—' }}</p>
+  {% if order.is_price_agreed %}
+  <p><b>Согласованная цена: {{ order.approximate_price }} ₽</b></p>
+  {% if order.price_terms %}<p>Что входит: {{ order.price_terms }}</p>{% endif %}
+  {% else %}
   <p>Ориентировочная цена: {{ order.approximate_price or '—' }}</p>
+  {% endif %}
   <p>Предоплата: {% if order.has_prepayment %}Да{% if order.paid %}, {{ '%.2f' | format(order.paid) }} ₽{% endif %}{% else %}Нет{% endif %}</p>
   <p>Мастер: {{ master.short_name if master else '—' }}</p>
   {% if order.note %}<p>Примечание: {{ order.note }}</p>{% endif %}

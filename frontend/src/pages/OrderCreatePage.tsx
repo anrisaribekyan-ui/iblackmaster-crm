@@ -3,11 +3,13 @@ import PriceHints from '../components/PriceHints'
 import { DevicePasswordInput } from '../components/PatternLock'
 import { ChecklistInput, SignaturePad, useChecklistItems, type ChecklistValues } from '../components/Checklist'
 import QuickOrderPicker, { type QuickOrder } from '../components/QuickOrderPicker'
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { localInputToIso } from '../format'
 import { useAuth } from '../auth'
+import { DEFAULT_APPEARANCE, DEFAULT_COMPLETE_SET, deadlineIn, defaultDeadline, formatPhoneInput, isPhoneComplete, phoneDigits } from '../intake'
+import { BrandInput, ModelInput, MultiValueInput, PrepaymentInput, PriceInput, type CashRegister } from '../components/SmartInputs'
 
 type Location = { id: number; name: string }
 type OrderType = { id: number; name: string }
@@ -73,6 +75,13 @@ function getRows(fields: FormField[]) {
 }
 
 function initialValue(field: FormField, employeeId: number | undefined) {
+  // Срок: 4 дня от приёма до конца дня, если в настройках поля не задана конкретная дата
+  if (field.key === 'deadline' && typeof field.default_value !== 'string') return defaultDeadline()
+  const isEmptyDefault = field.default_value === null || field.default_value === undefined
+    || (Array.isArray(field.default_value) && field.default_value.length === 0)
+  // В 9 из 10 случаев так и есть — убрать проще, чем набирать
+  if (isEmptyDefault && field.key === 'appearance') return [...DEFAULT_APPEARANCE]
+  if (isEmptyDefault && field.key === 'completeSet') return [...DEFAULT_COMPLETE_SET]
   if (field.default_value !== null && field.default_value !== undefined) {
     if (
       typeof field.default_value === 'object'
@@ -124,6 +133,14 @@ export default function OrderCreatePage() {
   const [checkIn, setCheckIn] = useState<ChecklistValues>({})
   const [signature, setSignature] = useState<string | null>(null)
   const [counteragentFound, setCounteragentFound] = useState('')
+  const [priceAgreed, setPriceAgreed] = useState(false)
+  const [priceTerms, setPriceTerms] = useState('')
+  const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([])
+  const [prepaymentAmount, setPrepaymentAmount] = useState('')
+  const [prepaymentMethod, setPrepaymentMethod] = useState<'cash' | 'bank'>('cash')
+  const [prepaymentRegisterId, setPrepaymentRegisterId] = useState('')
+  const formRef = useRef<HTMLFormElement>(null)
+  const focusedOnce = useRef(false)
   const [lookupError, setLookupError] = useState('')
   const [loading, setLoading] = useState(true)
   const [fieldsLoading, setFieldsLoading] = useState(false)
@@ -145,6 +162,7 @@ export default function OrderCreatePage() {
           api.get<Employee[]>('/employees/short?master=1'),
           api.get<Employee[]>('/employees/short?manager=1'),
         ])
+        const registerData = await api.get<CashRegister[]>('/cash-registers').catch(() => [] as CashRegister[])
         if (!active) return
         setLocations(locationData)
         setOrderTypes(typeData)
@@ -153,6 +171,7 @@ export default function OrderCreatePage() {
         setHowKnows(howKnowData)
         setMasters(masterData)
         setManagers(managerData)
+        setCashRegisters(registerData)
         if (locationData.length) setLocationId(String(locationData[0].id))
         if (typeData.length) setOrderTypeId(String(typeData[0].id))
       } catch (e) {
@@ -207,8 +226,7 @@ export default function OrderCreatePage() {
 
   const phoneValue = String(values.phones ?? '')
   useEffect(() => {
-    const digits = phoneValue.replace(/\D/g, '')
-    if (digits.length < 10) {
+    if (!isPhoneComplete(phoneValue)) {
       setCounteragentFound('')
       setLookupError('')
       return
@@ -273,6 +291,23 @@ export default function OrderCreatePage() {
       setError(`Заполните поле «${missingRequired.label}»`)
       return
     }
+    const priceText = String(values.approximatePrice ?? '').replace(/\s/g, '').replace(',', '.')
+    if (priceAgreed && !(Number(priceText) > 0)) {
+      setError('Укажите согласованную цену числом')
+      return
+    }
+    const prepaymentOn = Boolean(values.prepayment)
+    const prepaymentSum = prepaymentAmount.replace(/\s/g, '').replace(',', '.')
+    if (prepaymentOn && prepaymentSum !== '') {
+      if (!(Number(prepaymentSum) > 0)) {
+        setError('Введите сумму предоплаты числом')
+        return
+      }
+      if (!prepaymentRegisterId) {
+        setError('Нет кассы для этого способа оплаты')
+        return
+      }
+    }
     setSaving(true)
     setError('')
     try {
@@ -281,7 +316,7 @@ export default function OrderCreatePage() {
         ? { id: counteragentId }
         : {
             name: String(values.name ?? '').trim(),
-            phones: String(values.phones ?? '').trim() || null,
+            phones: phoneDigits(String(values.phones ?? '')).length > 1 ? phoneDigits(String(values.phones ?? '')) : null,
             how_know_id: howKnowId,
             is_buyer: true,
           }
@@ -305,6 +340,8 @@ export default function OrderCreatePage() {
         device_password: values.password ? String(values.password) : null,
         note: values.orderNode ? String(values.orderNode) : null,
         approximate_price: values.approximatePrice ? String(values.approximatePrice) : null,
+        is_price_agreed: priceAgreed,
+        price_terms: priceAgreed ? priceTerms.trim() || null : null,
         has_prepayment: Boolean(values.prepayment),
         deadline: localInputToIso(values.deadline as string | null),
         is_urgent: Boolean(values.isUrgent),
@@ -321,6 +358,21 @@ export default function OrderCreatePage() {
         await api.post(`/orders/${created.id}/signature`, { stage: 'in', image: signature }).catch(() => undefined)
       }
       dirty.current = false
+      if (prepaymentOn && prepaymentSum !== '') {
+        try {
+          await api.post(`/orders/${created.id}/payments`, {
+            cash_register_id: Number(prepaymentRegisterId),
+            amount: prepaymentSum,
+            is_bank: prepaymentMethod === 'bank',
+            note: 'Предоплата при приёме',
+          })
+        } catch (e) {
+          // Заказ уже есть — не держим приёмщика на форме, а предупреждаем в карточке
+          const reason = e instanceof ApiError ? e.message : 'ошибка связи'
+          navigate(`/orders/${created.id}`, { state: { flash: `Заказ создан, но предоплату провести не удалось: ${reason}. Внесите её в заказе.` } })
+          return
+        }
+      }
       navigate(`/orders/${created.id}`)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Не удалось создать заказ')
@@ -330,6 +382,45 @@ export default function OrderCreatePage() {
   }
 
   const rows = useMemo(() => getRows(fields), [fields])
+
+  // Нажали «Новый заказ» — сразу печатаем имя, без клика
+  useEffect(() => {
+    if (focusedOnce.current || fieldsLoading || fields.length === 0) return
+    const first = formRef.current?.querySelector<HTMLElement>('[data-field="name"]')
+      ?? formRef.current?.querySelector<HTMLElement>('[data-field]')
+    if (first) {
+      first.focus()
+      focusedOnce.current = true
+    }
+  }, [fields, fieldsLoading])
+
+  // Стрелки вверх/вниз и Enter — переход по полям; Ctrl+Enter — создать заказ
+  const onFormKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
+    if (event.defaultPrevented || event.altKey || event.shiftKey) return
+    const target = event.target as HTMLElement
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      event.preventDefault()
+      formRef.current?.requestSubmit()
+      return
+    }
+    if (event.ctrlKey || event.metaKey) return
+    if (!['ArrowDown', 'ArrowUp', 'Enter'].includes(event.key) || !target.dataset.field) return
+    if (target.getAttribute('aria-expanded') === 'true' || target instanceof HTMLSelectElement) return
+    if (target instanceof HTMLTextAreaElement) {
+      if (event.key === 'Enter') return
+      if (event.key === 'ArrowUp' && target.selectionStart !== 0) return
+      if (event.key === 'ArrowDown' && target.selectionEnd !== target.value.length) return
+    }
+    // В полях даты стрелки меняют число — там переходим только по Enter
+    if (target instanceof HTMLInputElement && ['date', 'datetime-local'].includes(target.type) && event.key !== 'Enter') return
+    const all = [...(formRef.current?.querySelectorAll<HTMLElement>('[data-field]') ?? [])]
+      .filter((el) => !(el as HTMLInputElement).disabled && el.offsetParent !== null)
+    const index = all.indexOf(target)
+    if (index === -1) return
+    const next = all[index + (event.key === 'ArrowUp' ? -1 : 1)]
+    event.preventDefault()
+    next?.focus()
+  }
   const hints = useIntakeHints(counteragentId, String(values.sn ?? ''), String(values.brand ?? ''), String(values.model ?? ''))
   const isWarrantyType = Boolean(hints?.warranty_order_type_id) && Number(orderTypeId) === hints?.warranty_order_type_id
   const applyWarranty = (item: NonNullable<typeof hints>['warranty'][number]) => {
@@ -356,7 +447,7 @@ export default function OrderCreatePage() {
       {orderTypes.length === 0 ? (
         <p className="rounded-lg border border-line bg-surface p-5 text-muted">Нет активных типов заказов. Добавьте тип в настройках перед созданием заказа.</p>
       ) : (
-        <form onSubmit={(event) => void submit(event)} onInput={() => { dirty.current = true }} className="grid gap-4">
+        <form ref={formRef} onSubmit={(event) => void submit(event)} onKeyDown={onFormKeyDown} onInput={() => { dirty.current = true }} className="grid gap-4">
           <div className="grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2">
             <label className="grid gap-1 text-sm text-muted">Локация
               <select className={inputClass} value={locationId} onChange={(event) => setLocationId(event.target.value)} required>
@@ -414,7 +505,32 @@ export default function OrderCreatePage() {
                             <div key={column} className="grid content-start gap-3">
                               {columnFields.map((field) => (
                                 <Fragment key={field.id}>
+                                {field.key === 'approximatePrice' ? (
+                                  <PriceInput
+                                    label={field.label}
+                                    value={String(values.approximatePrice ?? '')}
+                                    agreed={priceAgreed}
+                                    terms={priceTerms}
+                                    required={field.is_required}
+                                    onChange={(value) => updateValue('approximatePrice', value)}
+                                    onAgreedChange={setPriceAgreed}
+                                    onTermsChange={setPriceTerms}
+                                  />
+                                ) : field.key === 'prepayment' ? (
+                                  <PrepaymentInput
+                                    enabled={Boolean(values.prepayment)}
+                                    amount={prepaymentAmount}
+                                    method={prepaymentMethod}
+                                    registerId={prepaymentRegisterId}
+                                    registers={cashRegisters.filter((register) => register.location_id === null || register.location_id === Number(locationId))}
+                                    onEnabledChange={(value) => updateValue('prepayment', value)}
+                                    onAmountChange={setPrepaymentAmount}
+                                    onMethodChange={setPrepaymentMethod}
+                                    onRegisterChange={setPrepaymentRegisterId}
+                                  />
+                                ) : (
                                 <DynamicField
+                                  brand={String(values.brand ?? '')}
                                   field={field}
                                   value={values[field.key]}
                                   choices={
@@ -435,6 +551,7 @@ export default function OrderCreatePage() {
                                     setCounteragentFound('')
                                   }}
                                 />
+                                )}
                                 {field.key === 'model' && (
                                   // «Цена за 3 секунды» — сразу под моделью, пока приёмщик разговаривает с клиентом
                                   <PriceHints
@@ -483,6 +600,7 @@ export default function OrderCreatePage() {
 }
 
 function DynamicField({
+  brand,
   field,
   value,
   choices,
@@ -493,6 +611,7 @@ function DynamicField({
   counteragentFound,
   onNewCounteragent,
 }: {
+  brand: string
   field: FormField
   value: unknown
   choices: Choice[] | Employee[]
@@ -512,28 +631,25 @@ function DynamicField({
       <MultiValueInput
         value={selected}
         suggestions={suggestions}
-        placeholder={field.is_only_dictionary ? 'Выберите из списка' : 'Добавить и Enter'}
+        placeholder={field.is_only_dictionary ? 'Выберите из списка' : 'Начните вводить'}
+        onlyDictionary={field.is_only_dictionary}
+        dataField={field.key}
         onChange={onChange}
       />
     )
-  } else if (field.key === 'brand' || field.key === 'model') {
+  } else if (field.key === 'brand') {
+    const known = [...new Set(deviceSuggestions.map((device) => device.brand))]
+    control = <BrandInput value={String(value ?? '')} known={known} required={field.is_required} onChange={(v) => onChange(v)} />
+  } else if (field.key === 'model') {
     control = (
-      <div className="relative">
-        <input
-          className={inputClass}
-          value={String(value ?? '')}
-          required={field.is_required}
-          onChange={(event) => onChange(event.target.value)}
-          autoComplete="off"
-        />
-        {deviceSuggestions.length > 0 && (
-          <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-line bg-surface shadow-lg">
-            {deviceSuggestions.map((device) => (
-              <li key={device.id}><button type="button" className="w-full px-3 py-2 text-left hover:bg-canvas" onClick={() => onChooseDevice(device)}>{device.name}</button></li>
-            ))}
-          </ul>
-        )}
-      </div>
+      <ModelInput
+        value={String(value ?? '')}
+        brand={brand}
+        devices={deviceSuggestions}
+        required={field.is_required}
+        onChange={(v) => onChange(v)}
+        onChooseDevice={onChooseDevice}
+      />
     )
   } else if (field.key === 'howKnow' || field.key === 'master' || field.key === 'manager' || field.data_type === 'enum') {
     const options = field.key === 'master' || field.key === 'manager'
@@ -542,7 +658,7 @@ function DynamicField({
         ? (choices as Choice[]).map((choice) => ({ value: String(choice.id), label: choice.name }))
         : (field.items ?? []).map((item) => ({ value: item, label: item }))
     control = (
-      <select className={inputClass} value={String(value ?? '')} required={field.is_required} onChange={(event) => onChange(event.target.value)}>
+      <select data-field={field.key} className={inputClass} value={String(value ?? '')} required={field.is_required} onChange={(event) => onChange(event.target.value)}>
         {!field.is_required && <option value="">— Не выбрано —</option>}
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
@@ -550,9 +666,9 @@ function DynamicField({
   } else if (field.key === 'password') {
     control = <DevicePasswordInput className={inputClass} value={String(value ?? '')} onChange={(v) => onChange(v)} />
   } else if (field.data_type === 'boolean') {
-    control = <input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} />
+    control = <input data-field={field.key} type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} />
   } else if (field.data_type === 'text') {
-    control = <textarea className={inputClass} value={String(value ?? '')} required={field.is_required} rows={3} onChange={(event) => onChange(event.target.value)} />
+    control = <textarea data-field={field.key} className={inputClass} value={String(value ?? '')} required={field.is_required} rows={3} onChange={(event) => onChange(event.target.value)} />
   } else {
     const inputType = field.key === 'phones'
       ? 'tel'
@@ -563,22 +679,50 @@ function DynamicField({
           : field.data_type === 'number' || field.data_type === 'money'
             ? 'number'
             : 'text'
-    control = (
+    const isPhone = field.key === 'phones'
+    const input = (
       <input
+        data-field={field.key}
         className={inputClass}
         type={inputType}
+        inputMode={isPhone ? 'tel' : undefined}
+        placeholder={isPhone ? '8 (999) 123-45-67' : undefined}
         step={field.data_type === 'money' || field.data_type === 'number' ? 'any' : undefined}
         value={String(value ?? '')}
         required={field.is_required}
-        onChange={(event) => onChange(event.target.value)}
-        autoComplete={field.key === 'phones' ? 'tel' : 'off'}
+        onChange={(event) => onChange(isPhone ? formatPhoneInput(event.target.value, String(value ?? '')) : event.target.value)}
+        onFocus={isPhone ? (event) => {
+          // Восьмёрка уже стоит — остаётся набрать сам номер
+          if (!event.currentTarget.value) onChange('8 (')
+        } : undefined}
+        onBlur={isPhone ? () => { if (String(value ?? '') === '8 (') onChange('') } : undefined}
+        autoComplete={isPhone ? 'tel' : 'off'}
       />
     )
+    control = field.key === 'deadline' && field.data_type === 'dateTime' ? (
+      <div className="grid gap-1">
+        {input}
+        <div className="flex flex-wrap gap-1">
+          {[1, 4, 7].map((days) => (
+            <button
+              key={days}
+              type="button"
+              tabIndex={-1}
+              className={`rounded-full border px-2 py-0.5 text-xs ${String(value ?? '') === deadlineIn(days) ? 'border-accent text-accent' : 'border-line text-muted hover:text-ink'}`}
+              onClick={() => onChange(deadlineIn(days))}
+            >
+              +{days} {days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'}
+            </button>
+          ))}
+        </div>
+      </div>
+    ) : input
   }
 
   // Поля с кнопками внутри (подсказки, «+») нельзя оборачивать в <label>: клик по кнопке
   // перехватывается label и значение не добавляется.
-  const Wrapper = (field.data_type === 'multiple' && field.key !== 'phones') || field.key === 'password' ? 'div' : 'label'
+  const Wrapper = (field.data_type === 'multiple' && field.key !== 'phones')
+    || ['password', 'brand', 'model', 'deadline'].includes(field.key) ? 'div' : 'label'
   return (
     <Wrapper className="grid gap-1 text-sm text-muted">
       {label}
@@ -594,61 +738,3 @@ function DynamicField({
   )
 }
 
-function MultiValueInput({
-  value,
-  suggestions,
-  placeholder,
-  onChange,
-}: {
-  value: string[]
-  suggestions: string[]
-  placeholder: string
-  onChange: (value: string[]) => void
-}) {
-  const [draft, setDraft] = useState('')
-  const matching = suggestions.filter((item) => item.toLocaleLowerCase('ru-RU').includes(draft.toLocaleLowerCase('ru-RU')) && !value.includes(item)).slice(0, 8)
-  const add = (raw: string) => {
-    const item = raw.trim()
-    if (item && !value.includes(item)) onChange([...value, item])
-    setDraft('')
-  }
-  return (
-    <div>
-      {value.length > 0 && (
-        <ul className="mb-1 flex flex-wrap gap-1">
-          {value.map((item) => (
-            <li key={item} className="flex items-center gap-1 rounded-full bg-canvas px-2 py-1 text-xs text-ink">
-              {item}<button type="button" aria-label={`Убрать ${item}`} className="text-danger" onClick={() => onChange(value.filter((valueItem) => valueItem !== item))}>×</button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="relative flex gap-1">
-        <input
-          className={inputClass}
-          value={draft}
-          placeholder={placeholder}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ',') {
-              event.preventDefault()
-              add(draft)
-            }
-          }}
-          autoComplete="off"
-        />
-        <button type="button" className="rounded-md border border-line px-2" onClick={() => add(draft)}>+</button>
-        {draft && matching.length > 0 && (
-          <ul className="absolute left-0 top-full z-10 mt-1 max-h-40 w-full overflow-auto rounded-md border border-line bg-surface shadow-lg">
-            {matching.map((item) => <li key={item}><button type="button" className="w-full px-3 py-2 text-left hover:bg-canvas" onClick={() => add(item)}>{item}</button></li>)}
-          </ul>
-        )}
-      </div>
-      {suggestions.length > 0 && !draft && (
-        <div className="mt-1 flex flex-wrap gap-1">
-          {suggestions.slice(0, 5).filter((item) => !value.includes(item)).map((item) => <button key={item} type="button" className="rounded-full border border-line px-2 py-0.5 text-xs text-muted hover:text-ink" onClick={() => add(item)}>{item}</button>)}
-        </div>
-      )}
-    </div>
-  )
-}
