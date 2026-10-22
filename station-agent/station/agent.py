@@ -1,0 +1,311 @@
+"""Режим помощника: связь с CRM и выполнение задач.
+
+Два потока:
+- пульс (раз в 10 с): какие айфоны подключены, вошли ли в Apple ID → POST /agent/heartbeat;
+- задачи (раз в 3 с): POST /agent/next → выполнить → отчёты POST /agent/jobs/{id}.
+
+Пароль Apple ID живёт только в памяти, пока Apple не принял код (не дольше 15 минут).
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import threading
+import time
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
+from typing import Any, Optional
+
+from . import config, device
+from .ipatool import AppUnavailable, AuthRequired, Ipatool, IpatoolError
+
+log = logging.getLogger("station.agent")
+
+HEARTBEAT_SEC = 10
+POLL_SEC = 3
+APPLE_RECHECK_SEC = 300
+PENDING_LOGIN_TTL = 15 * 60
+
+
+class CrmError(Exception):
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+
+
+class Crm:
+    def __init__(self, url: str, token: str):
+        self.base = f"{url}/api/app-install/agent"
+        self.token = token
+
+    def post(self, path: str, body: Optional[dict] = None, timeout: int = 20) -> Any:
+        data = json.dumps(body or {}).encode()
+        req = urllib.request.Request(
+            self.base + path,
+            data=data,
+            method="POST",
+            headers={"Content-Type": "application/json", "X-Station-Token": self.token,
+                     "User-Agent": f"iBlackMasterStation/{config.VERSION}"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read()
+        except urllib.error.HTTPError as exc:
+            try:
+                message = json.loads(exc.read() or b"{}").get("message") or str(exc)
+            except ValueError:
+                message = str(exc)
+            raise CrmError(exc.code, message) from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            raise CrmError(0, f"CRM недоступна: {exc}") from exc
+        return json.loads(raw) if raw else None
+
+
+@dataclass
+class PendingLogin:
+    email: str
+    password: str
+    since: float
+
+
+class Agent:
+    def __init__(self, settings: config.Settings):
+        if not settings.crm_url or not settings.station_token:
+            raise SystemExit("Станция не подключена к CRM. Выполните: station connect <код из CRM>")
+        self.settings = settings
+        self.crm = Crm(settings.crm_url, settings.station_token)
+        self.ipatool = Ipatool(settings)
+        self.stop = threading.Event()
+        self.pending_logins: dict[int, PendingLogin] = {}
+        self.apple_auth = "unknown"
+        self.apple_id: Optional[str] = settings.apple_id_email or None
+        self._apple_checked_at = 0.0
+        self._lock = threading.Lock()
+
+    # ------------------------------------------------------------- пульс
+
+    def _check_apple(self, force: bool = False) -> None:
+        if not force and time.monotonic() - self._apple_checked_at < APPLE_RECHECK_SEC:
+            return
+        self._apple_checked_at = time.monotonic()
+        try:
+            info = self.ipatool.info()
+            self.apple_auth, self.apple_id = "ok", info.get("email") or self.apple_id
+        except AuthRequired:
+            self.apple_auth = "needed"
+        except IpatoolError as exc:
+            log.warning("ipatool auth info: %s", exc)
+            self.apple_auth = "needed" if "not" in str(exc).lower() else "unknown"
+
+    def heartbeat(self) -> None:
+        try:
+            devices = device.list_devices()
+        except device.DeviceError as exc:
+            log.warning("USB: %s", exc)
+            devices = []
+        self._check_apple()
+        self.crm.post("/heartbeat", {
+            "os": config.os_name(),
+            "agent_version": config.VERSION,
+            "devices": devices,
+            "apple_id": self.apple_id,
+            "apple_auth": self.apple_auth,
+        })
+
+    def _heartbeat_loop(self) -> None:
+        failures = 0
+        while not self.stop.is_set():
+            try:
+                self.heartbeat()
+                if failures:
+                    log.info("Связь с CRM восстановлена")
+                failures = 0
+            except CrmError as exc:
+                failures += 1
+                if exc.status == 401:
+                    log.error("CRM не принимает токен станции: %s. Вставьте новый код подключения.", exc)
+                elif failures in (1, 10) or failures % 60 == 0:
+                    log.warning("Пульс не дошёл (%s раз): %s", failures, exc)
+            except Exception:  # noqa: BLE001
+                log.exception("Сбой пульса")
+            self.stop.wait(HEARTBEAT_SEC)
+
+    # ------------------------------------------------------------- задачи
+
+    def report(self, job_id: int, **data: Any) -> bool:
+        """Отправить отчёт. True — задачу отменили в CRM."""
+        clean = {k: v for k, v in data.items() if v is not None}
+        for attempt in range(3):
+            try:
+                result = self.crm.post(f"/jobs/{job_id}", clean) or {}
+                return bool(result.get("cancelled"))
+            except CrmError as exc:
+                if exc.status in (400, 401, 404, 422) or attempt == 2:
+                    log.warning("Отчёт по задаче %s не принят: %s", job_id, exc)
+                    return False
+                time.sleep(2 * (attempt + 1))
+        return False
+
+    def run_job(self, job: dict) -> None:
+        kind, job_id = job["kind"], job["id"]
+        log.info("Задача %s: %s", job_id, kind)
+        try:
+            if kind == "scan":
+                self._scan(job)
+            elif kind == "purchases":
+                self._purchases(job)
+            elif kind == "login":
+                self._login(job)
+            elif kind == "install":
+                self._install(job)
+            else:
+                self.report(job_id, state="failed", message=f"Неизвестная задача: {kind}")
+        except AuthRequired as exc:
+            self.apple_auth = "needed"
+            log.warning("Задача %s: нужен вход в Apple ID (%s)", job_id, exc)
+            self.report(job_id, state="failed", error_code="AUTH_REQUIRED",
+                        message="Нужен вход в Apple ID: нажмите «Войти» у станции и повторите")
+        except AppUnavailable as exc:
+            self.report(job_id, state="failed", error_code=exc.code, message=str(exc))
+        except (IpatoolError, device.DeviceError) as exc:
+            self.report(job_id, state="failed", error_code=exc.code, message=str(exc))
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Задача %s упала", job_id)
+            self.report(job_id, state="failed", error_code="AGENT_ERROR", message=f"Сбой помощника: {exc}")
+        finally:
+            self._send_heartbeat_soon()
+
+    def _send_heartbeat_soon(self) -> None:
+        try:
+            self.heartbeat()
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _scan(self, job: dict) -> None:
+        self.report(job["id"], message="Читаю приложения с телефона…")
+        apps = device.scan_apps(job["target_udid"])
+        store = [
+            {"adam_id": a["adam_id"], "bundle_id": a["bundle_id"], "name": a["name"],
+             "version": a["version"], "version_id": a["version_id"]}
+            for a in apps if a["from_app_store"]
+        ]
+        other = len(apps) - len(store)
+        tail = f", ещё {other} не из App Store" if other else ""
+        self.report(job["id"], state="done", apps=store, message=f"Найдено приложений из App Store: {len(store)}{tail}")
+
+    def _purchases(self, job: dict) -> None:
+        self.report(job["id"], message="Загружаю покупки Apple ID…")
+        collected: list[dict] = []
+        page, total = 1, None
+        while page <= 50:
+            data = self.ipatool.purchases(page=page, limit=100)
+            items = data.get("apps") or []
+            total = data.get("totalCount", total)
+            for a in items:
+                if a.get("id"):
+                    collected.append({"adam_id": int(a["id"]), "bundle_id": a.get("bundleID") or "",
+                                      "name": a.get("name") or a.get("bundleID") or str(a["id"]),
+                                      "version": a.get("version") or None})
+            if not items or (total is not None and len(collected) >= int(total)):
+                break
+            page += 1
+            self.report(job["id"], message=f"Загружено {len(collected)} из {total or '?'}…")
+        self.apple_auth = "ok"
+        self.report(job["id"], state="done", apps=collected, message=f"В покупках: {len(collected)}")
+
+    def _login(self, job: dict) -> None:
+        job_id, secret = job["id"], job.get("secret") or ""
+        with self._lock:
+            pending = self.pending_logins.get(job_id)
+            if pending and time.monotonic() - pending.since > PENDING_LOGIN_TTL:
+                self.pending_logins.pop(job_id, None)
+                pending = None
+
+        if pending is None and len(secret) == 6 and secret.isdigit():
+            self.report(job_id, state="failed", message="Помощник перезапускался и забыл пароль. Начните вход заново.")
+            return
+        if pending is None:
+            email = job.get("email") or ""
+            if not email or not secret:
+                self.report(job_id, state="failed", message="Нет Apple ID или пароля. Начните вход заново.")
+                return
+            try:
+                self.ipatool.login(email, secret)
+            except AuthRequired as exc:
+                if "code" not in str(exc).lower():
+                    self.report(job_id, state="failed", message=f"Apple не принял вход: {exc}")
+                    return
+                with self._lock:
+                    self.pending_logins[job_id] = PendingLogin(email, secret, time.monotonic())
+                self.report(job_id, state="need_code", message="Apple прислал код на ваш iPhone. Введите его здесь.")
+                return
+        else:
+            code = "".join(ch for ch in secret if ch.isdigit())
+            try:
+                self.ipatool.login(pending.email, pending.password, code)
+            except AuthRequired as exc:
+                text = str(exc).lower()
+                if "code" in text or "verification" in text:
+                    self.report(job_id, state="need_code", message="Код не подошёл. Введите новый код от Apple.")
+                    return
+                with self._lock:
+                    self.pending_logins.pop(job_id, None)
+                self.report(job_id, state="failed", message=f"Apple не принял вход: {exc}")
+                return
+            with self._lock:
+                self.pending_logins.pop(job_id, None)
+            email = pending.email
+
+        config.write_config({"apple_id_email": email})
+        self.apple_auth, self.apple_id = "ok", email
+        self._apple_checked_at = time.monotonic()
+        self.report(job_id, state="done", apple_id=email, message=f"Вход выполнен: {email}")
+
+    def _install(self, job: dict) -> None:
+        job_id = job["id"]
+        name = job.get("app_name") or "приложение"
+        cached = self.ipatool.cached_path(job["adam_id"], job.get("version_id"))
+        if not cached.is_file():
+            if self.report(job_id, progress=5, message=f"Скачиваю «{name}» у Apple…"):
+                return
+        path, from_cache = self.ipatool.download(job["adam_id"], job.get("version_id"))
+        size_mb = path.stat().st_size / 1_048_576
+        if self.report(job_id, progress=40,
+                       message=f"{'Взял из архива' if from_cache else 'Скачано'} ({size_mb:.0f} МБ). Ставлю на телефон…"):
+            return
+
+        last = {"sent": 0.0, "value": 40}
+
+        def on_progress(percent: int) -> None:
+            value = 40 + int(percent * 0.6)
+            now = time.monotonic()
+            if value > last["value"] and now - last["sent"] > 1.5:
+                last.update(sent=now, value=value)
+                self.report(job_id, progress=min(value, 99), message=f"Установка… {percent}%")
+
+        device.install_ipa(job["target_udid"], path, progress=on_progress)
+        self.report(job_id, state="done",
+                    message=f"«{name}» установлено. На телефоне в App Store должен быть вход в тот же Apple ID.")
+
+    # ------------------------------------------------------------- главный цикл
+
+    def run(self) -> None:
+        log.info("Помощник %s запущен, CRM: %s", config.VERSION, self.settings.crm_url)
+        threading.Thread(target=self._heartbeat_loop, name="heartbeat", daemon=True).start()
+        failures = 0
+        while not self.stop.is_set():
+            try:
+                job = self.crm.post("/next")
+                failures = 0
+                if job:
+                    self.run_job(job)
+                    continue  # сразу проверяем следующую
+            except CrmError as exc:
+                failures += 1
+                if failures in (1, 10) or failures % 100 == 0:
+                    log.warning("Не получил задачи (%s раз): %s", failures, exc)
+            except Exception:  # noqa: BLE001
+                log.exception("Сбой цикла задач")
+            self.stop.wait(POLL_SEC if failures < 5 else 15)

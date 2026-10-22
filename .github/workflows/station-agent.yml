@@ -1,0 +1,100 @@
+name: Помощник станции (установщики)
+
+# Собирает установщик для Windows (.exe) и архив для Mac.
+# Скачать: вкладка Actions → последний запуск → Artifacts, или Releases при теге station-v*.
+on:
+  push:
+    paths:
+      - "station-agent/**"
+      - ".github/workflows/station-agent.yml"
+    tags:
+      - "station-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: station-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Зависимости
+        run: python -m pip install -r requirements.txt pyinstaller
+      - name: ipatool
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist tmp
+          gh release download --repo majd/ipatool --pattern "*windows-amd64.tar.gz" --dir tmp
+          tar -xzf tmp/*.tar.gz -C tmp
+          cp "$(find tmp -name 'ipatool*windows-amd64.exe' | head -1)" dist/ipatool.exe
+          ./dist/ipatool.exe --help > /dev/null
+      - name: Сборка программы
+        run: python -m PyInstaller --onefile --noconsole --name iBlackMasterStation --distpath dist --noconfirm station_entry.py
+      - name: Проверка программы
+        run: |
+          ./dist/iBlackMasterStation.exe connect "not-a-code" && exit 1 || test $? -eq 1
+          test -s "$APPDATA/iBlackMaster Station/logs/console.log"
+      - name: Установщик
+        run: |
+          VERSION=$(python -c "import sys; sys.path.insert(0,'.'); from station.config import VERSION; print(VERSION)")
+          "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" //DAppVersion=$VERSION installer/station.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iBlackMasterStation-Windows
+          path: station-agent/dist/iBlackMasterStation-Setup.exe
+
+  macos:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: station-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Зависимости
+        run: python -m pip install -r requirements.txt pyinstaller
+      - name: ipatool
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist tmp
+          gh release download --repo majd/ipatool --pattern "*macos-arm64*" --dir tmp
+          for f in tmp/*.tar.gz; do [ -e "$f" ] && tar -xzf "$f" -C tmp; done
+          BIN=$(find tmp -type f -name 'ipatool*macos-arm64' ! -name '*.tar.gz' | head -1)
+          cp "$BIN" dist/ipatool && chmod +x dist/ipatool
+          ./dist/ipatool --help > /dev/null
+      - name: Сборка программы
+        run: python -m PyInstaller --onefile --name iBlackMasterStation --distpath dist --noconfirm station_entry.py
+      - name: Архив
+        run: |
+          ./dist/iBlackMasterStation --help > /dev/null
+          mkdir -p pkg && cp dist/iBlackMasterStation dist/ipatool installer/install-mac.command pkg/
+          chmod +x pkg/*
+          (cd pkg && zip -r ../dist/iBlackMasterStation-Mac.zip .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iBlackMasterStation-Mac
+          path: station-agent/dist/iBlackMasterStation-Mac.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/station-v')
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" out/*/* --repo "${GITHUB_REPOSITORY}" --title "Помощник станции ${GITHUB_REF_NAME}" --notes "Установщик для Windows и архив для Mac."

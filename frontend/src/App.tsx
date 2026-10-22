@@ -26,6 +26,7 @@ const TasksPage = lazy(() => import('./pages/TasksPage'))
 const BoardsPage = lazy(() => import('./pages/BoardsPage'))
 const BoardPage = lazy(() => import('./pages/BoardPage'))
 const PurchasesPage = lazy(() => import('./pages/PurchasesPage'))
+const AppInstallPage = lazy(() => import('./pages/AppInstallPage'))
 import DashboardPage from './pages/DashboardPage'
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'))
 const FinanceLayout = lazy(() => import('./pages/finance/FinanceLayout'))
@@ -102,6 +103,7 @@ export default function App() {
             <Route path="boards" element={<BoardsPage />} />
             <Route path="boards/:spaceId" element={<BoardPage />} />
             <Route path="zakupki" element={<PurchasesPage />} />
+            <Route path="apps" element={<AppInstallPage />} />
             <Route path="finance" element={<FinanceLayout />}>
               <Route index element={<Navigate to="cashes" replace />} />
               <Route path="cashes" element={<FinanceCashesPage />} />

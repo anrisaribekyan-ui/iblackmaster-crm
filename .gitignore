@@ -23,3 +23,9 @@ Thumbs.db
 *.log
 backups/
 deploy/.env
+
+# помощник станции
+station-agent/dist/
+station-agent/build/
+station-agent/tmp/
+station-agent/*.spec

@@ -1,0 +1,4 @@
+pymobiledevice3>=11.40
+typer>=0.12
+rich>=13
+python-dotenv>=1.0
