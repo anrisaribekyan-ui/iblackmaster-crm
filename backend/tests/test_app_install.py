@@ -226,3 +226,38 @@ def test_permissions(client, auth_headers, db):
                     headers=master)
     assert r.status_code == 200
     assert r.json()["created_by_name"] == "Мастер"
+
+
+def test_agent_files_upload_and_public_download(client, auth_headers, db, tmp_path, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "uploads_dir", str(tmp_path))
+    files = client.get("/api/app-install/agent-files").json()  # без входа
+    assert [(f["platform"], f["available"]) for f in files] == [("windows", False), ("macos", False)]
+    assert client.get("/api/app-install/agent-files/windows").status_code == 404
+
+    exe = b"MZ" + b"\0" * 5000
+    r = client.post("/api/app-install/agent-files/windows", headers=auth_headers, data={"version": "1.0.0"},
+                    files={"file": ("iBlackMasterStation-Setup.exe", exe, "application/octet-stream")})
+    assert r.status_code == 200, r.text
+    win = r.json()[0]
+    assert win["available"] and win["size"] == len(exe) and win["version"] == "1.0.0"
+
+    d = client.get("/api/app-install/agent-files/windows")
+    assert d.status_code == 200 and d.content == exe
+    assert "iBlackMasterStation-Setup.exe" in d.headers["content-disposition"]
+
+    # Не тот файл
+    bad = client.post("/api/app-install/agent-files/windows", headers=auth_headers,
+                      files={"file": ("photo.jpg", b"\xff\xd8", "image/jpeg")})
+    assert bad.status_code == 400
+    fake = client.post("/api/app-install/agent-files/macos", headers=auth_headers,
+                       files={"file": ("iBlackMasterStation-Mac.zip", b"not a zip", "application/zip")})
+    assert fake.status_code == 400
+    assert not list(tmp_path.glob("station-agent/*.part"))
+
+    # Без права на станции загружать нельзя
+    make_employee(db, name="Мастер2", email="m2@x.test", permissions=["appInstallAccess"])
+    r = client.post("/api/app-install/agent-files/windows", headers=login(client, "m2@x.test"),
+                    files={"file": ("iBlackMasterStation-Setup.exe", exe, "application/octet-stream")})
+    assert r.status_code == 403

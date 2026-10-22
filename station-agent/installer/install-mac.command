@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")"
 DEST="$HOME/Applications/iBlackMaster Station"
 
-CODE=$(osascript -e 'text returned of (display dialog "Вставьте код подключения из CRM (Приложения → Добавить станцию):" default answer "" with title "iBlackMaster Station")') || exit 0
+CODE=$(osascript -e 'text returned of (display dialog "Вставьте код подключения из CRM (Приложения → Подключить компьютер):" default answer "" with title "iBlackMaster Station")') || exit 0
 
 mkdir -p "$DEST"
 pkill -f "iBlackMaster Station/iBlackMasterStation" 2>/dev/null || true
