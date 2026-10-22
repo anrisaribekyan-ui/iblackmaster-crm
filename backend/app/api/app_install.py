@@ -11,16 +11,20 @@
 """
 
 import hashlib
+import json
 import re
 import secrets
+from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, File, Form, Header, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, require
+from app.config import settings
 from app.db import utcnow
 from app.errors import BusinessError, NotFound
 from app.models import AppInstallJob, Employee, InstallStation, IosApp, JobKind, JobState, Location
@@ -508,3 +512,109 @@ def agent_report(job_id: int, data: ReportIn, db: DbSession, station: AgentStati
         station.apple_auth = "needed"
     db.commit()
     return {"ok": True, "cancelled": False}
+
+
+# ---------------------------------------------------------------- установщики помощника
+# Хранятся в uploads/station-agent: один файл на систему + meta.json (версия, размер, дата).
+# Скачивание без входа: в установщике нет секретов, подключение даёт только код из CRM.
+
+AGENT_FILES = {
+    "windows": {"name": "iBlackMasterStation-Setup.exe", "title": "Windows", "ext": (".exe",)},
+    "macos": {"name": "iBlackMasterStation-Mac.zip", "title": "Mac", "ext": (".zip",)},
+}
+AGENT_MAX_SIZE = 400 * 1024 * 1024
+VERSION_RE = re.compile(r"^[0-9][0-9A-Za-z.\-]{0,19}$")
+
+
+def _agent_dir() -> Path:
+    root = Path(settings.uploads_dir) / "station-agent"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _agent_meta() -> dict:
+    try:
+        return json.loads((_agent_dir() / "meta.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+class AgentFileOut(BaseModel):
+    platform: str
+    title: str
+    available: bool
+    filename: str
+    size: int | None = None
+    version: str | None = None
+    uploaded_at: datetime | None = None
+
+
+def _agent_files() -> list[AgentFileOut]:
+    meta = _agent_meta()
+    out = []
+    for platform, info in AGENT_FILES.items():
+        path = _agent_dir() / info["name"]
+        m = meta.get(platform) or {}
+        out.append(AgentFileOut(
+            platform=platform,
+            title=info["title"],
+            available=path.is_file(),
+            filename=info["name"],
+            size=path.stat().st_size if path.is_file() else None,
+            version=m.get("version"),
+            uploaded_at=m.get("uploaded_at"),
+        ))
+    return out
+
+
+@router.get("/agent-files", response_model=list[AgentFileOut])
+def list_agent_files():
+    return _agent_files()
+
+
+@router.get("/agent-files/{platform}")
+def download_agent_file(platform: str):
+    info = AGENT_FILES.get(platform)
+    path = _agent_dir() / info["name"] if info else None
+    if path is None or not path.is_file():
+        raise NotFound("Установщик")
+    return FileResponse(path, media_type="application/octet-stream", filename=info["name"],
+                        headers={"Cache-Control": "no-cache"})
+
+
+@router.post("/agent-files/{platform}", response_model=list[AgentFileOut], dependencies=station_access)
+async def upload_agent_file(platform: str, file: UploadFile = File(...), version: str = Form("")):
+    info = AGENT_FILES.get(platform)
+    if info is None:
+        raise NotFound("Система")
+    name = (file.filename or "").lower()
+    if not name.endswith(info["ext"]):
+        raise BusinessError(f"Для {info['title']} нужен файл {info['name']}")
+    version = version.strip()
+    if version and not VERSION_RE.match(version):
+        raise BusinessError("Версия — например 1.0.0")
+
+    target = _agent_dir() / info["name"]
+    tmp = target.with_suffix(target.suffix + ".part")
+    size = 0
+    head = b""
+    try:
+        with tmp.open("wb") as out:
+            while chunk := await file.read(1024 * 1024):
+                if not head:
+                    head = chunk[:4]
+                size += len(chunk)
+                if size > AGENT_MAX_SIZE:
+                    raise BusinessError("Файл больше 400 МБ — это точно установщик?")
+                out.write(chunk)
+        expected = b"MZ" if platform == "windows" else b"PK"
+        if not head.startswith(expected):
+            raise BusinessError(f"Это не {info['name']}: файл повреждён или другого типа")
+        tmp.replace(target)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+    meta = _agent_meta()
+    meta[platform] = {"version": version or None, "uploaded_at": utcnow().isoformat()}
+    (_agent_dir() / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    return _agent_files()

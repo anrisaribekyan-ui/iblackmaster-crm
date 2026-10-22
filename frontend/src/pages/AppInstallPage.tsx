@@ -4,6 +4,7 @@ import { useAuth } from '../auth'
 import Modal from '../components/Modal'
 import OtpInput from '../components/OtpInput'
 import Skeleton from '../components/Skeleton'
+import { AgentFilesPanel, StationWizard } from '../components/StationSetup'
 import { formatDateTime, inputClass } from './shared'
 
 /**
@@ -80,84 +81,8 @@ function jobTitle(job: Job) {
   }
 }
 
-/** Код подключения для установщика: адрес CRM и токен станции в одной строке. */
-function connectionCode(token: string) {
-  // Адрес и токен — только латиница, поэтому btoa без перекодировки
-  return btoa(JSON.stringify({ url: window.location.origin, token }))
-}
-
 function errorText(e: unknown, fallback: string) {
   return e instanceof ApiError ? e.message : fallback
-}
-
-// ------------------------------------------------------------------ станция: добавление
-
-function NewStationModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [name, setName] = useState('')
-  const [code, setCode] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [copied, setCopied] = useState(false)
-
-  const create = async () => {
-    setBusy(true)
-    setError('')
-    try {
-      const r = await api.post<{ token: string }>('/app-install/stations', { name })
-      setCode(connectionCode(r.token))
-      onCreated()
-    } catch (e) {
-      setError(errorText(e, 'Не удалось добавить станцию'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(code)
-      setCopied(true)
-    } catch {
-      setCopied(false)
-    }
-  }
-
-  return (
-    <Modal title="Новая станция" onClose={onClose}>
-      {!code ? (
-        <div className="grid gap-3">
-          <p className="text-sm text-muted">Станция — компьютер в точке, к которому по USB подключают айфоны. Назовите его так, чтобы мастера понимали, где он стоит.</p>
-          <div className="grid gap-1">
-            <label htmlFor="station-name" className="text-sm">Название</label>
-            <input id="station-name" className={inputClass} value={name} autoFocus
-              placeholder="Например, «Панфа — компьютер приёмки»" onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) void create() }} />
-          </div>
-          {error && <p role="alert" className="text-sm text-danger">{error}</p>}
-          <div className="flex justify-end">
-            <button className={primary} disabled={!name.trim() || busy} onClick={() => void create()}>
-              {busy ? 'Добавляю…' : 'Добавить'}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="grid gap-3">
-          <ol className="grid list-decimal gap-2 pl-5 text-sm">
-            <li>На компьютере станции скачайте и запустите <b>установщик помощника</b> (Windows или Mac).</li>
-            <li>Когда установщик попросит <b>код подключения</b>, вставьте этот:</li>
-          </ol>
-          <div className="rounded-lg border border-line bg-canvas p-3">
-            <code className="block break-all text-xs">{code}</code>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button className={primary} onClick={() => void copy()}>{copied ? 'Скопировано' : 'Скопировать код'}</button>
-            <span className="text-xs text-muted">Код показывается один раз. Потеряли — нажмите у станции «Новый код».</span>
-          </div>
-          <p className="text-sm text-muted">Через несколько секунд после запуска помощника станция загорится зелёным.</p>
-        </div>
-      )}
-    </Modal>
-  )
 }
 
 // ------------------------------------------------------------------ вход в Apple ID
@@ -281,7 +206,7 @@ export default function AppInstallPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [modal, setModal] = useState<'station' | 'login' | null>(null)
-  const [newCode, setNewCode] = useState('')
+  const [reissue, setReissue] = useState<{ stationId: number; name: string; token: string } | null>(null)
 
   const station = stations?.find((s) => s.id === stationId) ?? null
   const paired = useMemo(() => station?.devices.filter((d) => d.paired) ?? [], [station])
@@ -349,7 +274,7 @@ export default function AppInstallPage() {
     if (!station || !confirm(`Выдать станции «${station.name}» новый код? Старый перестанет работать.`)) return
     try {
       const r = await api.post<{ token: string }>(`/app-install/stations/${station.id}/token`)
-      setNewCode(connectionCode(r.token))
+      setReissue({ stationId: station.id, name: station.name, token: r.token })
     } catch (e) {
       setError(errorText(e, 'Не удалось выдать код'))
     }
@@ -381,16 +306,27 @@ export default function AppInstallPage() {
     <div className="mx-auto grid max-w-5xl gap-5 p-4">
       <header className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold">Установка приложений</h1>
-        {manage && <button className={`${button} ml-auto`} onClick={() => setModal('station')}>Добавить станцию</button>}
+        {manage && <button className={`${button} ml-auto`} onClick={() => setModal('station')}>Подключить компьютер</button>}
       </header>
 
       {stations.length === 0 ? (
-        <section className="grid gap-2 rounded-xl border border-dashed border-line p-6 text-center">
-          <p className="font-medium">Станций пока нет</p>
-          <p className="text-sm text-muted">
-            Станция — компьютер в точке с помощником, к которому по USB подключают айфоны.
-            {manage ? ' Нажмите «Добавить станцию» и следуйте подсказкам.' : ' Попросите руководителя добавить станцию.'}
-          </p>
+        <section className="grid gap-4 rounded-xl border border-dashed border-line p-6">
+          <div className="grid gap-1">
+            <p className="font-medium">Подключите компьютер, к которому будете подключать айфоны</p>
+            <p className="text-sm text-muted">
+              Откройте CRM на том компьютере (Windows или Mac) и нажмите кнопку ниже — мастер проведёт по шагам:
+              скачать помощника, вставить код, подключить телефон. Это делается один раз.
+            </p>
+          </div>
+          <ol className="grid list-decimal gap-1 pl-5 text-sm text-muted">
+            <li>Назвать компьютер, например «Панфа — приёмка».</li>
+            <li>Скачать помощника прямо отсюда и запустить.</li>
+            <li>Вставить в него код подключения из CRM.</li>
+            <li>Подключить айфон кабелем и нажать на нём «Доверять».</li>
+          </ol>
+          {manage
+            ? <button className="justify-self-start rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink" onClick={() => setModal('station')}>Подключить компьютер</button>
+            : <p className="text-sm text-warning">Подключать компьютеры может руководитель или сотрудник с правом «Может добавлять станции».</p>}
         </section>
       ) : (
         <>
@@ -427,7 +363,7 @@ export default function AppInstallPage() {
                       {station.apple_auth === 'ok' ? 'Сменить Apple ID' : 'Войти'}
                     </button>
                   )}
-                  {manage && <button className={button} onClick={() => void regenerate()}>Новый код</button>}
+                  {manage && <button className={button} onClick={() => void regenerate()}>Переподключить</button>}
                   {manage && <button className={`${button} hover:border-danger hover:text-danger`} onClick={() => void removeStation()}>Удалить</button>}
                 </div>
               </div>
@@ -514,17 +450,11 @@ export default function AppInstallPage() {
         </>
       )}
 
-      {modal === 'station' && <NewStationModal onClose={() => setModal(null)} onCreated={() => void refresh()} />}
+      {manage && <AgentFilesPanel />}
+
+      {modal === 'station' && <StationWizard onClose={() => setModal(null)} onChanged={() => void refresh()} />}
       {modal === 'login' && station && <LoginModal station={station} onClose={() => setModal(null)} onQueued={() => void loadJobs()} />}
-      {newCode && (
-        <Modal title="Новый код подключения" onClose={() => setNewCode('')}>
-          <div className="grid gap-3">
-            <p className="text-sm">Откройте помощника на компьютере станции и вставьте этот код вместо старого:</p>
-            <div className="rounded-lg border border-line bg-canvas p-3"><code className="block break-all text-xs">{newCode}</code></div>
-            <button className={primary} onClick={() => void navigator.clipboard.writeText(newCode).catch(() => undefined)}>Скопировать код</button>
-          </div>
-        </Modal>
-      )}
+      {reissue && <StationWizard reissue={reissue} onClose={() => setReissue(null)} onChanged={() => void refresh()} />}
     </div>
   )
 }
