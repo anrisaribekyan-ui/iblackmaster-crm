@@ -11,6 +11,7 @@ type Track = {
   total: string
   debt: string
   approximate_price: string | null
+  is_price_agreed?: boolean
   location: { name: string | null; address: string | null; phones: string | null; work_hours: string | null }
 }
 
@@ -96,8 +97,8 @@ export default function TrackPage() {
                 </div>
               ) : data.approximate_price ? (
                 <div className="flex items-baseline justify-between">
-                  <span className="text-muted">Ориентировочно</span>
-                  <span className="text-lg font-semibold">{data.approximate_price}</span>
+                  <span className="text-muted">{data.is_price_agreed ? 'Согласованная цена' : 'Ориентировочно'}</span>
+                  <span className="text-lg font-semibold">{data.is_price_agreed ? rub(data.approximate_price) : data.approximate_price}</span>
                 </div>
               ) : (
                 <p className="text-sm text-muted">Стоимость мастер сообщит после диагностики.</p>

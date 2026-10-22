@@ -789,3 +789,62 @@ def test_order_delete_rules_and_stock(client, auth_headers, db, owner):
     db.commit()
     blocked = client.delete(f"/api/orders/{order.id}", headers=auth_headers)
     assert blocked.status_code == 400 and "возврат" in blocked.json()["message"]
+
+
+def test_agreed_price_is_saved_and_printed(client, auth_headers, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    payload = order_payload(location.id, order_type.id, {"name": "Клиент"})
+    payload.update(approximate_price="4 500", is_price_agreed=True, price_terms="Замена дисплея, оригинал")
+
+    created = client.post("/api/orders", json=payload, headers=auth_headers)
+
+    assert created.status_code == 200, created.text
+    order = db.get(Order, created.json()["id"])
+    assert order.is_price_agreed is True
+    assert order.approximate_price == "4500"
+    assert order.price_terms == "Замена дисплея, оригинал"
+    receipt = client.get(f"/api/orders/{order.id}/print/receipt", headers=auth_headers)
+    assert "Согласованная цена: 4500" in receipt.text
+    assert "Замена дисплея, оригинал" in receipt.text
+
+
+def test_agreed_price_must_be_a_number(client, auth_headers, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    payload = order_payload(location.id, order_type.id, {"name": "Клиент"})
+    payload.update(approximate_price="3000-4500", is_price_agreed=True)
+
+    response = client.post("/api/orders", json=payload, headers=auth_headers)
+
+    assert response.status_code == 400
+    assert response.json()["message"] == "Укажите согласованную цену числом"
+
+
+def test_price_terms_dropped_when_price_is_approximate(client, auth_headers, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    payload = order_payload(location.id, order_type.id, {"name": "Клиент"})
+    payload.update(price_terms="лишнее")
+
+    created = client.post("/api/orders", json=payload, headers=auth_headers)
+
+    assert created.status_code == 200, created.text
+    order = db.get(Order, created.json()["id"])
+    assert order.is_price_agreed is False
+    assert order.price_terms is None
+
+
+def test_order_with_deadline_is_created_and_updated(client, auth_headers, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    payload = order_payload(location.id, order_type.id, {"name": "Клиент"})
+    payload["deadline"] = "2026-10-24T20:59:00.000Z"
+
+    created = client.post("/api/orders", json=payload, headers=auth_headers)
+
+    assert created.status_code == 200, created.text
+    order = db.get(Order, created.json()["id"])
+    assert order.deadline.isoformat().startswith("2026-10-24T20:59")
+    updated = client.put(f"/api/orders/{order.id}", json={"deadline": "2026-10-25T20:59:00Z"}, headers=auth_headers)
+    assert updated.status_code == 200, updated.text

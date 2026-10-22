@@ -206,6 +206,7 @@ def track(code: str, db: DbSession):
         "total": order.total_price,
         "debt": debt,
         "approximate_price": order.approximate_price,
+        "is_price_agreed": order.is_price_agreed,
         "location": {
             "name": location.name if location else None,
             "address": location.address if location else None,

@@ -1,5 +1,5 @@
 from datetime import date, datetime, time, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Literal
 
@@ -67,8 +67,10 @@ class OrderCreate(BaseModel):
     device_password: str | None = None
     note: str | None = None
     approximate_price: str | None = None
+    is_price_agreed: bool = False
+    price_terms: str | None = None
     has_prepayment: bool = False
-    deadline: str | None = None
+    deadline: datetime | None = None
     is_urgent: bool = False
     how_know_id: int | None = None
     verdict: str | None = None
@@ -95,8 +97,10 @@ class OrderUpdate(BaseModel):
     device_password: str | None = None
     note: str | None = None
     approximate_price: str | None = None
+    is_price_agreed: bool | None = None
+    price_terms: str | None = None
     has_prepayment: bool | None = None
-    deadline: str | None = None
+    deadline: datetime | None = None
     is_urgent: bool | None = None
     how_know_id: int | None = None
     verdict: str | None = None
@@ -470,6 +474,17 @@ def create_order(data: OrderCreate, db: DbSession, me: CurrentEmployee):
     order_type = get_order_type(db, data.order_type_id)
     counteragent = resolve_counteragent(db, data.counteragent)
     validate_required_fields(db, order_type.id, data, counteragent)
+    if data.is_price_agreed:
+        # Согласованная цена — конкретная сумма, а не вилка «3000–4500»
+        price = (data.approximate_price or "").replace(" ", "").replace(",", ".")
+        try:
+            if Decimal(price) <= 0:
+                raise InvalidOperation
+        except InvalidOperation:
+            raise BusinessError("Укажите согласованную цену числом")
+        data.approximate_price = price
+    else:
+        data.price_terms = None
     master = get_employee(db, data.master_id, "Мастер")
     manager = get_employee(db, data.manager_id, "Менеджер")
 

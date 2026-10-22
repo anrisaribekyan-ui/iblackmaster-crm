@@ -131,6 +131,8 @@ class Order(Base, TimestampMixin):
     # Доп. информация
     note: Mapped[str | None] = mapped_column(Text)  # комментарий приёмщика
     approximate_price: Mapped[str | None] = mapped_column(String(100))  # текст: «12000-16000»
+    is_price_agreed: Mapped[bool] = mapped_column(default=False)  # цена согласована с клиентом, а не ориентир
+    price_terms: Mapped[str | None] = mapped_column(Text)  # что именно сделаем за согласованную цену
     has_prepayment: Mapped[bool] = mapped_column(default=False)
     deadline: Mapped[datetime | None]
     is_urgent: Mapped[bool] = mapped_column(default=False)
