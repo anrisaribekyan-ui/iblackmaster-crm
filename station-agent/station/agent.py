@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import ssl
 import threading
 import time
 import urllib.error
@@ -27,6 +28,19 @@ HEARTBEAT_SEC = 10
 POLL_SEC = 3
 APPLE_RECHECK_SEC = 300
 PENDING_LOGIN_TTL = 15 * 60
+
+
+def _ssl_context() -> ssl.SSLContext:
+    """Собранная программа (PyInstaller) на Mac не видит системные сертификаты — берём набор certifi."""
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:  # pragma: no cover
+        return ssl.create_default_context()
+
+
+SSL_CONTEXT = _ssl_context()
 
 
 class CrmError(Exception):
@@ -50,7 +64,7 @@ class Crm:
                      "User-Agent": f"iBlackMasterStation/{config.VERSION}"},
         )
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with urllib.request.urlopen(req, timeout=timeout, context=SSL_CONTEXT) as resp:
                 raw = resp.read()
         except urllib.error.HTTPError as exc:
             try:
