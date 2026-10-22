@@ -22,8 +22,8 @@ jobs:
         shell: bash
         working-directory: station-agent
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Зависимости
@@ -41,13 +41,33 @@ jobs:
         run: python -m PyInstaller --onefile --noconsole --name iBlackMasterStation --distpath dist --noconfirm station_entry.py
       - name: Проверка программы
         run: |
-          ./dist/iBlackMasterStation.exe connect "not-a-code" && exit 1 || test $? -eq 1
-          test -s "$APPDATA/iBlackMaster Station/logs/console.log"
+          # Программа собрана без окна консоли: её вывод уходит в журнал. Причину сбоя пишем в пометки сборки.
+          LOGS="$APPDATA/iBlackMaster Station/logs"
+          set +e
+          ./dist/iBlackMasterStation.exe connect "not-a-code"
+          rc=$?
+          set -e
+          echo "exit code: $rc"
+          ls -la "$LOGS" || true
+          LOG=$(cat "$LOGS/console.log" "$LOGS/agent.log" 2>/dev/null | tail -c 1500 | tr '\r\n' '  ')
+          if [ "$rc" != "1" ]; then
+            echo "::error title=Проверка программы::код выхода $rc вместо 1. Журнал: ${LOG:-пусто}"
+            exit 1
+          fi
+          echo "::notice title=Проверка программы::ок. Журнал: ${LOG:-пусто}"
       - name: Установщик
         run: |
+          ISCC="/c/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          if [ ! -f "$ISCC" ]; then
+            choco install innosetup -y --no-progress > /dev/null
+          fi
+          if [ ! -f "$ISCC" ]; then
+            echo "::error title=Установщик::Inno Setup не найден после установки"
+            exit 1
+          fi
           VERSION=$(python -c "import sys; sys.path.insert(0,'.'); from station.config import VERSION; print(VERSION)")
-          "/c/Program Files (x86)/Inno Setup 6/ISCC.exe" //DAppVersion=$VERSION installer/station.iss
-      - uses: actions/upload-artifact@v4
+          "$ISCC" //DAppVersion=$VERSION installer/station.iss > iscc.log 2>&1 || { echo "::error title=Установщик::$(tail -c 1500 iscc.log | tr '\r\n' '  ')"; exit 1; }
+      - uses: actions/upload-artifact@v5
         with:
           name: iBlackMasterStation-Windows
           path: station-agent/dist/iBlackMasterStation-Setup.exe
@@ -58,8 +78,8 @@ jobs:
       run:
         working-directory: station-agent
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: Зависимости
@@ -82,7 +102,7 @@ jobs:
           mkdir -p pkg && cp dist/iBlackMasterStation dist/ipatool installer/install-mac.command pkg/
           chmod +x pkg/*
           (cd pkg && zip -r ../dist/iBlackMasterStation-Mac.zip .)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: iBlackMasterStation-Mac
           path: station-agent/dist/iBlackMasterStation-Mac.zip
@@ -92,7 +112,7 @@ jobs:
     needs: [windows, macos]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: out
       - env:
