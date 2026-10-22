@@ -16,6 +16,7 @@ export const MENU: { to: string; label: string; icon: string; permission?: strin
   { to: '/tasks', icon: 'tasks', label: 'Задачи' },
   { to: '/boards', icon: 'boards', label: 'Доски' },
   { to: '/zakupki', icon: 'cart', label: 'Закупки' },
+  { to: '/apps', icon: 'phone', label: 'Приложения', permission: 'appInstallAccess' },
   { to: '/finance/cashes', icon: 'finance', label: 'Финансы' },
   { to: '/analytics', icon: 'analytics', label: 'Аналитика', permission: 'reportAccess' },
   { to: '/compendiums/how-knows', icon: 'books', label: 'Справочники' },

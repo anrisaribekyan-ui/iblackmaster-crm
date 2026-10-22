@@ -107,6 +107,8 @@ PERMISSIONS: dict[str, dict] = {
     "problemAccess": {"section": "Справочники", "title": "Неисправности", "parent": None},
     "cashItemAccess": {"section": "Справочники", "title": "Статьи движения денег", "parent": None},
     "measureAccess": {"section": "Справочники", "title": "Единицы измерения", "parent": None},
+    "appInstallAccess": {"section": "Установка приложений", "title": "Может ставить приложения на айфоны", "parent": None},
+    "appInstallStationAccess": {"section": "Установка приложений", "title": "Может добавлять станции и входить в Apple ID", "parent": "appInstallAccess"},
 }
 
 # Права-выборы. Значение хранится в Role.scopes[<ключ>] = <код варианта>.

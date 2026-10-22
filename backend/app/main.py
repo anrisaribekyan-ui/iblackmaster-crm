@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 import app.models  # noqa: F401  — регистрирует все таблицы
 from app.api import (
+    app_install,
     auth,
     mail_settings,
     forgotten as forgotten_api,
@@ -116,3 +117,4 @@ app.include_router(stock_remains.router, prefix="/api")
 app.include_router(sales.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(transactions.router, prefix="/api")
+app.include_router(app_install.router, prefix="/api")
