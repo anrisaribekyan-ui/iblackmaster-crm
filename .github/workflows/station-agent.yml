@@ -49,7 +49,7 @@ jobs:
           set -e
           echo "exit code: $rc"
           ls -la "$LOGS" || true
-          LOG=$(cat "$LOGS/console.log" "$LOGS/agent.log" 2>/dev/null | tail -c 1500 | tr '\r\n' '  ')
+          LOG=$( (cat "$LOGS/console.log" "$LOGS/agent.log" 2>/dev/null || true) | tail -c 1500 | tr '\r\n' '  ')
           if [ "$rc" != "1" ]; then
             echo "::error title=Проверка программы::код выхода $rc вместо 1. Журнал: ${LOG:-пусто}"
             exit 1
