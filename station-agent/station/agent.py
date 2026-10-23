@@ -98,6 +98,16 @@ class Agent:
         self._apple_checked_at = 0.0
         self._lock = threading.Lock()
 
+    def reload_token(self) -> bool:
+        """CRM отказала в доступе: возможно, код подключения заменили (переустановка, «Переподключить»).
+        Перечитываем config.json — новый код подхватится без перезапуска помощника."""
+        fresh = config.load()
+        if fresh.station_token and fresh.station_token != self.crm.token:
+            self.crm = Crm(fresh.crm_url or self.settings.crm_url, fresh.station_token)
+            log.info("Подхватил новый код подключения")
+            return True
+        return False
+
     # ------------------------------------------------------------- пульс
 
     def _check_apple(self, force: bool = False) -> None:
@@ -138,6 +148,8 @@ class Agent:
                 failures = 0
             except CrmError as exc:
                 failures += 1
+                if exc.status == 401 and self.reload_token():
+                    continue
                 if exc.status == 401:
                     log.error("CRM не принимает токен станции: %s. Вставьте новый код подключения.", exc)
                 elif failures in (1, 10) or failures % 60 == 0:
@@ -317,6 +329,8 @@ class Agent:
                     self.run_job(job)
                     continue  # сразу проверяем следующую
             except CrmError as exc:
+                if exc.status == 401 and self.reload_token():
+                    continue
                 failures += 1
                 if failures in (1, 10) or failures % 100 == 0:
                     log.warning("Не получил задачи (%s раз): %s", failures, exc)
