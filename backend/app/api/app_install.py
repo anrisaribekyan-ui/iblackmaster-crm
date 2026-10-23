@@ -32,6 +32,10 @@ from app.models import AppInstallJob, Employee, InstallStation, IosApp, JobKind,
 router = APIRouter(prefix="/app-install", tags=["Установка приложений"])
 
 ONLINE_SECONDS = 45  # помощник шлёт пульс раз в ~10 с
+# Задача без вестей от станции дольше этого — станция её потеряла (перезапуск, сменили код, выключили)
+STALE_MINUTES = {JobKind.INSTALL: 30}  # скачивание большого приложения идёт молча
+STALE_DEFAULT_MINUTES = 10
+CODE_WAIT_MINUTES = 15  # помощник помнит пароль Apple ID до ввода кода не дольше этого
 CODE_RE = re.compile(r"^\d{6}$")
 
 
@@ -174,6 +178,29 @@ def _job_out(db, job: AppInstallJob) -> JobOut:
     )
 
 
+def _expire_stale(db) -> None:
+    """Зависшие задачи закрываем сами, чтобы не висели «Выполняется» вечно."""
+    now = utcnow()
+    open_jobs = db.scalars(
+        select(AppInstallJob).where(AppInstallJob.state.in_((JobState.RUNNING, JobState.NEED_CODE)))
+    ).all()
+    changed = False
+    for job in open_jobs:
+        idle = now - job.updated_at
+        if job.state == JobState.NEED_CODE and job.secret is None and idle > timedelta(minutes=CODE_WAIT_MINUTES):
+            job.state, job.error_code = JobState.FAILED, "CODE_TIMEOUT"
+            job.message = "Код от Apple не ввели вовремя. Начните вход заново."
+        elif job.state == JobState.RUNNING and idle > timedelta(minutes=STALE_MINUTES.get(job.kind, STALE_DEFAULT_MINUTES)):
+            job.state, job.error_code = JobState.FAILED, "STALE"
+            job.message = "Станция перестала отвечать по этой задаче. Проверьте, что она на связи, и повторите."
+        else:
+            continue
+        job.secret, job.finished_at = None, now
+        changed = True
+    if changed:
+        db.commit()
+
+
 def _get_station(db, station_id: int) -> InstallStation:
     station = db.get(InstallStation, station_id)
     if station is None or not station.is_active:
@@ -252,6 +279,7 @@ def hide_app(app_id: int, db: DbSession):
 
 @router.get("/jobs", response_model=list[JobOut], dependencies=use_access)
 def list_jobs(db: DbSession, station_id: int | None = None, limit: int = 30):
+    _expire_stale(db)
     query = select(AppInstallJob).order_by(AppInstallJob.id.desc()).limit(min(max(limit, 1), 100))
     if station_id is not None:
         query = query.where(AppInstallJob.station_id == station_id)
@@ -261,6 +289,7 @@ def list_jobs(db: DbSession, station_id: int | None = None, limit: int = 30):
 @router.post("/jobs", response_model=JobOut, dependencies=use_access)
 def create_job(data: JobIn, db: DbSession, me: CurrentEmployee):
     station = _get_station(db, data.station_id)
+    _expire_stale(db)
     if not _is_online(station):
         raise BusinessError("Станция не на связи: проверьте, что компьютер включён и помощник запущен")
 
@@ -337,7 +366,7 @@ def cancel_job(job_id: int, db: DbSession):
     job = _open_job(db, job_id)
     if job.state not in JobState.OPEN:
         raise BusinessError("Задача уже завершена")
-    if job.state == JobState.RUNNING and job.kind == JobKind.INSTALL:
+    if job.state == JobState.RUNNING and job.kind == JobKind.INSTALL and job.progress >= 40:
         raise BusinessError("Установку уже не остановить, дождитесь окончания")
     job.state, job.secret, job.finished_at = JobState.CANCELLED, None, utcnow()
     job.message = "Отменено"
@@ -485,6 +514,7 @@ def agent_report(job_id: int, data: ReportIn, db: DbSession, station: AgentStati
     if job is None or job.station_id != station.id:
         raise NotFound("Задача")
     station.last_seen_at = utcnow()
+    job.updated_at = utcnow()  # любая весть от станции = задача жива
     if job.state == JobState.CANCELLED:
         db.commit()
         return {"ok": True, "cancelled": True}

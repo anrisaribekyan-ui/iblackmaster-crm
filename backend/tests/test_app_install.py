@@ -261,3 +261,41 @@ def test_agent_files_upload_and_public_download(client, auth_headers, db, tmp_pa
     r = client.post("/api/app-install/agent-files/windows", headers=login(client, "m2@x.test"),
                     files={"file": ("iBlackMasterStation-Setup.exe", exe, "application/octet-stream")})
     assert r.status_code == 403
+
+
+def test_stale_jobs_expire_and_running_login_can_be_cancelled(client, auth_headers, db):
+    station_id, agent = make_station(client, auth_headers)
+    beat(client, agent)
+    r = client.post("/api/app-install/jobs",
+                    json={"station_id": station_id, "kind": "login", "email": "a@icloud.com", "password": "p"},
+                    headers=auth_headers)
+    login_id = r.json()["id"]
+    next_job(client, agent)  # станция взяла вход и пропала
+    client.post("/api/app-install/jobs", json={"station_id": station_id, "kind": "purchases"}, headers=auth_headers)
+    purchases = next_job(client, agent)
+    report(client, agent, purchases["id"], message="Загружаю…")
+
+    job = db.get(AppInstallJob, login_id)
+    job.updated_at = utcnow() - timedelta(minutes=11)
+    db.commit()
+    jobs = {j["id"]: j for j in client.get("/api/app-install/jobs", headers=auth_headers).json()}
+    assert jobs[login_id]["state"] == "failed" and jobs[login_id]["error_code"] == "STALE"
+    assert jobs[purchases["id"]]["state"] == "running"  # свежая задача не тронута
+
+    # Зависший вход можно отменить вручную, не дожидаясь 10 минут
+    assert client.post(f"/api/app-install/jobs/{purchases['id']}/cancel", headers=auth_headers).json()["state"] == "cancelled"
+
+
+def test_code_wait_expires(client, auth_headers, db):
+    station_id, agent = make_station(client, auth_headers)
+    beat(client, agent)
+    job_id = client.post("/api/app-install/jobs",
+                         json={"station_id": station_id, "kind": "login", "email": "a@icloud.com", "password": "p"},
+                         headers=auth_headers).json()["id"]
+    next_job(client, agent)
+    report(client, agent, job_id, state="need_code")
+    job = db.get(AppInstallJob, job_id)
+    job.updated_at = utcnow() - timedelta(minutes=16)
+    db.commit()
+    jobs = client.get("/api/app-install/jobs", headers=auth_headers).json()
+    assert jobs[0]["state"] == "failed" and jobs[0]["error_code"] == "CODE_TIMEOUT"

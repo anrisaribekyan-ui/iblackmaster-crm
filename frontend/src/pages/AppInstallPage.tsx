@@ -181,7 +181,7 @@ function JobRow({ job, onChanged }: { job: Job; onChanged: () => void }) {
       )}
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       <div className="flex flex-wrap gap-2 empty:hidden">
-        {(job.state === 'queued' || job.state === 'need_code') && (
+        {(job.state === 'queued' || job.state === 'need_code' || (job.state === 'running' && (job.kind !== 'install' || job.progress < 40))) && (
           <button className={button} onClick={() => void act('cancel')}>Отменить</button>
         )}
         {(job.state === 'failed' || job.state === 'cancelled') && job.kind !== 'login' && (
