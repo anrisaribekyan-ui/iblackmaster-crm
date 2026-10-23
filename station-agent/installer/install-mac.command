@@ -11,6 +11,9 @@ mkdir -p "$DEST"
 # Останавливаем старого помощника так, чтобы launchd не поднял его со старым кодом
 launchctl unload "$HOME/Library/LaunchAgents/ru.iblackmaster.station.plist" 2>/dev/null || true
 pkill -f "iBlackMaster Station/iBlackMasterStation" 2>/dev/null || true
+# Удаляем старые файлы, а не пишем поверх: на Apple Silicon перезапись подписанного файла
+# в том же месте приводит к «Killed: 9» (система помнит подпись старого)
+rm -f "$DEST/iBlackMasterStation" "$DEST/ipatool"
 cp iBlackMasterStation ipatool "$DEST/"
 chmod +x "$DEST/iBlackMasterStation" "$DEST/ipatool"
 xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true
