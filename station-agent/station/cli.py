@@ -266,3 +266,28 @@ def autostart(enable: bool = typer.Option(True, "--enable/--disable")) -> None:
     subprocess.run(["launchctl", "unload", str(plist)], check=False, capture_output=True)
     subprocess.run(["launchctl", "load", str(plist)], check=False)
     console.print(f"[green]Помощник будет запускаться сам.[/] Файл: {plist}")
+
+
+@app.command()
+def proxy(
+    ssh: Optional[str] = typer.Option(None, "--ssh", help="Сервер за границей для туннеля, например root@91.204.75.96"),
+    url: Optional[str] = typer.Option(None, "--url", help="Готовый прокси, например socks5://127.0.0.1:1080"),
+    off: bool = typer.Option(False, "--off", help="Ходить к Apple напрямую"),
+) -> None:
+    """Как ходить к серверам Apple: напрямую, через SSH-туннель или через прокси."""
+    from .tunnel import APPLE_PROXY, TUNNEL_PORT
+
+    if off:
+        config.write_config({"apple_proxy": "", "ssh_tunnel": ""})
+    elif ssh:
+        config.write_config({"ssh_tunnel": ssh.strip(), "apple_proxy": ""})
+        if not APPLE_PROXY.ensure_tunnel(ssh.strip()):
+            console.print(f"[red]Туннель не поднялся:[/] {APPLE_PROXY.last_error}")
+            console.print("Нужен вход на сервер по ключу: ssh-copy-id " + ssh.strip())
+            raise typer.Exit(2)
+        console.print(f"[green]Туннель работает[/] (порт {TUNNEL_PORT}). Помощник будет держать его сам.")
+        APPLE_PROXY.stop()
+    elif url:
+        config.write_config({"apple_proxy": url.strip(), "ssh_tunnel": ""})
+    console.print(f"Apple: {APPLE_PROXY.describe()}")
+    console.print("Помощник применяет настройку сразу, перезапуск не нужен.")

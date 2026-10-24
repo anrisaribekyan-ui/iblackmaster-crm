@@ -30,6 +30,7 @@ class InstallStation(Base, TimestampMixin):
     devices: Mapped[list[dict]] = mapped_column(JSON, default=list)  # что сейчас подключено по USB
     apple_id: Mapped[str | None] = mapped_column(String(200))  # под каким Apple ID вошёл помощник
     apple_auth: Mapped[str] = mapped_column(String(10), default="unknown")  # ok | needed | unknown
+    apple_route: Mapped[str | None] = mapped_column(String(300))  # как станция ходит к Apple: напрямую / туннель / прокси
 
 
 class IosApp(Base, TimestampMixin):
