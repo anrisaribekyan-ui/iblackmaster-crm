@@ -299,3 +299,14 @@ def test_code_wait_expires(client, auth_headers, db):
     db.commit()
     jobs = client.get("/api/app-install/jobs", headers=auth_headers).json()
     assert jobs[0]["state"] == "failed" and jobs[0]["error_code"] == "CODE_TIMEOUT"
+
+
+def test_long_urls_in_messages_are_shortened(client, auth_headers, db):
+    station_id, agent = make_station(client, auth_headers)
+    beat(client, agent)
+    client.post("/api/app-install/jobs", json={"station_id": station_id, "kind": "purchases"}, headers=auth_headers)
+    job = next_job(client, agent)
+    url = "https://iosapps.itunes.apple.com/itunes-assets/Purple116/v4/a.ipa?accessKey=" + "x" * 500
+    report(client, agent, job["id"], state="failed", message=f'failed: Get "{url}": TLS handshake timeout')
+    msg = client.get("/api/app-install/jobs", headers=auth_headers).json()[0]["message"]
+    assert msg == 'failed: Get "[iosapps.itunes.apple.com]": TLS handshake timeout'
