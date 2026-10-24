@@ -75,8 +75,10 @@ class AppleProxy:
                 ssh, "-N", "-D", f"127.0.0.1:{TUNNEL_PORT}",
                 "-o", "BatchMode=yes",  # без пароля: только ключ, иначе тихо падаем
                 "-o", "ExitOnForwardFailure=yes",
-                "-o", "ServerAliveInterval=30",
-                "-o", "ServerAliveCountMax=3",
+                # Провайдеры режут «тихие» долгие SSH: без частых keepalive большие загрузки обрывались (EOF)
+                "-o", "ServerAliveInterval=15",
+                "-o", "ServerAliveCountMax=4",
+                "-o", "TCPKeepAlive=yes",
                 "-o", "StrictHostKeyChecking=accept-new",
                 "-o", "ConnectTimeout=15",
                 ssh_host,
