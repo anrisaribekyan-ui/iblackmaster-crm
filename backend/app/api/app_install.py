@@ -12,13 +12,15 @@
 
 import hashlib
 import json
+import plistlib
+import zipfile
 import re
 import secrets
 from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, File, Form, Header, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_, select
@@ -99,6 +101,10 @@ class AppOut(BaseModel):
     version: str | None
     version_id: int | None
     source: str
+    ipa_size: int | None = None
+    ipa_version: str | None = None
+    ipa_apple_id: str | None = None
+    ipa_uploaded_at: datetime | None = None
 
 
 class JobOut(BaseModel):
@@ -423,6 +429,9 @@ class AgentJob(BaseModel):
     app_name: str | None
     email: str | None
     secret: str | None  # пароль (login) или код 2FA (продолжение login)
+    app_id: int | None = None
+    ipa_in_crm: bool = False  # файл есть в архиве CRM — качать у Apple не нужно
+    ipa_size: int | None = None
 
 
 class AppReport(BaseModel):
@@ -490,6 +499,9 @@ def agent_next(db: DbSession, station: AgentStation):
         app_name=app_item.name if app_item else None,
         email=(job.payload or {}).get("email"),
         secret=secret,
+        app_id=app_item.id if app_item else None,
+        ipa_in_crm=bool(app_item and _ipa_exists(app_item)),
+        ipa_size=app_item.ipa_size if app_item else None,
     )
 
 
@@ -648,3 +660,151 @@ async def upload_agent_file(platform: str, file: UploadFile = File(...), version
     meta[platform] = {"version": version or None, "uploaded_at": utcnow().isoformat()}
     (_agent_dir() / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
     return _agent_files()
+
+
+# ---------------------------------------------------------------- архив IPA в CRM
+# Файл, однажды скачанный станцией (или загруженный вручную), хранится на сервере CRM.
+# Дальше любая станция ставит его без донора и без Apple.
+
+IPA_MAX_SIZE = 8 * 1024 * 1024 * 1024  # 8 ГБ — больше приложений в App Store почти нет
+
+
+def _ipa_dir() -> Path:
+    root = Path(settings.uploads_dir) / "ipa"
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _ipa_path(app_item: IosApp) -> Path:
+    return _ipa_dir() / f"{app_item.id}.ipa"
+
+
+def _ipa_exists(app_item: IosApp) -> bool:
+    return app_item.ipa_size is not None and _ipa_path(app_item).is_file()
+
+
+def read_ipa_metadata(path: Path) -> dict:
+    """Что внутри IPA: из iTunesMetadata.plist (App Store) и Payload/*.app/Info.plist."""
+    try:
+        with zipfile.ZipFile(path) as z:
+            names = z.namelist()
+            meta: dict = {}
+            if "iTunesMetadata.plist" in names:
+                meta = plistlib.loads(z.read("iTunesMetadata.plist"))
+            info_name = next((n for n in names if n.startswith("Payload/") and n.count("/") == 2
+                              and n.endswith(".app/Info.plist")), None)
+            info = plistlib.loads(z.read(info_name)) if info_name else {}
+    except (zipfile.BadZipFile, plistlib.InvalidFileException, ValueError, KeyError) as exc:
+        raise BusinessError("Это не файл приложения iPhone (.ipa) или он повреждён") from exc
+    if not info:
+        raise BusinessError("В файле нет приложения (папки Payload) — это точно .ipa?")
+    account = meta.get("appleId") or (meta.get("com.apple.iTunesStore.downloadInfo") or {}).get("accountInfo", {}).get("AppleID")
+    adam_id = meta.get("itemId")
+    return {
+        "adam_id": int(adam_id) if adam_id else None,
+        "version_id": int(meta["softwareVersionExternalIdentifier"]) if meta.get("softwareVersionExternalIdentifier") else None,
+        "bundle_id": info.get("CFBundleIdentifier") or meta.get("softwareVersionBundleId") or "",
+        "name": meta.get("itemName") or info.get("CFBundleDisplayName") or info.get("CFBundleName") or "",
+        "version": info.get("CFBundleShortVersionString") or meta.get("bundleShortVersionString"),
+        "apple_id": account,
+    }
+
+
+async def _save_stream(chunks, target: Path) -> tuple[int, str]:
+    tmp = target.with_suffix(".part")
+    digest, size = hashlib.sha256(), 0
+    try:
+        with tmp.open("wb") as out:
+            async for chunk in chunks:
+                size += len(chunk)
+                if size > IPA_MAX_SIZE:
+                    raise BusinessError("Файл больше 8 ГБ")
+                digest.update(chunk)
+                out.write(chunk)
+        if size < 1024:
+            raise BusinessError("Файл пустой или оборван")
+        tmp.replace(target)
+    finally:
+        tmp.unlink(missing_ok=True)
+    return size, digest.hexdigest()
+
+
+def _apply_ipa(app_item: IosApp, size: int, sha: str, meta: dict) -> None:
+    app_item.ipa_size, app_item.ipa_sha256 = size, sha
+    app_item.ipa_version = meta.get("version") or app_item.version
+    app_item.ipa_apple_id = meta.get("apple_id")
+    app_item.ipa_uploaded_at = utcnow()
+
+
+@router.post("/agent/apps/{app_id}/ipa")
+async def agent_upload_ipa(app_id: int, request: Request, db: DbSession, station: AgentStation):
+    """Станция присылает скачанный у Apple файл (тело запроса = сам .ipa)."""
+    app_item = db.get(IosApp, app_id)
+    if app_item is None:
+        raise NotFound("Приложение")
+    target = _ipa_path(app_item)
+    tmp = _ipa_dir() / f"{app_item.id}.incoming.ipa"
+    size, sha = await _save_stream(request.stream(), tmp)
+    try:
+        meta = read_ipa_metadata(tmp)
+        if meta["adam_id"] and meta["adam_id"] != app_item.adam_id:
+            raise BusinessError("Файл от другого приложения")
+        tmp.replace(target)
+    finally:
+        tmp.unlink(missing_ok=True)
+    _apply_ipa(app_item, size, sha, meta)
+    station.last_seen_at = utcnow()
+    db.commit()
+    return {"ok": True, "size": size}
+
+
+@router.get("/agent/apps/{app_id}/ipa")
+def agent_download_ipa(app_id: int, db: DbSession, station: AgentStation):
+    app_item = db.get(IosApp, app_id)
+    if app_item is None or not _ipa_exists(app_item):
+        raise NotFound("Файл приложения в архиве")
+    return FileResponse(_ipa_path(app_item), media_type="application/octet-stream",
+                        headers={"X-Ipa-Sha256": app_item.ipa_sha256 or ""})
+
+
+@router.post("/apps/upload", response_model=AppOut, dependencies=station_access)
+async def upload_ipa(db: DbSession, file: UploadFile = File(...)):
+    """Положить .ipa в архив вручную (например, сохранённый когда-то через iMazing)."""
+    if not (file.filename or "").lower().endswith(".ipa"):
+        raise BusinessError("Нужен файл .ipa")
+
+    async def chunks():
+        while chunk := await file.read(1024 * 1024):
+            yield chunk
+
+    tmp = _ipa_dir() / f"upload-{secrets.token_hex(8)}.ipa"
+    size, sha = await _save_stream(chunks(), tmp)
+    try:
+        meta = read_ipa_metadata(tmp)
+        if not meta["adam_id"]:
+            raise BusinessError("В файле нет данных App Store (iTunesMetadata): такой IPA не поставить под Apple ID")
+        app_item = db.scalar(select(IosApp).where(IosApp.adam_id == meta["adam_id"]))
+        if app_item is None:
+            app_item = IosApp(adam_id=meta["adam_id"], bundle_id=meta["bundle_id"], name=meta["name"] or meta["bundle_id"],
+                              version=meta["version"], version_id=meta["version_id"], source="upload")
+            db.add(app_item)
+            db.flush()
+        app_item.is_active = True
+        if meta["version_id"]:
+            app_item.version, app_item.version_id = meta["version"], meta["version_id"]
+        tmp.replace(_ipa_path(app_item))
+    finally:
+        tmp.unlink(missing_ok=True)
+    _apply_ipa(app_item, size, sha, meta)
+    db.commit()
+    return app_item
+
+
+@router.get("/apps/{app_id}/ipa", dependencies=station_access)
+def download_ipa(app_id: int, db: DbSession):
+    app_item = db.get(IosApp, app_id)
+    if app_item is None or not _ipa_exists(app_item):
+        raise NotFound("Файл приложения в архиве")
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", app_item.bundle_id) or str(app_item.adam_id)
+    return FileResponse(_ipa_path(app_item), media_type="application/octet-stream",
+                        filename=f"{safe}_{app_item.ipa_version or ''}.ipa".replace("_.ipa", ".ipa"))
