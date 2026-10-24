@@ -21,6 +21,7 @@ from typing import Any, Optional
 
 from . import config, device
 from .ipatool import AppUnavailable, AuthRequired, Ipatool, IpatoolError
+from .tunnel import APPLE_PROXY
 
 log = logging.getLogger("station.agent")
 
@@ -136,6 +137,7 @@ class Agent:
             "devices": devices,
             "apple_id": self.apple_id,
             "apple_auth": self.apple_auth,
+            "apple_route": APPLE_PROXY.describe(),
         })
 
     def _heartbeat_loop(self) -> None:
@@ -319,6 +321,7 @@ class Agent:
 
     def run(self) -> None:
         log.info("Помощник %s запущен, CRM: %s", config.VERSION, self.settings.crm_url)
+        threading.Thread(target=APPLE_PROXY.url, name="tunnel", daemon=True).start()  # поднять туннель заранее
         threading.Thread(target=self._heartbeat_loop, name="heartbeat", daemon=True).start()
         failures = 0
         while not self.stop.is_set():

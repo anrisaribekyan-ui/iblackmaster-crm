@@ -79,6 +79,7 @@ class StationOut(BaseModel):
     devices: list[DeviceInfo]
     apple_id: str | None
     apple_auth: str
+    apple_route: str | None = None
 
 
 class StationIn(BaseModel):
@@ -158,6 +159,7 @@ def _station_out(db, station: InstallStation, now: datetime | None = None) -> St
         devices=[DeviceInfo(**d) for d in (station.devices or [])] if _is_online(station, now) else [],
         apple_id=station.apple_id,
         apple_auth=station.apple_auth,
+        apple_route=station.apple_route,
     )
 
 
@@ -417,6 +419,7 @@ class HeartbeatIn(BaseModel):
     devices: list[DeviceInfo] = Field(default_factory=list, max_length=50)
     apple_id: str | None = Field(default=None, max_length=200)
     apple_auth: Literal["ok", "needed", "unknown"] = "unknown"
+    apple_route: str | None = Field(default=None, max_length=300)
 
 
 class AgentJob(BaseModel):
@@ -460,6 +463,7 @@ def agent_heartbeat(data: HeartbeatIn, db: DbSession, station: AgentStation):
     station.apple_id = data.apple_id or station.apple_id
     if data.apple_auth != "unknown":
         station.apple_auth = data.apple_auth
+    station.apple_route = data.apple_route
     db.commit()
     return {"ok": True, "station": station.name}
 

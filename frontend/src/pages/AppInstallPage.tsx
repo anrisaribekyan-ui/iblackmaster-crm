@@ -25,6 +25,7 @@ type Station = {
   devices: Device[]
   apple_id: string | null
   apple_auth: 'ok' | 'needed' | 'unknown'
+  apple_route: string | null
 }
 type IosApp = { id: number; adam_id: number; bundle_id: string; name: string; version: string | null; version_id: number | null; source: string }
 type Job = {
@@ -353,6 +354,11 @@ export default function AppInstallPage() {
                       ? `на связи${station.os ? ` · ${station.os === 'windows' ? 'Windows' : station.os === 'macos' ? 'Mac' : station.os}` : ''}`
                       : station.last_seen_at ? `не на связи с ${formatDateTime(station.last_seen_at)}` : 'помощник ещё не подключался'}
                   </span>
+                  {station.online && station.apple_route && (
+                    <span className={`text-sm ${/не поднят/.test(station.apple_route) ? 'text-warning' : 'text-muted'}`}>
+                      · к Apple: {station.apple_route}
+                    </span>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-sm sm:ml-auto">
                   {station.apple_auth === 'ok' && station.apple_id
