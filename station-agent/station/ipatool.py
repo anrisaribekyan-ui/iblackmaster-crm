@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 from pathlib import Path
 from typing import Any, Optional
@@ -45,13 +46,26 @@ class AuthRequired(IpatoolError):
     exit_code = 3
 
 
+class AppleUnreachable(IpatoolError):
+    code = "APPLE_UNREACHABLE"
+    exit_code = 5
+
+
 class AppUnavailable(IpatoolError):
     code = "APP_UNAVAILABLE"
     exit_code = 4
 
 
+_NET_MARKERS = ("tls handshake timeout", "i/o timeout", "connection refused", "connection reset",
+                "no such host", "network is unreachable", "failed to make round trip", "socks connect")
+
+
 def _classify(message: str) -> IpatoolError:
     low = message.lower()
+    if any(m in low for m in _NET_MARKERS):
+        return AppleUnreachable(
+            "Серверы Apple не открываются с этого компьютера. Включите туннель (ssh-tunnel) или прокси для Apple "
+            f"на станции. ({message[:200]})")
     if any(m in low for m in _AUTH_MARKERS):
         return AuthRequired(f"Нужен вход в Apple ID ({message})")
     if any(m in low for m in _UNAVAILABLE_MARKERS):
@@ -87,11 +101,19 @@ class Ipatool:
 
         shown = " ".join("***" if secret and a == secret else a for a in cmd)
         shown = shown.replace(self.s.keychain_passphrase, "***") if self.s.keychain_passphrase else shown
-        log.info("ipatool: %s", shown)
+        from .tunnel import APPLE_PROXY
 
+        env = dict(os.environ)
+        proxy = APPLE_PROXY.url()
+        if proxy:  # серверы Apple из России открываются не все — идём через прокси/туннель
+            env["HTTPS_PROXY"] = env["HTTP_PROXY"] = proxy
+            env.pop("NO_PROXY", None)
+        log.info("ipatool%s: %s", f" (через {proxy})" if proxy else "", shown)
+
+        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
-                                  errors="replace", timeout=timeout)
+                                  errors="replace", timeout=timeout, env=env, creationflags=flags)
         except FileNotFoundError as exc:
             raise NotInstalled(f"Не запускается ipatool: {self.s.ipatool_path}") from exc
         except subprocess.TimeoutExpired as exc:
