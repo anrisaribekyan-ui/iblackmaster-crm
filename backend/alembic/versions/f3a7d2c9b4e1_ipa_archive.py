@@ -1,7 +1,7 @@
 """Архив IPA в CRM: поля файла у приложения.
 
 Revision ID: f3a7d2c9b4e1
-Revises: e8b1c4d7a9f2
+Revises: b2d4f6a8c0e1
 Create Date: 2026-10-24 23:50:00
 """
 from typing import Sequence, Union
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = 'f3a7d2c9b4e1'
-down_revision: Union[str, Sequence[str], None] = 'e8b1c4d7a9f2'
+down_revision: Union[str, Sequence[str], None] = 'b2d4f6a8c0e1'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
