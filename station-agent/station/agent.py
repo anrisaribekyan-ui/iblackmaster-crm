@@ -17,7 +17,8 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from typing import Any, Optional
+from pathlib import Path
+from typing import Any, Callable, Optional
 
 from . import config, device
 from .ipatool import AppUnavailable, AuthRequired, Ipatool, IpatoolError
@@ -76,6 +77,57 @@ class Crm:
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise CrmError(0, f"CRM недоступна: {exc}") from exc
         return json.loads(raw) if raw else None
+
+    def _headers(self) -> dict:
+        return {"X-Station-Token": self.token, "User-Agent": f"iBlackMasterStation/{config.VERSION}"}
+
+    def download_file(self, path: str, dest: Path, progress: Optional[Callable[[int], None]] = None) -> None:
+        """Скачать файл из CRM (архив IPA) во временный файл и переименовать — без половинок."""
+        tmp = dest.with_suffix(dest.suffix + ".part")
+        req = urllib.request.Request(self.base + path, headers=self._headers())
+        try:
+            with urllib.request.urlopen(req, timeout=60, context=SSL_CONTEXT) as resp, tmp.open("wb") as out:
+                total = int(resp.headers.get("Content-Length") or 0)
+                done, last = 0, -1
+                while chunk := resp.read(1024 * 1024):
+                    out.write(chunk)
+                    done += len(chunk)
+                    if progress and total:
+                        pct = done * 100 // total
+                        if pct >= last + 5:
+                            last = pct
+                            progress(pct)
+            tmp.replace(dest)
+        except urllib.error.HTTPError as exc:
+            tmp.unlink(missing_ok=True)
+            raise CrmError(exc.code, f"Архив CRM: {exc}") from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            tmp.unlink(missing_ok=True)
+            raise CrmError(0, f"Архив CRM недоступен: {exc}") from exc
+
+    def upload_file(self, path: str, src: Path) -> Any:
+        """Отправить файл в CRM телом запроса (без multipart), потоком."""
+        size = src.stat().st_size
+        with src.open("rb") as body:
+            req = urllib.request.Request(self.base + path, data=body, method="POST",
+                                         headers={**self._headers(), "Content-Type": "application/octet-stream",
+                                                  "Content-Length": str(size)})
+            try:
+                with urllib.request.urlopen(req, timeout=600, context=SSL_CONTEXT) as resp:
+                    raw = resp.read()
+            except urllib.error.HTTPError as exc:
+                try:
+                    message = json.loads(exc.read() or b"{}").get("message") or str(exc)
+                except ValueError:
+                    message = str(exc)
+                raise CrmError(exc.code, message) from exc
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                raise CrmError(0, f"CRM недоступна: {exc}") from exc
+        return json.loads(raw) if raw else None
+
+
+class _Cancelled(Exception):
+    """Задачу отменили в CRM — тихо выходим."""
 
 
 @dataclass
@@ -291,17 +343,55 @@ class Agent:
         self._apple_checked_at = time.monotonic()
         self.report(job_id, state="done", apple_id=email, message=f"Вход выполнен: {email}")
 
-    def _install(self, job: dict) -> None:
+    def _get_ipa(self, job: dict) -> tuple[Path, str]:
+        """IPA для установки: локальный кэш → архив CRM → Apple. Возвращает (путь, откуда)."""
         job_id = job["id"]
         name = job.get("app_name") or "приложение"
         cached = self.ipatool.cached_path(job["adam_id"], job.get("version_id"))
-        if not cached.is_file():
-            if self.report(job_id, progress=5, message=f"Скачиваю «{name}» у Apple…"):
-                return
+        if cached.is_file() and cached.stat().st_size > 0:
+            return cached, "кэша станции"
+
+        if job.get("ipa_in_crm") and job.get("app_id"):
+            mb = (job.get("ipa_size") or 0) / 1_048_576
+            if self.report(job_id, progress=5, message=f"Беру «{name}» из архива CRM ({mb:.0f} МБ)…"):
+                raise _Cancelled()
+            try:
+                self.crm.download_file(
+                    f"/apps/{job['app_id']}/ipa", cached,
+                    progress=lambda p: self.report(job_id, progress=5 + p * 35 // 100,
+                                                   message=f"Беру «{name}» из архива CRM… {p}%"),
+                )
+                return cached, "архива CRM"
+            except CrmError as exc:
+                log.warning("Архив CRM не отдал файл, качаю у Apple: %s", exc)
+
+        if self.report(job_id, progress=5, message=f"Скачиваю «{name}» у Apple…"):
+            raise _Cancelled()
         path, from_cache = self.ipatool.download(job["adam_id"], job.get("version_id"))
+        if not from_cache and job.get("app_id"):
+            self._archive_later(job["app_id"], path, name)
+        return path, "кэша станции" if from_cache else "Apple"
+
+    def _archive_later(self, app_id: int, path: Path, name: str) -> None:
+        """Сохранить скачанный у Apple файл в архив CRM — в фоне, установку не задерживаем."""
+        def upload() -> None:
+            try:
+                self.crm.upload_file(f"/apps/{app_id}/ipa", path)
+                log.info("«%s» сохранено в архив CRM", name)
+            except CrmError as exc:
+                log.warning("Не удалось сохранить «%s» в архив CRM: %s", name, exc)
+
+        threading.Thread(target=upload, name=f"archive-{app_id}", daemon=True).start()
+
+    def _install(self, job: dict) -> None:
+        job_id = job["id"]
+        name = job.get("app_name") or "приложение"
+        try:
+            path, source = self._get_ipa(job)
+        except _Cancelled:
+            return
         size_mb = path.stat().st_size / 1_048_576
-        if self.report(job_id, progress=40,
-                       message=f"{'Взял из архива' if from_cache else 'Скачано'} ({size_mb:.0f} МБ). Ставлю на телефон…"):
+        if self.report(job_id, progress=40, message=f"Файл из {source} ({size_mb:.0f} МБ). Ставлю на телефон…"):
             return
 
         last = {"sent": 0.0, "value": 40}
@@ -315,7 +405,7 @@ class Agent:
 
         device.install_ipa(job["target_udid"], path, progress=on_progress)
         self.report(job_id, state="done",
-                    message=f"«{name}» установлено. На телефоне в App Store должен быть вход в тот же Apple ID.")
+                    message=f"«{name}» установлено (файл из {source}). На телефоне в App Store должен быть вход в тот же Apple ID.")
 
     # ------------------------------------------------------------- главный цикл
 

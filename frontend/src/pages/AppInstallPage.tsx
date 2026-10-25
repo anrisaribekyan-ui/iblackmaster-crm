@@ -27,7 +27,18 @@ type Station = {
   apple_auth: 'ok' | 'needed' | 'unknown'
   apple_route: string | null
 }
-type IosApp = { id: number; adam_id: number; bundle_id: string; name: string; version: string | null; version_id: number | null; source: string }
+type IosApp = {
+  id: number
+  adam_id: number
+  bundle_id: string
+  name: string
+  version: string | null
+  version_id: number | null
+  source: string
+  ipa_size: number | null
+  ipa_version: string | null
+  ipa_apple_id: string | null
+}
 type Job = {
   id: number
   station_id: number
@@ -222,6 +233,7 @@ export default function AppInstallPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [modal, setModal] = useState<'station' | 'login' | null>(null)
+  const [uploading, setUploading] = useState(false)
   const [reissue, setReissue] = useState<{ stationId: number; name: string; token: string } | null>(null)
 
   const station = stations?.find((s) => s.id === stationId) ?? null
@@ -283,6 +295,33 @@ export default function AppInstallPage() {
       await loadJobs()
     } catch (e) {
       setError(errorText(e, 'Не удалось поставить задачу'))
+    }
+  }
+
+  const uploadIpa = async (file: File) => {
+    setUploading(true)
+    setError('')
+    setNotice('')
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const app = await api.upload<IosApp>('/app-install/apps/upload', form)
+      setNotice(`«${app.name}» в архиве CRM`)
+      await loadApps(query)
+    } catch (e) {
+      setError(errorText(e, 'Не удалось загрузить файл'))
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const clearHistory = async () => {
+    if (!confirm('Стереть завершённые задачи? Текущие останутся.')) return
+    try {
+      await api.del('/app-install/jobs')
+      await loadJobs()
+    } catch (e) {
+      setError(errorText(e, 'Не удалось очистить историю'))
     }
   }
 
@@ -435,6 +474,13 @@ export default function AppInstallPage() {
                 onClick={() => void startJob({ kind: 'purchases' }, 'Загружаю покупки Apple ID')}>
                 Покупки Apple ID
               </button>
+              {manage && (
+                <label className={`${button} cursor-pointer`}>
+                  {uploading ? 'Загружаю…' : 'Загрузить IPA'}
+                  <input type="file" accept=".ipa" className="sr-only" disabled={uploading}
+                    onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void uploadIpa(f) }} />
+                </label>
+              )}
             </div>
             {apps.length === 0 ? (
               <p className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
@@ -447,6 +493,12 @@ export default function AppInstallPage() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{a.name}</div>
                       <div className="truncate text-xs text-muted">{a.bundle_id}{a.version ? ` · ${a.version}` : ''}</div>
+                      {a.ipa_size ? (
+                        <div className="truncate text-xs text-success" title="Файл хранится на сервере CRM: ставится без Apple и без донора">
+                          В архиве CRM · {a.ipa_version ?? ''} · {Math.max(1, Math.round(a.ipa_size / 1_048_576))} МБ
+                          {a.ipa_apple_id ? ` · ${a.ipa_apple_id}` : ''}
+                        </div>
+                      ) : null}
                     </div>
                     <button className={primary} disabled={!targetUdid || busyApp(a.id)}
                       title={!targetUdid ? 'Сначала выберите телефон: «Ставить сюда»' : undefined}
@@ -463,7 +515,12 @@ export default function AppInstallPage() {
           </section>
 
           <section className="grid gap-3" aria-labelledby="jobs-title">
-            <h2 id="jobs-title" className="font-semibold">Последние задачи</h2>
+            <div className="flex items-center gap-2">
+              <h2 id="jobs-title" className="font-semibold">Последние задачи</h2>
+              {jobs.some((j) => !OPEN.includes(j.state)) && (
+                <button className={`${button} ml-auto`} onClick={() => void clearHistory()}>Очистить историю</button>
+              )}
+            </div>
             {jobs.length === 0
               ? <p className="text-sm text-muted">Здесь появится ход скана, входа и установки.</p>
               : <ul className="grid gap-2">{jobs.map((j) => <JobRow key={j.id} job={j} onChanged={() => void loadJobs()} />)}</ul>}

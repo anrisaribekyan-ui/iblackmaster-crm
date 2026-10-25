@@ -310,3 +310,124 @@ def test_long_urls_in_messages_are_shortened(client, auth_headers, db):
     report(client, agent, job["id"], state="failed", message=f'failed: Get "{url}": TLS handshake timeout')
     msg = client.get("/api/app-install/jobs", headers=auth_headers).json()[0]["message"]
     assert msg == 'failed: Get "[iosapps.itunes.apple.com]": TLS handshake timeout'
+
+
+def test_agent_files_accept_github_artifact_zip(client, auth_headers, tmp_path, monkeypatch):
+    import io
+    import zipfile
+
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "uploads_dir", str(tmp_path))
+
+    def zipped(name: str, data: bytes) -> bytes:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr(name, data)
+        return buf.getvalue()
+
+    exe = b"MZ" + b"\1" * 3000
+    r = client.post("/api/app-install/agent-files/windows", headers=auth_headers,
+                    files={"file": ("iBlackMasterStation-Windows.zip", zipped("iBlackMasterStation-Setup.exe", exe), "application/zip")})
+    assert r.status_code == 200, r.text
+    assert client.get("/api/app-install/agent-files/windows").content == exe
+
+    bad = client.post("/api/app-install/agent-files/windows", headers=auth_headers,
+                      files={"file": ("other.zip", zipped("readme.txt", b"hi"), "application/zip")})
+    assert bad.status_code == 400 and "нет iBlackMasterStation-Setup.exe" in bad.json()["message"]
+
+    inner_mac = zipped("iBlackMasterStation", b"\xcf\xfa\xed\xfe" + b"\0" * 100)
+    r = client.post("/api/app-install/agent-files/macos", headers=auth_headers,
+                    files={"file": ("iBlackMasterStation-Mac.zip", zipped("iBlackMasterStation-Mac.zip", inner_mac), "application/zip")})
+    assert r.status_code == 200
+    assert client.get("/api/app-install/agent-files/macos").content == inner_mac
+    # Сам Mac-установщик (не обёрнутый) принимается как есть
+    r = client.post("/api/app-install/agent-files/macos", headers=auth_headers,
+                    files={"file": ("iBlackMasterStation-Mac.zip", inner_mac, "application/zip")})
+    assert r.status_code == 200 and client.get("/api/app-install/agent-files/macos").content == inner_mac
+
+
+def test_clear_history_keeps_open_jobs(client, auth_headers, db):
+    station_id, agent = make_station(client, auth_headers)
+    beat(client, agent)
+    done = client.post("/api/app-install/jobs", json={"station_id": station_id, "kind": "purchases"}, headers=auth_headers).json()
+    report(client, agent, next_job(client, agent)["id"], state="done")
+    running = client.post("/api/app-install/jobs", json={"station_id": station_id, "kind": "scan", "target_udid": DONOR["udid"]},
+                          headers=auth_headers).json()
+    r = client.delete("/api/app-install/jobs", headers=auth_headers)
+    assert r.status_code == 200 and r.json()["removed"] == 1
+    ids = [j["id"] for j in client.get("/api/app-install/jobs", headers=auth_headers).json()]
+    assert ids == [running["id"]] and done["id"] not in ids
+
+
+def _fake_ipa(adam_id: int | None = 111, bundle: str = "com.bank.old", version: str = "5.2", account: str = "me@icloud.com") -> bytes:
+    import io
+    import plistlib
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("Payload/Bank.app/Info.plist", plistlib.dumps(
+            {"CFBundleIdentifier": bundle, "CFBundleShortVersionString": version, "CFBundleDisplayName": "Старый банк"}))
+        z.writestr("Payload/Bank.app/Bank", b"\0" * 4096)
+        if adam_id:
+            z.writestr("iTunesMetadata.plist", plistlib.dumps(
+                {"itemId": adam_id, "itemName": "Старый банк", "softwareVersionExternalIdentifier": 8001, "apple-id": account}))
+    return buf.getvalue()
+
+
+def test_ipa_archive_agent_roundtrip(client, auth_headers, db, tmp_path, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "uploads_dir", str(tmp_path))
+    station_id, agent = make_station(client, auth_headers)
+    beat(client, agent)
+    db.add(IosApp(adam_id=111, bundle_id="com.bank.old", name="Старый банк", version="5.2", version_id=8001))
+    db.commit()
+    app_id = db.scalar(select(IosApp.id))
+
+    client.post("/api/app-install/jobs", json={"station_id": station_id, "kind": "install", "app_id": app_id,
+                                               "target_udid": TARGET["udid"]}, headers=auth_headers)
+    job = next_job(client, agent)
+    assert job["ipa_in_crm"] is False and job["app_id"] == app_id
+
+    ipa = _fake_ipa()
+    r = client.post(f"/api/app-install/agent/apps/{app_id}/ipa", content=ipa, headers=agent)
+    assert r.status_code == 200, r.text
+    lib = client.get("/api/app-install/apps", headers=auth_headers).json()[0]
+    assert lib["ipa_size"] == len(ipa) and lib["ipa_apple_id"] == "me@icloud.com" and lib["ipa_version"] == "5.2"
+    report(client, agent, job["id"], state="done")
+
+    client.post("/api/app-install/jobs", json={"station_id": station_id, "kind": "install", "app_id": app_id,
+                                               "target_udid": TARGET["udid"]}, headers=auth_headers)
+    job = next_job(client, agent)
+    assert job["ipa_in_crm"] is True and job["ipa_size"] == len(ipa)
+    got = client.get(f"/api/app-install/agent/apps/{app_id}/ipa", headers=agent)
+    assert got.status_code == 200 and got.content == ipa
+    assert client.get(f"/api/app-install/agent/apps/{app_id}/ipa").status_code == 401  # без токена станции нельзя
+
+    # Чужое приложение под видом этого — отказ, старый файл цел
+    r = client.post(f"/api/app-install/agent/apps/{app_id}/ipa", content=_fake_ipa(adam_id=999), headers=agent)
+    assert r.status_code == 400
+    assert client.get(f"/api/app-install/agent/apps/{app_id}/ipa", headers=agent).content == ipa
+
+
+def test_ipa_manual_upload(client, auth_headers, db, tmp_path, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "uploads_dir", str(tmp_path))
+    r = client.post("/api/app-install/apps/upload", headers=auth_headers,
+                    files={"file": ("bank.ipa", _fake_ipa(adam_id=222, bundle="ru.new.bank"), "application/octet-stream")})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["adam_id"] == 222 and body["source"] == "upload" and body["ipa_size"] > 0
+    d = client.get(f"/api/app-install/apps/{body['id']}/ipa", headers=auth_headers)
+    assert d.status_code == 200 and d.headers["content-disposition"].endswith('ru.new.bank_5.2.ipa"')
+
+    r = client.post("/api/app-install/apps/upload", headers=auth_headers,
+                    files={"file": ("bare.ipa", _fake_ipa(adam_id=None), "application/octet-stream")})
+    assert r.status_code == 400 and "iTunesMetadata" in r.json()["message"]
+    r = client.post("/api/app-install/apps/upload", headers=auth_headers,
+                    files={"file": ("x.ipa", b"not a zip" * 200, "application/octet-stream")})
+    assert r.status_code == 400
+    assert not [p for p in (tmp_path / "ipa").iterdir() if p.name.startswith("upload-")]

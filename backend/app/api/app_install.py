@@ -294,6 +294,21 @@ def list_jobs(db: DbSession, station_id: int | None = None, limit: int = 30):
     return [_job_out(db, j) for j in db.scalars(query)]
 
 
+@router.delete("/jobs", dependencies=use_access)
+def clear_jobs(db: DbSession, station_id: int | None = None):
+    """Стереть историю: удаляются только завершённые задачи, текущие остаются."""
+    _expire_stale(db)
+    query = select(AppInstallJob).where(AppInstallJob.state.not_in(JobState.OPEN))
+    if station_id is not None:
+        query = query.where(AppInstallJob.station_id == station_id)
+    removed = 0
+    for job in db.scalars(query):
+        db.delete(job)
+        removed += 1
+    db.commit()
+    return {"removed": removed}
+
+
 @router.post("/jobs", response_model=JobOut, dependencies=use_access)
 def create_job(data: JobIn, db: DbSession, me: CurrentEmployee):
     station = _get_station(db, data.station_id)
@@ -614,6 +629,22 @@ def _agent_files() -> list[AgentFileOut]:
     return out
 
 
+def _unwrap_github_artifact(path: Path, wanted: str) -> None:
+    """GitHub отдаёт артефакт сборки zip-архивом, внутри которого лежит наш файл. Если это он —
+    подменяем содержимое path на вложенный файл. Сам Mac-установщик тоже zip, но внутри у него
+    iBlackMasterStation и install-mac.command, а не вложенный архив."""
+    if not zipfile.is_zipfile(path):
+        return
+    with zipfile.ZipFile(path) as z:
+        inner = next((n for n in z.namelist() if n.rsplit("/", 1)[-1] == wanted), None)
+        if inner is None:
+            if wanted.endswith(".exe"):
+                raise BusinessError(f"В архиве нет {wanted} — это точно сборка помощника для Windows?")
+            return  # Mac: это уже сам установщик
+        data = z.read(inner)
+    path.write_bytes(data)
+
+
 @router.get("/agent-files", response_model=list[AgentFileOut])
 def list_agent_files():
     return _agent_files()
@@ -631,12 +662,14 @@ def download_agent_file(platform: str):
 
 @router.post("/agent-files/{platform}", response_model=list[AgentFileOut], dependencies=station_access)
 async def upload_agent_file(platform: str, file: UploadFile = File(...), version: str = Form("")):
+    """Принимает сам установщик или архив артефакта GitHub (iBlackMasterStation-Windows.zip / -Mac.zip),
+    из которого достаём нужный файл."""
     info = AGENT_FILES.get(platform)
     if info is None:
         raise NotFound("Система")
     name = (file.filename or "").lower()
-    if not name.endswith(info["ext"]):
-        raise BusinessError(f"Для {info['title']} нужен файл {info['name']}")
+    if not name.endswith((*info["ext"], ".zip")):
+        raise BusinessError(f"Для {info['title']} нужен файл {info['name']} или архив сборки с GitHub")
     version = version.strip()
     if version and not VERSION_RE.match(version):
         raise BusinessError("Версия — например 1.0.0")
@@ -644,19 +677,18 @@ async def upload_agent_file(platform: str, file: UploadFile = File(...), version
     target = _agent_dir() / info["name"]
     tmp = target.with_suffix(target.suffix + ".part")
     size = 0
-    head = b""
     try:
         with tmp.open("wb") as out:
             while chunk := await file.read(1024 * 1024):
-                if not head:
-                    head = chunk[:4]
                 size += len(chunk)
                 if size > AGENT_MAX_SIZE:
                     raise BusinessError("Файл больше 400 МБ — это точно установщик?")
                 out.write(chunk)
+        _unwrap_github_artifact(tmp, info["name"])
         expected = b"MZ" if platform == "windows" else b"PK"
-        if not head.startswith(expected):
-            raise BusinessError(f"Это не {info['name']}: файл повреждён или другого типа")
+        with tmp.open("rb") as check:
+            if not check.read(4).startswith(expected):
+                raise BusinessError(f"Это не {info['name']}: файл повреждён или другого типа")
         tmp.replace(target)
     finally:
         tmp.unlink(missing_ok=True)
@@ -703,7 +735,7 @@ def read_ipa_metadata(path: Path) -> dict:
         raise BusinessError("Это не файл приложения iPhone (.ipa) или он повреждён") from exc
     if not info:
         raise BusinessError("В файле нет приложения (папки Payload) — это точно .ipa?")
-    account = meta.get("appleId") or (meta.get("com.apple.iTunesStore.downloadInfo") or {}).get("accountInfo", {}).get("AppleID")
+    account = meta.get("apple-id") or meta.get("appleId") or (meta.get("com.apple.iTunesStore.downloadInfo") or {}).get("accountInfo", {}).get("AppleID")
     adam_id = meta.get("itemId")
     return {
         "adam_id": int(adam_id) if adam_id else None,
