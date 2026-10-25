@@ -270,7 +270,7 @@ export function AgentFilesPanel() {
         <h2 id="agent-files-title" className="font-semibold">Файлы помощника</h2>
         <p className="text-sm text-muted">
           Отсюда сотрудники скачивают помощника при подключении компьютера. Свежие файлы собирает GitHub
-          (репозиторий → Actions → «Помощник станции» → Artifacts) — скачайте, распакуйте и загрузите сюда.
+          (репозиторий → Actions → «Помощник станции» → Artifacts) — скачайте и загрузите сюда как есть, распаковывать не нужно.
         </p>
       </div>
       <ul className="grid gap-2 sm:grid-cols-2">
@@ -285,7 +285,7 @@ export function AgentFilesPanel() {
               </div>
             </div>
             <input ref={(el) => { inputs.current[f.platform] = el }} type="file" className="sr-only"
-              accept={f.platform === 'windows' ? '.exe' : '.zip'} aria-label={`Файл для ${f.title}`}
+              accept={f.platform === 'windows' ? '.exe,.zip' : '.zip'} aria-label={`Файл для ${f.title}`}
               onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void upload(f.platform, file) }} />
             <button className="rounded-md border border-line px-3 py-1.5 text-sm hover:border-accent hover:text-accent disabled:opacity-50"
               disabled={!!busy} onClick={() => inputs.current[f.platform]?.click()}>
