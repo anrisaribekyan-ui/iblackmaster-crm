@@ -538,7 +538,8 @@ def agent_report(job_id: int, data: ReportIn, db: DbSession, station: AgentStati
     if data.progress is not None:
         job.progress = data.progress
     if data.message is not None:
-        job.message = data.message
+        # Адреса файлов Apple с одноразовыми ключами — длинные и бесполезные в журнале
+        job.message = re.sub(r"https?://([^/\s\"']+)[^\s\"']*", r"[\1]", data.message)[:2000]
     if data.error_code is not None:
         job.error_code = data.error_code
     if data.apps:

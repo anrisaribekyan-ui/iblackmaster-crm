@@ -82,6 +82,17 @@ function jobTitle(job: Job) {
   }
 }
 
+/** Длинные ссылки (адреса файлов Apple с ключами) не нужны мастеру и растягивали страницу. */
+function shortMessage(text: string) {
+  return text.replace(/https?:\/\/[^\s"']+/g, (url) => {
+    try {
+      return `[${new URL(url).host}]`
+    } catch {
+      return '[ссылка]'
+    }
+  })
+}
+
 function errorText(e: unknown, fallback: string) {
   return e instanceof ApiError ? e.message : fallback
 }
@@ -160,7 +171,7 @@ function JobRow({ job, onChanged }: { job: Job; onChanged: () => void }) {
   }, [code])
 
   return (
-    <li className="grid gap-2 rounded-xl border border-line bg-surface p-3">
+    <li className="grid min-w-0 gap-2 rounded-xl border border-line bg-surface p-3">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="font-medium">{jobTitle(job)}</span>
         <span className={`text-sm ${STATE_CLASS[job.state]}`}>{STATE_TITLE[job.state]}</span>
@@ -173,7 +184,11 @@ function JobRow({ job, onChanged }: { job: Job; onChanged: () => void }) {
           <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${Math.max(job.progress, 3)}%` }} />
         </div>
       )}
-      {job.message && <p className={`text-sm ${job.state === 'failed' ? 'text-danger' : 'text-muted'}`}>{job.message}</p>}
+      {job.message && (
+        <p className={`text-sm [overflow-wrap:anywhere] ${job.state === 'failed' ? 'text-danger' : 'text-muted'}`}>
+          {shortMessage(job.message)}
+        </p>
+      )}
       {waitingCode && (
         <div className="grid max-w-xs gap-1">
           <label htmlFor={`code-${job.id}`} className="text-sm">Код из Apple на вашем iPhone</label>

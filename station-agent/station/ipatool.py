@@ -56,7 +56,7 @@ class AppUnavailable(IpatoolError):
     exit_code = 4
 
 
-_NET_MARKERS = ("tls handshake timeout", "i/o timeout", "connection refused", "connection reset",
+_NET_MARKERS = ("unexpected eof", "tls handshake timeout", "i/o timeout", "connection refused", "connection reset",
                 "no such host", "network is unreachable", "failed to make round trip", "socks connect")
 
 
@@ -156,11 +156,22 @@ class Ipatool:
         args = ["download", "--app-id", str(adam_id), "--purchase", "-o", str(tmp)]
         if version_id:
             args += ["--external-version-id", str(version_id)]
-        try:
-            result = self._run(args)
-        except Exception:
-            tmp.unlink(missing_ok=True)
-            raise
+        # Большие загрузки через туннель иногда обрываются — пробуем ещё дважды, подняв туннель заново
+        for attempt in range(3):
+            try:
+                result = self._run(args)
+                break
+            except AppleUnreachable:
+                tmp.unlink(missing_ok=True)
+                if attempt == 2:
+                    raise
+                from .tunnel import APPLE_PROXY
+
+                log.warning("Скачивание оборвалось, попытка %s из 3", attempt + 2)
+                APPLE_PROXY.stop()
+            except Exception:
+                tmp.unlink(missing_ok=True)
+                raise
         produced = Path(result.get("output") or tmp)
         if produced != target:
             produced.replace(target)
