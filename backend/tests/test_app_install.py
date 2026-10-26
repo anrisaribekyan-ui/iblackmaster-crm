@@ -471,3 +471,47 @@ def test_archive_jobs_prefetch_and_priority(client, auth_headers, db, tmp_path, 
                     headers=auth_headers)
     assert r.status_code == 400 and "уже в архиве" in r.json()["message"]
     assert client.get("/api/app-install/agent/archive").status_code == 401
+
+
+def test_import_ids_store_check_and_archive_removed(client, auth_headers, db, monkeypatch):
+    import app.api.app_install as mod
+
+    calls = []
+
+    def fake_lookup(ids):
+        calls.append(sorted(ids))
+        return {222: {"trackId": 222, "trackName": "Почта России", "bundleId": "ru.post"}}
+
+    monkeypatch.setattr(mod, "_lookup_ru", fake_lookup)
+    station_id, agent = make_station(client, auth_headers)
+    beat(client, agent)
+
+    r = client.post("/api/app-install/apps/import", headers=auth_headers, json={
+        "apps": [{"adam_id": 111111, "bundle_id": "ru.sber", "name": "СБОЛ"}],
+        "text": "https://apps.apple.com/ru/app/x/id222 не то, а вот 333333 и снова id111111",
+    })
+    # id222 короче 6 цифр — не номер приложения; ссылка и голое число находятся
+    assert r.status_code == 200, r.text
+    assert r.json() == {"total": 2, "added": 2, "removed": 2, "checked": True}
+
+    r = client.post("/api/app-install/apps/import", headers=auth_headers, json={"text": "id222222 https://apps.apple.com/app/id444444"})
+    assert r.json()["added"] == 2
+
+    apps = {a["adam_id"]: a for a in client.get("/api/app-install/apps", headers=auth_headers).json()}
+    assert apps[111111]["store_ru"] == "removed" and apps[111111]["source"] == "import"
+    removed = client.get("/api/app-install/apps?store=removed", headers=auth_headers).json()
+    assert {a["adam_id"] for a in removed} == {111111, 333333, 222222, 444444}
+    stats = client.get("/api/app-install/apps/stats", headers=auth_headers).json()
+    assert stats["all"] == 4 and stats["removed"] == 4 and stats["unchecked"] == 0
+
+    db.add(IosApp(adam_id=555555, bundle_id="ok", name="Есть в магазине", store_ru="available"))
+    db.commit()
+    r = client.post("/api/app-install/jobs/archive-all", json={"station_id": station_id, "store": "removed"}, headers=auth_headers)
+    assert r.json()["queued"] == 4
+
+    # Apple молчит — ничего не помечаем, импорт всё равно проходит
+    monkeypatch.setattr(mod, "_lookup_ru", lambda ids: None)
+    r = client.post("/api/app-install/apps/import", headers=auth_headers, json={"text": "777777"})
+    assert r.json()["checked"] is False
+    assert client.post("/api/app-install/apps/import", headers=auth_headers, json={"text": "пусто"}).status_code == 400
+    assert client.post("/api/app-install/apps/check-store", headers=auth_headers).status_code == 400

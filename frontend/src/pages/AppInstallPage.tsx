@@ -38,7 +38,10 @@ type IosApp = {
   ipa_size: number | null
   ipa_version: string | null
   ipa_apple_id: string | null
+  store_ru: 'available' | 'removed' | null
 }
+type StoreFilter = 'all' | 'removed' | 'archived'
+type AppStats = { all: number; removed: number; archived: number; unchecked: number }
 type Job = {
   id: number
   station_id: number
@@ -111,6 +114,63 @@ function errorText(e: unknown, fallback: string) {
 }
 
 // ------------------------------------------------------------------ вход в Apple ID
+
+function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: (text: string) => void }) {
+  const [text, setText] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      const body: { text?: string; apps?: unknown[] } = {}
+      if (file) {
+        const raw = await file.text()
+        // Список из медиатеки — JSON с adam_id и названиями; любой другой файл читаем как текст со ссылками и номерами
+        try {
+          const parsed: unknown = JSON.parse(raw)
+          if (Array.isArray(parsed)) body.apps = parsed
+          else body.text = raw
+        } catch {
+          body.text = raw
+        }
+      }
+      if (text.trim()) body.text = [body.text, text].filter(Boolean).join('\n')
+      const r = await api.post<{ total: number; added: number; removed: number | null; checked: boolean }>('/app-install/apps/import', body)
+      onDone(`Добавлено новых: ${r.added} из ${r.total}.` +
+        (r.checked ? ` Снято в РФ: ${r.removed ?? 0}.` : ' Проверить App Store не удалось — нажмите «Проверить App Store» позже.'))
+      onClose()
+    } catch (e) {
+      setError(errorText(e, 'Не удалось добавить'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal title="Добавить приложения по списку" onClose={onClose}>
+      <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); void submit() }}>
+        <p className="text-sm text-muted">
+          Вставьте ссылки App Store или номера приложений (каждое с новой строки) либо выберите файл со списком.
+          Добавятся только номера и названия: сами приложения станция потом скачает у Apple под нашим Apple ID.
+        </p>
+        <textarea aria-label="Ссылки или номера приложений" rows={5} className={`${inputClass} font-mono text-xs`}
+          placeholder="https://apps.apple.com/ru/app/сбербанк-онлайн/id492224193" value={text} onChange={(e) => setText(e.target.value)} />
+        <label className="grid gap-1 text-sm">
+          Файл списка (.json, .txt, .csv)
+          <input type="file" accept=".json,.txt,.csv,application/json,text/plain" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        </label>
+        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" className={button} onClick={onClose}>Отмена</button>
+          <button type="submit" className={primary} disabled={busy || (!text.trim() && !file)}>{busy ? 'Добавляю…' : 'Добавить'}</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
 
 function LoginModal({ station, onClose, onQueued }: { station: Station; onClose: () => void; onQueued: () => void }) {
   const [email, setEmail] = useState(station.apple_id ?? '')
@@ -231,6 +291,10 @@ export default function AppInstallPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [apps, setApps] = useState<IosApp[]>([])
   const [query, setQuery] = useState('')
+  const [storeFilter, setStoreFilter] = useState<StoreFilter>('all')
+  const [stats, setStats] = useState<AppStats | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
+  const [checking, setChecking] = useState(false)
   const [targetUdid, setTargetUdid] = useState<string>('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -251,8 +315,15 @@ export default function AppInstallPage() {
     setJobs(await api.get<Job[]>('/app-install/jobs?limit=20'))
   }, [])
 
-  const loadApps = useCallback(async (q: string) => {
-    setApps(await api.get<IosApp[]>(`/app-install/apps${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ''}`))
+  const loadApps = useCallback(async (q: string, store: StoreFilter = 'all') => {
+    const params = new URLSearchParams({ store })
+    if (q.trim()) params.set('q', q.trim())
+    const [list, counts] = await Promise.all([
+      api.get<IosApp[]>(`/app-install/apps?${params}`),
+      api.get<AppStats>('/app-install/apps/stats'),
+    ])
+    setApps(list)
+    setStats(counts)
   }, [])
 
   const refresh = useCallback(async () => {
@@ -273,13 +344,14 @@ export default function AppInstallPage() {
   }, [refresh])
 
   useEffect(() => {
-    const timer = setTimeout(() => void loadApps(query).catch(() => undefined), 250)
+    const timer = setTimeout(() => void loadApps(query, storeFilter).catch(() => undefined), 250)
     return () => clearTimeout(timer)
-  }, [query, loadApps])
+  }, [query, storeFilter, loadApps])
 
   // Скан или покупки закончились — библиотека пополнилась
   const finishedLists = jobs.filter((j) => (j.kind === 'scan' || j.kind === 'purchases') && j.state === 'done').map((j) => j.id).join(',')
-  useEffect(() => { void loadApps(query).catch(() => undefined) }, [finishedLists]) // eslint-disable-line react-hooks/exhaustive-deps
+  const finishedArchive = jobs.filter((j) => j.kind === 'archive' && j.state === 'done').length
+  useEffect(() => { void loadApps(query, storeFilter).catch(() => undefined) }, [finishedLists, finishedArchive]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Целевой телефон выбирается сам, если подключён один
   useEffect(() => {
@@ -309,7 +381,7 @@ export default function AppInstallPage() {
       form.append('file', file)
       const app = await api.upload<IosApp>('/app-install/apps/upload', form)
       setNotice(`«${app.name}» в архиве CRM`)
-      await loadApps(query)
+      await loadApps(query, storeFilter)
     } catch (e) {
       setError(errorText(e, 'Не удалось загрузить файл'))
     } finally {
@@ -321,11 +393,27 @@ export default function AppInstallPage() {
     if (!station) return
     setError('')
     try {
-      const r = await api.post<{ queued: number }>('/app-install/jobs/archive-all', { station_id: station.id })
+      const r = await api.post<{ queued: number }>('/app-install/jobs/archive-all', {
+        station_id: station.id, store: storeFilter === 'removed' ? 'removed' : 'all',
+      })
       setNotice(r.queued ? `В очереди на скачивание в архив: ${r.queued}` : 'Всё уже в архиве или в очереди')
       await loadJobs()
     } catch (e) {
       setError(errorText(e, 'Не удалось поставить в очередь'))
+    }
+  }
+
+  const checkStore = async () => {
+    setChecking(true)
+    setError('')
+    try {
+      const r = await api.post<{ checked: number; removed: number }>('/app-install/apps/check-store')
+      setNotice(`Проверено: ${r.checked}. Снято в российском App Store: ${r.removed}`)
+      await loadApps(query, storeFilter)
+    } catch (e) {
+      setError(errorText(e, 'Не удалось проверить App Store'))
+    } finally {
+      setChecking(false)
     }
   }
 
@@ -490,10 +578,19 @@ export default function AppInstallPage() {
                 onClick={() => void startJob({ kind: 'purchases' }, 'Загружаю покупки Apple ID')}>
                 Покупки Apple ID
               </button>
-              {notArchived > 0 && (
+              {notArchived > 0 && storeFilter !== 'archived' && (
                 <button className={button} disabled={!station?.online} onClick={() => void archiveAll()}
-                  title="Станция скачает у Apple всё, чего ещё нет в архиве, и положит в CRM">
-                  Скачать всё в архив ({notArchived})
+                  title="Станция скачает у Apple всё из этого списка, чего ещё нет в архиве, и положит в CRM">
+                  {storeFilter === 'removed' ? `Скачать снятые в архив (${notArchived})` : `Скачать всё в архив (${notArchived})`}
+                </button>
+              )}
+              {manage && (
+                <button className={button} onClick={() => setImportOpen(true)}>Добавить по списку</button>
+              )}
+              {manage && !!stats?.all && (
+                <button className={button} disabled={checking} onClick={() => void checkStore()}
+                  title="Сверить библиотеку с российским App Store и отметить снятые">
+                  {checking ? 'Проверяю…' : 'Проверить App Store'}
                 </button>
               )}
               {manage && (
@@ -504,9 +601,24 @@ export default function AppInstallPage() {
                 </label>
               )}
             </div>
+            {stats && stats.all > 0 && (
+              <div role="tablist" aria-label="Какие приложения показать" className="flex flex-wrap gap-1">
+                {([
+                  ['all', `Все · ${stats.all}`],
+                  ['removed', `Снятые в РФ · ${stats.removed}`],
+                  ['archived', `В архиве · ${stats.archived}`],
+                ] as const).map(([key, label]) => (
+                  <button key={key} role="tab" aria-selected={storeFilter === key}
+                    className={`rounded-full border px-3 py-1 text-sm ${storeFilter === key ? 'border-accent bg-accent/10 text-accent' : 'border-line text-muted hover:text-ink'}`}
+                    onClick={() => setStoreFilter(key)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
             {apps.length === 0 ? (
               <p className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
-                {query ? 'Ничего не нашлось.' : 'Библиотека пуста. Подключите телефон-донор и нажмите «Это донор: прочитать приложения» или загрузите покупки Apple ID.'}
+                {query || storeFilter !== 'all' ? 'Ничего не нашлось.' : 'Библиотека пуста. Подключите телефон-донор и нажмите «Это донор: прочитать приложения» или загрузите покупки Apple ID.'}
               </p>
             ) : (
               <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
@@ -514,7 +626,10 @@ export default function AppInstallPage() {
                   <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{a.name}</div>
-                      <div className="truncate text-xs text-muted">{a.bundle_id}{a.version ? ` · ${a.version}` : ''}</div>
+                      <div className="truncate text-xs text-muted">
+                        {a.store_ru === 'removed' && <span className="mr-1 font-medium text-warning">Снято в РФ ·</span>}
+                        {a.bundle_id}{a.version ? ` · ${a.version}` : ''}
+                      </div>
                       {a.ipa_size ? (
                         <div className="truncate text-xs text-success" title="Файл хранится на сервере CRM: ставится без Apple и без донора">
                           В архиве CRM · {a.ipa_version ?? ''} · {Math.max(1, Math.round(a.ipa_size / 1_048_576))} МБ
@@ -560,6 +675,10 @@ export default function AppInstallPage() {
       <AgentFilesPanel canUpload={manage} />
 
       {modal === 'station' && <StationWizard onClose={() => setModal(null)} onChanged={() => void refresh()} />}
+      {importOpen && (
+        <ImportModal onClose={() => setImportOpen(false)}
+          onDone={(text) => { setNotice(text); void loadApps(query, storeFilter).catch(() => undefined) }} />
+      )}
       {modal === 'login' && station && <LoginModal station={station} onClose={() => setModal(null)} onQueued={() => void loadJobs()} />}
       {reissue && <StationWizard reissue={reissue} onClose={() => setReissue(null)} onChanged={() => void refresh()} />}
     </div>
