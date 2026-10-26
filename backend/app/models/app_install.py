@@ -42,7 +42,7 @@ class IosApp(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(200))
     version: Mapped[str | None] = mapped_column(String(50))
     version_id: Mapped[int | None] = mapped_column(BigInteger)  # softwareVersionExternalIdentifier
-    source: Mapped[str] = mapped_column(String(10), default="scan")  # scan | purchases | upload
+    source: Mapped[str] = mapped_column(String(10), default="scan")  # scan | purchases | upload | import
     is_active: Mapped[bool] = mapped_column(default=True)
     # Архив CRM: сам файл IPA лежит в uploads/ipa/<id>.ipa. Ставится без донора и без Apple,
     # но запустится только на телефоне, где в App Store вход в тот же Apple ID (ipa_apple_id).
@@ -51,6 +51,9 @@ class IosApp(Base, TimestampMixin):
     ipa_version: Mapped[str | None] = mapped_column(String(50))
     ipa_apple_id: Mapped[str | None] = mapped_column(String(200))
     ipa_uploaded_at: Mapped[datetime | None]
+    # Есть ли приложение сейчас в российском App Store: available | removed | None (не проверяли)
+    store_ru: Mapped[str | None] = mapped_column(String(10))
+    store_checked_at: Mapped[datetime | None]
 
 
 class JobKind:

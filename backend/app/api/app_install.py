@@ -11,6 +11,7 @@
 """
 
 import hashlib
+import logging
 import json
 import plistlib
 import zipfile
@@ -20,6 +21,7 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from typing import Annotated, Literal
 
+import httpx
 from fastapi import APIRouter, Depends, File, Form, Header, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -106,6 +108,7 @@ class AppOut(BaseModel):
     ipa_version: str | None = None
     ipa_apple_id: str | None = None
     ipa_uploaded_at: datetime | None = None
+    store_ru: str | None = None
 
 
 class JobOut(BaseModel):
@@ -264,13 +267,142 @@ def delete_station(station_id: int, db: DbSession):
 # ---------------------------------------------------------------- библиотека
 
 
-@router.get("/apps", response_model=list[AppOut], dependencies=use_access)
-def list_apps(db: DbSession, q: str | None = None):
-    query = select(IosApp).where(IosApp.is_active.is_(True)).order_by(IosApp.name)
+def _apps_query(store: str | None = None, q: str | None = None):
+    query = select(IosApp).where(IosApp.is_active.is_(True))
     if q and q.strip():
         like = f"%{q.strip()}%"
         query = query.where(or_(IosApp.name.ilike(like), IosApp.bundle_id.ilike(like)))
-    return db.scalars(query.limit(500)).all()
+    if store == "removed":
+        query = query.where(IosApp.store_ru == "removed")
+    elif store == "archived":
+        query = query.where(IosApp.ipa_size.is_not(None))
+    return query
+
+
+@router.get("/apps", response_model=list[AppOut], dependencies=use_access)
+def list_apps(db: DbSession, q: str | None = None, store: Literal["all", "removed", "archived"] = "all"):
+    return db.scalars(_apps_query(store, q).order_by(IosApp.name).limit(2000)).all()
+
+
+@router.get("/apps/stats", dependencies=use_access)
+def apps_stats(db: DbSession):
+    def count(query) -> int:
+        return db.scalar(select(func.count()).select_from(query.subquery())) or 0
+
+    return {"all": count(_apps_query()), "removed": count(_apps_query("removed")),
+            "archived": count(_apps_query("archived")),
+            "unchecked": count(_apps_query().where(IosApp.store_ru.is_(None)))}
+
+
+# Проверка по открытому справочнику Apple: что из библиотеки сейчас есть в российском App Store
+ITUNES_LOOKUP = "https://itunes.apple.com/lookup"
+log = logging.getLogger(__name__)
+
+
+def _lookup_ru(adam_ids: list[int]) -> dict[int, dict] | None:
+    """Какие из adam_id есть в App Store России (с названием). None — Apple не ответил (не помечаем ничего)."""
+    found: dict[int, dict] = {}
+    try:
+        with httpx.Client(timeout=30) as client:
+            for i in range(0, len(adam_ids), 150):
+                part = adam_ids[i:i + 150]
+                r = client.get(ITUNES_LOOKUP, params={"country": "ru", "id": ",".join(map(str, part))})
+                r.raise_for_status()
+                found.update({int(x["trackId"]): x for x in r.json().get("results", []) if x.get("trackId")})
+    except (httpx.HTTPError, ValueError) as exc:
+        log.warning("Проверка App Store не удалась: %s", exc)
+        return None
+    return found
+
+
+def _check_store(db, apps: list[IosApp]) -> int | None:
+    if not apps:
+        return 0
+    found = _lookup_ru([a.adam_id for a in apps])
+    if found is None:
+        return None
+    now = utcnow()
+    for a in apps:
+        info = found.get(a.adam_id)
+        a.store_ru = "available" if info else "removed"
+        a.store_checked_at = now
+        if info:
+            if info.get("trackName") and (not a.name or a.name == str(a.adam_id)):
+                a.name = str(info["trackName"])[:200]
+            if info.get("bundleId") and not a.bundle_id:
+                a.bundle_id = str(info["bundleId"])[:200]
+            if info.get("version") and not a.version:
+                a.version = str(info["version"])[:50]
+    return sum(1 for a in apps if a.store_ru == "removed")
+
+
+@router.post("/apps/check-store", dependencies=station_access)
+def check_store(db: DbSession, only_unchecked: bool = False):
+    query = _apps_query()
+    if only_unchecked:
+        query = query.where(IosApp.store_ru.is_(None))
+    apps = list(db.scalars(query))
+    removed = _check_store(db, apps)
+    if removed is None:
+        raise BusinessError("Справочник Apple не ответил. Попробуйте позже")
+    db.commit()
+    return {"checked": len(apps), "removed": removed}
+
+
+class ImportAppIn(BaseModel):
+    adam_id: int = Field(gt=0)
+    bundle_id: str | None = None
+    name: str | None = None
+    version: str | None = None
+
+
+class ImportIn(BaseModel):
+    apps: list[ImportAppIn] = Field(default_factory=list, max_length=5000)
+    text: str | None = Field(default=None, max_length=500_000)  # ссылки App Store или номера через пробел/строку
+
+
+def _ids_from_text(text: str) -> list[int]:
+    """Номера из ссылок вида apps.apple.com/ru/app/…/id492224193 и из голых чисел."""
+    ids = [int(x) for x in re.findall(r"id(\d{6,12})", text)]
+    rest = re.sub(r"id\d{6,12}", " ", text)
+    ids += [int(x) for x in re.findall(r"(?<![\d.])(\d{6,12})(?![\d.])", rest)]
+    return list(dict.fromkeys(ids))
+
+
+@router.post("/apps/import", dependencies=station_access)
+def import_apps(data: ImportIn, db: DbSession):
+    """Добавить в библиотеку приложения по номерам App Store (например, список из старой медиатеки iMazing).
+
+    Только номера и названия: сами файлы потом честно скачиваются у Apple под нашим Apple ID.
+    """
+    items = {a.adam_id: a for a in data.apps}
+    for adam_id in _ids_from_text(data.text or ""):
+        items.setdefault(adam_id, ImportAppIn(adam_id=adam_id))
+    if not items:
+        raise BusinessError("Не нашёл номеров приложений: нужен файл списка или ссылки App Store")
+    known = {a.adam_id: a for a in db.scalars(select(IosApp).where(IosApp.adam_id.in_(list(items))))}
+    added, touched = 0, []
+    for adam_id, item in items.items():
+        row = known.get(adam_id)
+        if row is None:
+            row = IosApp(adam_id=adam_id, source="import", bundle_id=(item.bundle_id or "")[:200],
+                         name=(item.name or item.bundle_id or str(adam_id))[:200], version=(item.version or None))
+            db.add(row)
+            added += 1
+        else:
+            if item.name and row.name == str(row.adam_id):
+                row.name = item.name[:200]
+            if item.bundle_id and not row.bundle_id:
+                row.bundle_id = item.bundle_id[:200]
+        row.is_active = True
+        touched.append(row)
+    db.flush()
+    # Сразу узнаём, что снято в РФ. Без ответа Apple просто оставляем «не проверено»
+    unknown = [r for r in touched if r.store_ru is None or not r.bundle_id or r.name == str(r.adam_id)]
+    removed = _check_store(db, unknown) if unknown else 0
+    db.commit()
+    return {"total": len(items), "added": added, "removed": removed,
+            "checked": removed is not None}
 
 
 @router.delete("/apps/{app_id}", status_code=204, dependencies=use_access)
@@ -296,6 +428,7 @@ def list_jobs(db: DbSession, station_id: int | None = None, limit: int = 30):
 
 class ArchiveAllIn(BaseModel):
     station_id: int
+    store: Literal["all", "removed"] = "all"  # removed — только снятые в РФ
 
 
 @router.post("/jobs/archive-all", dependencies=use_access)
@@ -307,7 +440,7 @@ def archive_all(data: ArchiveAllIn, db: DbSession, me: CurrentEmployee):
     queued_apps = set(db.scalars(select(AppInstallJob.app_id).where(
         AppInstallJob.kind == JobKind.ARCHIVE, AppInstallJob.state.in_(JobState.OPEN))))
     added = 0
-    for app_item in db.scalars(select(IosApp).where(IosApp.is_active.is_(True)).order_by(IosApp.name)):
+    for app_item in db.scalars(_apps_query(data.store).order_by(IosApp.name)):
         if _ipa_exists(app_item) or app_item.id in queued_apps:
             continue
         db.add(AppInstallJob(station_id=station.id, kind=JobKind.ARCHIVE, app_id=app_item.id,
