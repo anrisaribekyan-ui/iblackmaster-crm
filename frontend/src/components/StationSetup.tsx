@@ -242,7 +242,7 @@ export function StationWizard({
 }
 
 /** Блок для руководителя: какие установщики лежат в CRM, загрузить новый. */
-export function AgentFilesPanel() {
+export function AgentFilesPanel({ canUpload }: { canUpload: boolean }) {
   const { files, reload } = useAgentFiles()
   const [busy, setBusy] = useState<string>('')
   const [error, setError] = useState('')
@@ -269,13 +269,14 @@ export function AgentFilesPanel() {
       <div>
         <h2 id="agent-files-title" className="font-semibold">Файлы помощника</h2>
         <p className="text-sm text-muted">
-          Отсюда сотрудники скачивают помощника при подключении компьютера. Свежие файлы собирает GitHub
-          (репозиторий → Actions → «Помощник станции» → Artifacts) — скачайте и загрузите сюда как есть, распаковывать не нужно.
+          Программа для компьютера, к которому подключают айфоны. Скачайте вариант для своей системы и запустите.
+          {canUpload && <> Свежие файлы собирает GitHub (репозиторий → Actions → «Помощник станции» → Artifacts) —
+          скачайте и загрузите сюда как есть, распаковывать не нужно.</>}
         </p>
       </div>
       <ul className="grid gap-2 sm:grid-cols-2">
         {files.map((f) => (
-          <li key={f.platform} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-surface p-3">
+          <li key={f.platform} className="relative flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-line bg-surface p-3">
             <div className="min-w-0 flex-1">
               <div className="font-medium">{f.title}</div>
               <div className="truncate text-xs text-muted">
@@ -284,13 +285,21 @@ export function AgentFilesPanel() {
                   : `Не загружен — нужен ${f.filename}`}
               </div>
             </div>
-            <input ref={(el) => { inputs.current[f.platform] = el }} type="file" className="sr-only"
+            {canUpload && <input ref={(el) => { inputs.current[f.platform] = el }} type="file" className="sr-only"
               accept={f.platform === 'windows' ? '.exe,.zip' : '.zip'} aria-label={`Файл для ${f.title}`}
-              onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void upload(f.platform, file) }} />
-            <button className="rounded-md border border-line px-3 py-1.5 text-sm hover:border-accent hover:text-accent disabled:opacity-50"
-              disabled={!!busy} onClick={() => inputs.current[f.platform]?.click()}>
-              {busy === f.platform ? 'Загружаю…' : f.available ? 'Заменить' : 'Загрузить'}
-            </button>
+              onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ''; if (file) void upload(f.platform, file) }} />}
+            {f.available && (
+              <a href={`/api/app-install/agent-files/${f.platform}`} download={f.filename}
+                className="rounded-md bg-accent px-3 py-1.5 text-sm text-accent-ink">
+                Скачать
+              </a>
+            )}
+            {canUpload && (
+              <button className="rounded-md border border-line px-3 py-1.5 text-sm hover:border-accent hover:text-accent disabled:opacity-50"
+                disabled={!!busy} onClick={() => inputs.current[f.platform]?.click()}>
+                {busy === f.platform ? 'Загружаю…' : f.available ? 'Заменить' : 'Загрузить'}
+              </button>
+            )}
           </li>
         ))}
       </ul>

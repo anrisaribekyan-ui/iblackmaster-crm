@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 import ssl
 import threading
 import time
@@ -30,6 +31,8 @@ HEARTBEAT_SEC = 10
 POLL_SEC = 3
 APPLE_RECHECK_SEC = 300
 PENDING_LOGIN_TTL = 15 * 60
+CACHE_SYNC_SEC = 10 * 60  # как часто сверять свой кэш с архивом CRM
+CACHE_MIN_FREE = 5 * 1024 ** 3  # не забивать диск станции: оставляем минимум 5 ГБ
 
 
 def _ssl_context() -> ssl.SSLContext:
@@ -74,6 +77,17 @@ class Crm:
             except ValueError:
                 message = str(exc)
             raise CrmError(exc.code, message) from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            raise CrmError(0, f"CRM недоступна: {exc}") from exc
+        return json.loads(raw) if raw else None
+
+    def get(self, path: str, timeout: int = 30) -> Any:
+        req = urllib.request.Request(self.base + path, headers=self._headers())
+        try:
+            with urllib.request.urlopen(req, timeout=timeout, context=SSL_CONTEXT) as resp:
+                raw = resp.read()
+        except urllib.error.HTTPError as exc:
+            raise CrmError(exc.code, str(exc)) from exc
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise CrmError(0, f"CRM недоступна: {exc}") from exc
         return json.loads(raw) if raw else None
@@ -150,6 +164,8 @@ class Agent:
         self.apple_id: Optional[str] = settings.apple_id_email or None
         self._apple_checked_at = 0.0
         self._lock = threading.Lock()
+        self._cache_wakeup = threading.Event()
+        self._archive_seen: Optional[int] = None
 
     def reload_token(self) -> bool:
         """CRM отказала в доступе: возможно, код подключения заменили (переустановка, «Переподключить»).
@@ -183,14 +199,18 @@ class Agent:
             log.warning("USB: %s", exc)
             devices = []
         self._check_apple()
-        self.crm.post("/heartbeat", {
+        answer = self.crm.post("/heartbeat", {
             "os": config.os_name(),
             "agent_version": config.VERSION,
             "devices": devices,
             "apple_id": self.apple_id,
             "apple_auth": self.apple_auth,
             "apple_route": APPLE_PROXY.describe(),
-        })
+        }) or {}
+        archive = answer.get("archive")
+        if archive is not None and archive != self._archive_seen:
+            self._archive_seen = archive
+            self._cache_wakeup.set()  # в архиве CRM появилось новое — подтянуть в кэш сейчас
 
     def _heartbeat_loop(self) -> None:
         failures = 0
@@ -240,6 +260,8 @@ class Agent:
                 self._login(job)
             elif kind == "install":
                 self._install(job)
+            elif kind == "archive":
+                self._archive_job(job)
             else:
                 self.report(job_id, state="failed", message=f"Неизвестная задача: {kind}")
         except AuthRequired as exc:
@@ -383,6 +405,65 @@ class Agent:
 
         threading.Thread(target=upload, name=f"archive-{app_id}", daemon=True).start()
 
+    def _archive_job(self, job: dict) -> None:
+        """Заранее: скачать у Apple и положить в архив CRM, чтобы потом ставить без ожидания."""
+        job_id = job["id"]
+        name = job.get("app_name") or "приложение"
+        if job.get("ipa_in_crm"):
+            self.report(job_id, state="done", message=f"«{name}» уже в архиве CRM")
+            return
+        cached = self.ipatool.cached_path(job["adam_id"], job.get("version_id"))
+        if not (cached.is_file() and cached.stat().st_size > 0):
+            if self.report(job_id, progress=5, message=f"Скачиваю «{name}» у Apple…"):
+                return
+        path, _ = self.ipatool.download(job["adam_id"], job.get("version_id"))
+        size_mb = path.stat().st_size / 1_048_576
+        if self.report(job_id, progress=60, message=f"Скачано ({size_mb:.0f} МБ). Кладу в архив CRM…"):
+            return
+        try:
+            self.crm.upload_file(f"/apps/{job['app_id']}/ipa", path)
+        except CrmError as exc:
+            self.report(job_id, state="failed", error_code="ARCHIVE_UPLOAD",
+                        message=f"Скачано, но в архив CRM не легло: {exc}. Файл остался на станции.")
+            return
+        self.report(job_id, state="done", message=f"«{name}» в архиве CRM ({size_mb:.0f} МБ)")
+
+    # ------------------------------------------------------------- кэш станции = копия архива CRM
+
+    def sync_cache(self) -> int:
+        """Скопировать к себе всё из архива CRM, чего ещё нет локально. Возвращает, сколько скачано."""
+        try:
+            items = self.crm.get("/archive") or []
+        except CrmError as exc:
+            log.debug("Список архива недоступен: %s", exc)
+            return 0
+        fetched = 0
+        for item in items:
+            target = self.ipatool.cached_path(item["adam_id"], item.get("version_id"))
+            if target.is_file() and target.stat().st_size == item.get("size"):
+                continue
+            free = shutil.disk_usage(target.parent).free
+            if free - (item.get("size") or 0) < CACHE_MIN_FREE:
+                log.warning("Мало места на диске станции — «%s» в кэш не копирую", item.get("name"))
+                break
+            try:
+                self.crm.download_file(f"/apps/{item['app_id']}/ipa", target)
+                fetched += 1
+                log.info("В кэш станции: «%s»", item.get("name"))
+            except CrmError as exc:
+                log.warning("Не скопировал «%s» из архива: %s", item.get("name"), exc)
+        return fetched
+
+    def _cache_loop(self) -> None:
+        self.stop.wait(20)  # дать помощнику спокойно стартовать
+        while not self.stop.is_set():
+            try:
+                self.sync_cache()
+            except Exception:  # noqa: BLE001
+                log.exception("Сбой синхронизации кэша")
+            self._cache_wakeup.wait(CACHE_SYNC_SEC)
+            self._cache_wakeup.clear()
+
     def _install(self, job: dict) -> None:
         job_id = job["id"]
         name = job.get("app_name") or "приложение"
@@ -413,6 +494,7 @@ class Agent:
         log.info("Помощник %s запущен, CRM: %s", config.VERSION, self.settings.crm_url)
         threading.Thread(target=APPLE_PROXY.url, name="tunnel", daemon=True).start()  # поднять туннель заранее
         threading.Thread(target=self._heartbeat_loop, name="heartbeat", daemon=True).start()
+        threading.Thread(target=self._cache_loop, name="cache", daemon=True).start()
         failures = 0
         while not self.stop.is_set():
             try:
