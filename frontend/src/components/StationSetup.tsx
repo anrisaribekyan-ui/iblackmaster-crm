@@ -115,6 +115,7 @@ export function StationWizard({
   const [code, setCode] = useState(reissue ? connectionCode(reissue.token) : '')
   const [downloaded, setDownloaded] = useState(!!reissue)
   const [copied, setCopied] = useState(false)
+  const [copyFailed, setCopyFailed] = useState(false)
   const [online, setOnline] = useState<StationLite | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -141,12 +142,28 @@ export function StationWizard({
   }
 
   const copy = async () => {
+    // navigator.clipboard работает не везде (http, запрет браузера) — тогда копируем через выделение
+    let ok = false
     try {
       await navigator.clipboard.writeText(code)
-      setCopied(true)
+      ok = true
     } catch {
-      setCopied(false)
+      const area = document.createElement('textarea')
+      area.value = code
+      area.setAttribute('readonly', '')
+      area.style.position = 'fixed'
+      area.style.opacity = '0'
+      document.body.appendChild(area)
+      area.select()
+      try {
+        ok = document.execCommand('copy')
+      } catch {
+        ok = false
+      }
+      area.remove()
     }
+    setCopied(ok)
+    setCopyFailed(!ok)
   }
 
   // Ждём, пока помощник выйдет на связь с новым кодом
@@ -212,7 +229,7 @@ export function StationWizard({
         <Step n={reissue ? 2 : 3} title="Вставьте код подключения в окно помощника" done={!!online} active={!!stationId && downloaded && !online}>
           <p className="text-sm text-muted">Установщик спросит код на первом шаге. Код работает только для этого компьютера.</p>
           <div className="rounded-lg border border-line bg-canvas p-3">
-            <code className="block max-h-24 overflow-auto break-all text-xs">{code}</code>
+            <code className="block max-h-24 select-all overflow-auto break-all text-xs">{code}</code>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button className={primary} onClick={() => void copy()}>{copied ? 'Скопировано' : 'Скопировать код'}</button>
@@ -221,6 +238,11 @@ export function StationWizard({
               Жду, когда компьютер выйдет на связь…
             </span>
           </div>
+          {copyFailed && (
+            <p role="alert" className="text-sm text-warning">
+              Браузер не дал скопировать автоматически. Щёлкните по коду — он выделится целиком — и нажмите ⌘C или Ctrl+C.
+            </p>
+          )}
           {waitingLong && (
             <p className="text-sm text-muted">
               Долго? Проверьте, что установка дошла до конца и есть интернет. Если код вставили с ошибкой —
