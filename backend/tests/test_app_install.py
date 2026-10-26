@@ -515,3 +515,52 @@ def test_import_ids_store_check_and_archive_removed(client, auth_headers, db, mo
     assert r.json()["checked"] is False
     assert client.post("/api/app-install/apps/import", headers=auth_headers, json={"text": "пусто"}).status_code == 400
     assert client.post("/api/app-install/apps/check-store", headers=auth_headers).status_code == 400
+
+
+def test_retire_app_broken_blocks_install_and_frees_archive(client, auth_headers, db, tmp_path, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "uploads_dir", str(tmp_path))
+    station_id, agent = make_station(client, auth_headers)
+    beat(client, agent)
+    db.add(IosApp(adam_id=1001, bundle_id="ru.alfabank", name="Альфа-Банк", version="1", version_id=5))
+    db.add(IosApp(adam_id=1002, bundle_id="game", name="Игра", version="1"))
+    db.commit()
+    alfa = db.scalar(select(IosApp).where(IosApp.adam_id == 1001))
+    game = db.scalar(select(IosApp).where(IosApp.adam_id == 1002))
+    assert client.post(f"/api/app-install/agent/apps/{alfa.id}/ipa", content=_fake_ipa(adam_id=1001), headers=agent).status_code == 200
+    queued = client.post("/api/app-install/jobs", json={"station_id": station_id, "kind": "install", "app_id": alfa.id,
+                                                        "target_udid": TARGET["udid"]}, headers=auth_headers).json()
+
+    r = client.post(f"/api/app-install/apps/{alfa.id}/retire", json={"reason": "broken", "note": "банк отключил вход"},
+                    headers=auth_headers)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["retired_reason"] == "broken" and body["ipa_size"] is None and body["retired_by_name"]
+    assert not (tmp_path / "ipa" / f"{alfa.id}.ipa").exists()
+    assert db.get(AppInstallJob, queued["id"]).state == "cancelled"
+
+    # Не видно в библиотеке, видно в «Убранных»; ставить нельзя
+    assert all(a["id"] != alfa.id for a in client.get("/api/app-install/apps", headers=auth_headers).json())
+    retired = client.get("/api/app-install/apps?store=retired", headers=auth_headers).json()
+    assert [a["retired_note"] for a in retired] == ["банк отключил вход"]
+    r = client.post("/api/app-install/jobs", json={"station_id": station_id, "kind": "install", "app_id": alfa.id,
+                                                   "target_udid": TARGET["udid"]}, headers=auth_headers)
+    assert r.status_code == 400 and "банк отключил вход" in r.json()["message"]
+    assert client.get("/api/app-install/apps/stats", headers=auth_headers).json()["retired"] == 1
+    assert client.get("/api/app-install/agent/retired", headers=agent).json() == [1001]
+
+    # Скан с донора и импорт не возвращают убранное
+    beat(client, agent)
+    client.post("/api/app-install/apps/import", headers=auth_headers, json={"text": "1001 нет, нужен шестизначный: 001001"})
+    db.expire_all()
+    assert db.get(IosApp, alfa.id).is_active is False
+
+    # «Не нужно» — тоже прячется; возвращается кнопкой
+    client.post(f"/api/app-install/apps/{game.id}/retire", json={"reason": "unneeded"}, headers=auth_headers)
+    r = client.post(f"/api/app-install/apps/{game.id}/install", headers=auth_headers)
+    r = client.post("/api/app-install/jobs", json={"station_id": station_id, "kind": "archive", "app_id": game.id}, headers=auth_headers)
+    assert r.status_code == 400 and "Убранные" in r.json()["message"]
+    r = client.post(f"/api/app-install/apps/{game.id}/restore", headers=auth_headers)
+    assert r.json()["retired_reason"] is None
+    assert any(a["id"] == game.id for a in client.get("/api/app-install/apps", headers=auth_headers).json())

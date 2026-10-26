@@ -39,9 +39,13 @@ type IosApp = {
   ipa_version: string | null
   ipa_apple_id: string | null
   store_ru: 'available' | 'removed' | null
+  retired_reason: 'broken' | 'unneeded' | null
+  retired_note: string | null
+  retired_at: string | null
+  retired_by_name: string | null
 }
-type StoreFilter = 'all' | 'removed' | 'archived'
-type AppStats = { all: number; removed: number; archived: number; unchecked: number }
+type StoreFilter = 'all' | 'removed' | 'archived' | 'retired'
+type AppStats = { all: number; removed: number; archived: number; unchecked: number; retired: number }
 type Job = {
   id: number
   station_id: number
@@ -114,6 +118,65 @@ function errorText(e: unknown, fallback: string) {
 }
 
 // ------------------------------------------------------------------ вход в Apple ID
+
+function RetireModal({ app, onClose, onDone }: { app: IosApp; onClose: () => void; onDone: (text: string) => void }) {
+  const [reason, setReason] = useState<'broken' | 'unneeded' | ''>('')
+  const [note, setNote] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async () => {
+    if (!reason) return
+    setBusy(true)
+    setError('')
+    try {
+      await api.post(`/app-install/apps/${app.id}/retire`, { reason, note: note.trim() || null })
+      onDone(reason === 'broken' ? `«${app.name}» отмечено как неработающее` : `«${app.name}» убрано`)
+      onClose()
+    } catch (e) {
+      setError(errorText(e, 'Не удалось убрать'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const options = [
+    ['broken', 'Не работает', 'Производитель отключил: не входит, не поддерживается. Установить будет нельзя.'],
+    ['unneeded', 'Больше не нужно', 'Просто убрать из списка. Вернуть можно в любой момент.'],
+  ] as const
+
+  return (
+    <Modal title={`Убрать «${app.name}»`} onClose={onClose}>
+      <form className="grid gap-3" onSubmit={(e) => { e.preventDefault(); void submit() }}>
+        <fieldset className="grid gap-2">
+          <legend className="mb-1 text-sm">Почему убираете?</legend>
+          {options.map(([value, title, hint]) => (
+            <label key={value}
+              className={`flex cursor-pointer gap-3 rounded-lg border p-3 ${reason === value ? 'border-accent bg-accent/5' : 'border-line'}`}>
+              <input type="radio" name="retire-reason" value={value} checked={reason === value}
+                onChange={() => setReason(value)} className="mt-1" />
+              <span className="grid gap-0.5">
+                <span className="font-medium">{title}</span>
+                <span className="text-sm text-muted">{hint}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <label className="grid gap-1 text-sm">
+          Комментарий (необязательно)
+          <input className={inputClass} maxLength={500} value={note} placeholder="Например: банк отключил вход в приложение"
+            onChange={(e) => setNote(e.target.value)} />
+        </label>
+        {app.ipa_size ? <p className="text-sm text-muted">Файл из архива CRM и копии на станциях будут удалены.</p> : null}
+        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" className={button} onClick={onClose}>Отмена</button>
+          <button type="submit" className={primary} disabled={busy || !reason}>{busy ? 'Убираю…' : 'Убрать'}</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
 
 function ImportModal({ onClose, onDone }: { onClose: () => void; onDone: (text: string) => void }) {
   const [text, setText] = useState('')
@@ -294,6 +357,7 @@ export default function AppInstallPage() {
   const [storeFilter, setStoreFilter] = useState<StoreFilter>('all')
   const [stats, setStats] = useState<AppStats | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [retiring, setRetiring] = useState<IosApp | null>(null)
   const [checking, setChecking] = useState(false)
   const [targetUdid, setTargetUdid] = useState<string>('')
   const [error, setError] = useState('')
@@ -414,6 +478,22 @@ export default function AppInstallPage() {
       setError(errorText(e, 'Не удалось проверить App Store'))
     } finally {
       setChecking(false)
+    }
+  }
+
+  // Вернули последнее убранное — вкладка исчезает, показываем всю библиотеку
+  useEffect(() => {
+    if (storeFilter === 'retired' && stats && stats.retired === 0) setStoreFilter('all')
+  }, [stats, storeFilter])
+
+  const restoreApp = async (a: IosApp) => {
+    setError('')
+    try {
+      await api.post(`/app-install/apps/${a.id}/restore`)
+      setNotice(`«${a.name}» снова в библиотеке`)
+      await loadApps(query, storeFilter)
+    } catch (e) {
+      setError(errorText(e, 'Не удалось вернуть'))
     }
   }
 
@@ -578,7 +658,7 @@ export default function AppInstallPage() {
                 onClick={() => void startJob({ kind: 'purchases' }, 'Загружаю покупки Apple ID')}>
                 Покупки Apple ID
               </button>
-              {notArchived > 0 && storeFilter !== 'archived' && (
+              {notArchived > 0 && storeFilter !== 'archived' && storeFilter !== 'retired' && (
                 <button className={button} disabled={!station?.online} onClick={() => void archiveAll()}
                   title="Станция скачает у Apple всё из этого списка, чего ещё нет в архиве, и положит в CRM">
                   {storeFilter === 'removed' ? `Скачать снятые в архив (${notArchived})` : `Скачать всё в архив (${notArchived})`}
@@ -607,6 +687,7 @@ export default function AppInstallPage() {
                   ['all', `Все · ${stats.all}`],
                   ['removed', `Снятые в РФ · ${stats.removed}`],
                   ['archived', `В архиве · ${stats.archived}`],
+                  ...(stats.retired ? [['retired', `Убранные · ${stats.retired}`] as const] : []),
                 ] as const).map(([key, label]) => (
                   <button key={key} role="tab" aria-selected={storeFilter === key}
                     className={`rounded-full border px-3 py-1 text-sm ${storeFilter === key ? 'border-accent bg-accent/10 text-accent' : 'border-line text-muted hover:text-ink'}`}
@@ -637,23 +718,44 @@ export default function AppInstallPage() {
                         </div>
                       ) : null}
                     </div>
-                    {!a.ipa_size && (
-                      <button className={button} disabled={!station?.online || archiving(a.id)}
-                        title="Скачать у Apple заранее и хранить в CRM — установка потом без ожидания"
-                        onClick={() => void startJob({ kind: 'archive', app_id: a.id }, `Кладу «${a.name}» в архив`)}>
-                        {archiving(a.id) ? 'В архив…' : 'В архив'}
-                      </button>
+                    {a.retired_reason ? (
+                      <>
+                        <div className="basis-full text-xs sm:basis-auto sm:text-right">
+                          <span className={`font-medium ${a.retired_reason === 'broken' ? 'text-danger' : 'text-muted'}`}>
+                            {a.retired_reason === 'broken' ? 'Не работает — установить нельзя' : 'Больше не нужно'}
+                          </span>
+                          {a.retired_note && <span className="text-muted"> · {a.retired_note}</span>}
+                          <div className="text-muted">
+                            {[a.retired_by_name, a.retired_at && formatDateTime(a.retired_at)].filter(Boolean).join(' · ')}
+                          </div>
+                        </div>
+                        <button className={button} onClick={() => void restoreApp(a)}>Вернуть</button>
+                      </>
+                    ) : (
+                      <>
+                        {!a.ipa_size && (
+                          <button className={button} disabled={!station?.online || archiving(a.id)}
+                            title="Скачать у Apple заранее и хранить в CRM — установка потом без ожидания"
+                            onClick={() => void startJob({ kind: 'archive', app_id: a.id }, `Кладу «${a.name}» в архив`)}>
+                            {archiving(a.id) ? 'В архив…' : 'В архив'}
+                          </button>
+                        )}
+                        <button className={primary} disabled={!targetUdid || busyApp(a.id)}
+                          title={!targetUdid ? 'Сначала выберите телефон: «Ставить сюда»' : undefined}
+                          onClick={() => void startJob({ kind: 'install', app_id: a.id, target_udid: targetUdid }, `Ставлю «${a.name}»`)}>
+                          {busyApp(a.id) ? 'Ставится…' : 'Установить'}
+                        </button>
+                        <button className={`${button} px-2`} aria-label={`Убрать «${a.name}»`} title="Убрать из списка"
+                          onClick={() => setRetiring(a)}>
+                          Убрать
+                        </button>
+                      </>
                     )}
-                    <button className={primary} disabled={!targetUdid || busyApp(a.id)}
-                      title={!targetUdid ? 'Сначала выберите телефон: «Ставить сюда»' : undefined}
-                      onClick={() => void startJob({ kind: 'install', app_id: a.id, target_udid: targetUdid }, `Ставлю «${a.name}»`)}>
-                      {busyApp(a.id) ? 'Ставится…' : 'Установить'}
-                    </button>
                   </li>
                 ))}
               </ul>
             )}
-            {apps.length > 0 && !targetUdid && station?.online && (
+            {apps.length > 0 && !targetUdid && station?.online && storeFilter !== 'retired' && (
               <p className="text-sm text-muted">Чтобы установить, нажмите «Ставить сюда» у нужного телефона.</p>
             )}
           </section>
@@ -675,6 +777,10 @@ export default function AppInstallPage() {
       <AgentFilesPanel canUpload={manage} />
 
       {modal === 'station' && <StationWizard onClose={() => setModal(null)} onChanged={() => void refresh()} />}
+      {retiring && (
+        <RetireModal app={retiring} onClose={() => setRetiring(null)}
+          onDone={(text) => { setNotice(text); void loadApps(query, storeFilter).catch(() => undefined) }} />
+      )}
       {importOpen && (
         <ImportModal onClose={() => setImportOpen(false)}
           onDone={(text) => { setNotice(text); void loadApps(query, storeFilter).catch(() => undefined) }} />

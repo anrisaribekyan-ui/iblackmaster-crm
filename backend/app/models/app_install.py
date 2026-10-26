@@ -54,6 +54,16 @@ class IosApp(Base, TimestampMixin):
     # Есть ли приложение сейчас в российском App Store: available | removed | None (не проверяли)
     store_ru: Mapped[str | None] = mapped_column(String(10))
     store_checked_at: Mapped[datetime | None]
+    # Убрано из библиотеки: broken — не работает (производитель отключил, ставить нельзя), unneeded — не нужно
+    retired_reason: Mapped[str | None] = mapped_column(String(10))
+    retired_note: Mapped[str | None] = mapped_column(String(500))
+    retired_at: Mapped[datetime | None]
+    retired_by_id: Mapped[int | None] = mapped_column(ForeignKey("employee.id", ondelete="SET NULL"))
+    retired_by = relationship("Employee", foreign_keys=[retired_by_id], lazy="joined")
+
+    @property
+    def retired_by_name(self) -> str | None:
+        return self.retired_by.name if self.retired_by else None
 
 
 class JobKind:

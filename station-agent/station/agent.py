@@ -437,6 +437,7 @@ class Agent:
         except CrmError as exc:
             log.debug("Список архива недоступен: %s", exc)
             return 0
+        self._prune_cache()
         fetched = 0
         for item in items:
             target = self.ipatool.cached_path(item["adam_id"], item.get("version_id"))
@@ -453,6 +454,17 @@ class Agent:
             except CrmError as exc:
                 log.warning("Не скопировал «%s» из архива: %s", item.get("name"), exc)
         return fetched
+
+    def _prune_cache(self) -> None:
+        """Стереть из кэша приложения, которые в CRM убрали (не работают или больше не нужны)."""
+        try:
+            retired = self.crm.get("/retired") or []
+        except CrmError:
+            return  # старая CRM без этого списка
+        for adam_id in retired:
+            for path in self.ipatool.s.cache_dir.glob(f"{int(adam_id)}_*.ipa"):
+                path.unlink(missing_ok=True)
+                log.info("Убрал из кэша станции: %s", path.name)
 
     def _cache_loop(self) -> None:
         self.stop.wait(20)  # дать помощнику спокойно стартовать
