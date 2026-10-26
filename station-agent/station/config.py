@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import re
 import os
 import secrets
 import shutil
@@ -85,17 +86,36 @@ def write_config(values: dict) -> None:
     tmp.replace(path)
 
 
-def parse_connection_code(code: str) -> tuple[str, str]:
-    """Код из CRM (base64 от {"url","token"}) → (адрес CRM, токен станции)."""
-    cleaned = "".join(code.split())
+def _decode_code(chunk: str) -> tuple[str, str] | None:
+    chunk = chunk.replace("-", "+").replace("_", "/")
     try:
-        data = json.loads(base64.b64decode(cleaned + "=" * (-len(cleaned) % 4)).decode("utf-8"))
+        data = json.loads(base64.b64decode(chunk + "=" * (-len(chunk) % 4)).decode("utf-8"))
         url, token = str(data["url"]).rstrip("/"), str(data["token"])
-    except (binascii.Error, ValueError, KeyError, TypeError, UnicodeDecodeError) as exc:
-        raise ValueError("Код подключения не подходит: скопируйте его из CRM целиком") from exc
+    except (binascii.Error, ValueError, KeyError, TypeError, UnicodeDecodeError, AttributeError):
+        return None
     if not url.startswith(("http://", "https://")) or not token.startswith("st_"):
-        raise ValueError("Код подключения не подходит: скопируйте его из CRM целиком")
+        return None
     return url, token
+
+
+def parse_connection_code(code: str) -> tuple[str, str]:
+    """Код из CRM (base64 от {"url","token"}) → (адрес CRM, токен станции).
+
+    Терпим к мусору вокруг: кавычки, пробелы, переносы строк, лишний текст
+    (например, вставили вместе с командой) — ищем внутри сам код.
+    """
+    text = code or ""
+    candidates = ["".join(text.split())]
+    candidates += sorted(re.findall(r"[A-Za-z0-9+/_-]{40,}={0,2}", text), key=len, reverse=True)
+    for chunk in candidates:
+        found = _decode_code(chunk.strip("\"'«»`"))
+        if found:
+            return found
+    shown = " ".join(text.split())
+    hint = f" (вставлено: «{shown[:40]}{'…' if len(shown) > 40 else ''}»)" if shown else " (вставлена пустая строка)"
+    raise ValueError(
+        "Код подключения не подходит: в CRM нажмите «Скопировать код» и вставьте его целиком" + hint
+    )
 
 
 @dataclass(frozen=True)
