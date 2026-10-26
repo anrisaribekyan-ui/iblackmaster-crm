@@ -43,7 +43,7 @@ type Job = {
   id: number
   station_id: number
   station_name: string
-  kind: 'scan' | 'purchases' | 'login' | 'install'
+  kind: 'scan' | 'purchases' | 'login' | 'install' | 'archive'
   app: IosApp | null
   target_name: string | null
   state: 'queued' | 'running' | 'need_code' | 'done' | 'failed' | 'cancelled'
@@ -88,6 +88,8 @@ function jobTitle(job: Job) {
       return 'Покупки Apple ID'
     case 'login':
       return `Вход в Apple ID ${job.email ?? ''}`
+    case 'archive':
+      return `${job.app?.name ?? 'Приложение'} → в архив CRM`
     default:
       return `${job.app?.name ?? 'Приложение'} → ${job.target_name ?? 'телефон'}`
   }
@@ -315,6 +317,18 @@ export default function AppInstallPage() {
     }
   }
 
+  const archiveAll = async () => {
+    if (!station) return
+    setError('')
+    try {
+      const r = await api.post<{ queued: number }>('/app-install/jobs/archive-all', { station_id: station.id })
+      setNotice(r.queued ? `В очереди на скачивание в архив: ${r.queued}` : 'Всё уже в архиве или в очереди')
+      await loadJobs()
+    } catch (e) {
+      setError(errorText(e, 'Не удалось поставить в очередь'))
+    }
+  }
+
   const clearHistory = async () => {
     if (!confirm('Стереть завершённые задачи? Текущие останутся.')) return
     try {
@@ -347,6 +361,8 @@ export default function AppInstallPage() {
 
   const openJobs = jobs.filter((j) => OPEN.includes(j.state))
   const busyApp = (appId: number) => openJobs.some((j) => j.kind === 'install' && j.app?.id === appId)
+  const archiving = (appId: number) => openJobs.some((j) => j.kind === 'archive' && j.app?.id === appId)
+  const notArchived = apps.filter((a) => !a.ipa_size).length
 
   if (stations === null) {
     return (
@@ -474,8 +490,14 @@ export default function AppInstallPage() {
                 onClick={() => void startJob({ kind: 'purchases' }, 'Загружаю покупки Apple ID')}>
                 Покупки Apple ID
               </button>
+              {notArchived > 0 && (
+                <button className={button} disabled={!station?.online} onClick={() => void archiveAll()}
+                  title="Станция скачает у Apple всё, чего ещё нет в архиве, и положит в CRM">
+                  Скачать всё в архив ({notArchived})
+                </button>
+              )}
               {manage && (
-                <label className={`${button} cursor-pointer`}>
+                <label className={`${button} relative cursor-pointer`}>
                   {uploading ? 'Загружаю…' : 'Загрузить IPA'}
                   <input type="file" accept=".ipa" className="sr-only" disabled={uploading}
                     onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void uploadIpa(f) }} />
@@ -500,6 +522,13 @@ export default function AppInstallPage() {
                         </div>
                       ) : null}
                     </div>
+                    {!a.ipa_size && (
+                      <button className={button} disabled={!station?.online || archiving(a.id)}
+                        title="Скачать у Apple заранее и хранить в CRM — установка потом без ожидания"
+                        onClick={() => void startJob({ kind: 'archive', app_id: a.id }, `Кладу «${a.name}» в архив`)}>
+                        {archiving(a.id) ? 'В архив…' : 'В архив'}
+                      </button>
+                    )}
                     <button className={primary} disabled={!targetUdid || busyApp(a.id)}
                       title={!targetUdid ? 'Сначала выберите телефон: «Ставить сюда»' : undefined}
                       onClick={() => void startJob({ kind: 'install', app_id: a.id, target_udid: targetUdid }, `Ставлю «${a.name}»`)}>
@@ -528,7 +557,7 @@ export default function AppInstallPage() {
         </>
       )}
 
-      {manage && <AgentFilesPanel />}
+      <AgentFilesPanel canUpload={manage} />
 
       {modal === 'station' && <StationWizard onClose={() => setModal(null)} onChanged={() => void refresh()} />}
       {modal === 'login' && station && <LoginModal station={station} onClose={() => setModal(null)} onQueued={() => void loadJobs()} />}

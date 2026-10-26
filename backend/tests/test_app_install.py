@@ -431,3 +431,43 @@ def test_ipa_manual_upload(client, auth_headers, db, tmp_path, monkeypatch):
                     files={"file": ("x.ipa", b"not a zip" * 200, "application/octet-stream")})
     assert r.status_code == 400
     assert not [p for p in (tmp_path / "ipa").iterdir() if p.name.startswith("upload-")]
+
+
+def test_archive_jobs_prefetch_and_priority(client, auth_headers, db, tmp_path, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "uploads_dir", str(tmp_path))
+    station_id, agent = make_station(client, auth_headers)
+    beat(client, agent)
+    for adam, name in ((111, "Старый банк"), (222, "Игра"), (333, "Почта")):
+        db.add(IosApp(adam_id=adam, bundle_id=f"b.{adam}", name=name, version="1", version_id=adam * 10))
+    db.commit()
+    ids = {a.adam_id: a.id for a in db.scalars(select(IosApp))}
+
+    r = client.post("/api/app-install/jobs/archive-all", json={"station_id": station_id}, headers=auth_headers)
+    assert r.json()["queued"] == 3
+    assert client.post("/api/app-install/jobs/archive-all", json={"station_id": station_id}, headers=auth_headers).json()["queued"] == 0
+
+    # Установка, поставленная позже, всё равно идёт первой
+    client.post("/api/app-install/jobs", json={"station_id": station_id, "kind": "install", "app_id": ids[333],
+                                               "target_udid": TARGET["udid"]}, headers=auth_headers)
+    first = next_job(client, agent)
+    assert first["kind"] == "install"
+    report(client, agent, first["id"], state="done")
+
+    job = next_job(client, agent)
+    assert job["kind"] == "archive" and job["target_udid"] is None and job["ipa_in_crm"] is False
+    r = client.post(f"/api/app-install/agent/apps/{job['app_id']}/ipa", content=_fake_ipa(adam_id=job["adam_id"]), headers=agent)
+    assert r.status_code == 200, r.text
+    report(client, agent, job["id"], state="done")
+
+    listing = client.get("/api/app-install/agent/archive", headers=agent).json()
+    assert [x["adam_id"] for x in listing] == [job["adam_id"]] and listing[0]["size"] > 0
+    hb = client.post("/api/app-install/agent/heartbeat", json={"devices": [TARGET]}, headers=agent).json()
+    assert hb["archive"] == 1
+
+    # Уже в архиве — повторно класть нельзя
+    r = client.post("/api/app-install/jobs", json={"station_id": station_id, "kind": "archive", "app_id": job["app_id"]},
+                    headers=auth_headers)
+    assert r.status_code == 400 and "уже в архиве" in r.json()["message"]
+    assert client.get("/api/app-install/agent/archive").status_code == 401

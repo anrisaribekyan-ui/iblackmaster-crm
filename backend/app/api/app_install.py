@@ -23,7 +23,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, File, Form, Header, Request, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import or_, select
+from sqlalchemy import case, func, or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, require
 from app.config import settings
@@ -35,7 +35,7 @@ router = APIRouter(prefix="/app-install", tags=["Установка прилож
 
 ONLINE_SECONDS = 45  # помощник шлёт пульс раз в ~10 с
 # Задача без вестей от станции дольше этого — станция её потеряла (перезапуск, сменили код, выключили)
-STALE_MINUTES = {JobKind.INSTALL: 30}  # скачивание большого приложения идёт молча
+STALE_MINUTES = {JobKind.INSTALL: 30, JobKind.ARCHIVE: 30}  # скачивание большого приложения идёт молча
 STALE_DEFAULT_MINUTES = 10
 CODE_WAIT_MINUTES = 15  # помощник помнит пароль Apple ID до ввода кода не дольше этого
 CODE_RE = re.compile(r"^\d{6}$")
@@ -130,7 +130,7 @@ class JobOut(BaseModel):
 
 class JobIn(BaseModel):
     station_id: int
-    kind: Literal["scan", "purchases", "login", "install"]
+    kind: Literal["scan", "purchases", "login", "install", "archive"]
     app_id: int | None = None
     target_udid: str | None = Field(default=None, max_length=64)
     order_id: int | None = None
@@ -294,6 +294,29 @@ def list_jobs(db: DbSession, station_id: int | None = None, limit: int = 30):
     return [_job_out(db, j) for j in db.scalars(query)]
 
 
+class ArchiveAllIn(BaseModel):
+    station_id: int
+
+
+@router.post("/jobs/archive-all", dependencies=use_access)
+def archive_all(data: ArchiveAllIn, db: DbSession, me: CurrentEmployee):
+    """Поставить в очередь предзагрузку всех приложений библиотеки, которых ещё нет в архиве."""
+    station = _get_station(db, data.station_id)
+    if not _is_online(station):
+        raise BusinessError("Станция не на связи: проверьте, что компьютер включён и помощник запущен")
+    queued_apps = set(db.scalars(select(AppInstallJob.app_id).where(
+        AppInstallJob.kind == JobKind.ARCHIVE, AppInstallJob.state.in_(JobState.OPEN))))
+    added = 0
+    for app_item in db.scalars(select(IosApp).where(IosApp.is_active.is_(True)).order_by(IosApp.name)):
+        if _ipa_exists(app_item) or app_item.id in queued_apps:
+            continue
+        db.add(AppInstallJob(station_id=station.id, kind=JobKind.ARCHIVE, app_id=app_item.id,
+                             created_by_id=me.id, payload={}))
+        added += 1
+    db.commit()
+    return {"queued": added}
+
+
 @router.delete("/jobs", dependencies=use_access)
 def clear_jobs(db: DbSession, station_id: int | None = None):
     """Стереть историю: удаляются только завершённые задачи, текущие остаются."""
@@ -332,12 +355,14 @@ def create_job(data: JobIn, db: DbSession, me: CurrentEmployee):
         job.target_udid = data.target_udid
         job.target_name = device.get("name") or device.get("product_type")
 
-    if data.kind == JobKind.INSTALL:
+    if data.kind in (JobKind.INSTALL, JobKind.ARCHIVE):
         app_item = db.get(IosApp, data.app_id) if data.app_id else None
         if app_item is None or not app_item.is_active:
             raise NotFound("Приложение")
         job.app_id = app_item.id
-        job.order_id = data.order_id
+        job.order_id = data.order_id if data.kind == JobKind.INSTALL else None
+        if data.kind == JobKind.ARCHIVE and _ipa_exists(app_item):
+            raise BusinessError(f"«{app_item.name}» уже в архиве CRM")
 
     if data.kind == JobKind.LOGIN:
         email = (data.email or "").strip()
@@ -469,6 +494,17 @@ class ReportIn(BaseModel):
     apple_id: str | None = Field(default=None, max_length=200)
 
 
+@router.get("/agent/archive")
+def agent_archive_list(db: DbSession, station: AgentStation):
+    """Что лежит в архиве CRM — станция копирует это к себе заранее, чтобы ставить без ожидания."""
+    rows = db.scalars(select(IosApp).where(IosApp.is_active.is_(True), IosApp.ipa_size.is_not(None)))
+    return [
+        {"app_id": a.id, "adam_id": a.adam_id, "version_id": a.version_id, "size": a.ipa_size,
+         "sha256": a.ipa_sha256, "name": a.name}
+        for a in rows if _ipa_exists(a)
+    ]
+
+
 @router.post("/agent/heartbeat")
 def agent_heartbeat(data: HeartbeatIn, db: DbSession, station: AgentStation):
     station.last_seen_at = utcnow()
@@ -480,7 +516,9 @@ def agent_heartbeat(data: HeartbeatIn, db: DbSession, station: AgentStation):
         station.apple_auth = data.apple_auth
     station.apple_route = data.apple_route
     db.commit()
-    return {"ok": True, "station": station.name}
+    # Сколько файлов в архиве: изменилось — станция сразу подтянет новое к себе в кэш
+    archived = db.scalar(select(func.count()).select_from(IosApp).where(IosApp.ipa_size.is_not(None))) or 0
+    return {"ok": True, "station": station.name, "archive": archived}
 
 
 @router.post("/agent/next", response_model=AgentJob | None)
@@ -496,7 +534,8 @@ def agent_next(db: DbSession, station: AgentStation):
                 (AppInstallJob.state == JobState.NEED_CODE) & AppInstallJob.secret.is_not(None),
             ),
         )
-        .order_by(AppInstallJob.id)
+        # Установка клиенту и вход — сразу; предзагрузка в архив — только когда больше нечего делать
+        .order_by(case((AppInstallJob.kind == JobKind.ARCHIVE, 1), else_=0), AppInstallJob.id)
         .limit(1)
     ).first()
     if job is None:

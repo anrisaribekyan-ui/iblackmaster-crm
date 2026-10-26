@@ -58,8 +58,9 @@ class JobKind:
     PURCHASES = "purchases"  # список покупок Apple ID
     LOGIN = "login"  # вход в Apple ID на станции
     INSTALL = "install"  # скачать IPA и поставить на телефон
+    ARCHIVE = "archive"  # заранее скачать у Apple и положить в архив CRM (телефон не нужен)
 
-    ALL = (SCAN, PURCHASES, LOGIN, INSTALL)
+    ALL = (SCAN, PURCHASES, LOGIN, INSTALL, ARCHIVE)
 
 
 class JobState:
