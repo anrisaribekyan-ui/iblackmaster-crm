@@ -109,6 +109,10 @@ class AppOut(BaseModel):
     ipa_apple_id: str | None = None
     ipa_uploaded_at: datetime | None = None
     store_ru: str | None = None
+    retired_reason: str | None = None
+    retired_note: str | None = None
+    retired_at: datetime | None = None
+    retired_by_name: str | None = None
 
 
 class JobOut(BaseModel):
@@ -268,7 +272,10 @@ def delete_station(station_id: int, db: DbSession):
 
 
 def _apps_query(store: str | None = None, q: str | None = None):
-    query = select(IosApp).where(IosApp.is_active.is_(True))
+    if store == "retired":
+        query = select(IosApp).where(IosApp.is_active.is_(False), IosApp.retired_reason.is_not(None))
+    else:
+        query = select(IosApp).where(IosApp.is_active.is_(True))
     if q and q.strip():
         like = f"%{q.strip()}%"
         query = query.where(or_(IosApp.name.ilike(like), IosApp.bundle_id.ilike(like)))
@@ -280,8 +287,9 @@ def _apps_query(store: str | None = None, q: str | None = None):
 
 
 @router.get("/apps", response_model=list[AppOut], dependencies=use_access)
-def list_apps(db: DbSession, q: str | None = None, store: Literal["all", "removed", "archived"] = "all"):
-    return db.scalars(_apps_query(store, q).order_by(IosApp.name).limit(2000)).all()
+def list_apps(db: DbSession, q: str | None = None, store: Literal["all", "removed", "archived", "retired"] = "all"):
+    order = IosApp.retired_at.desc() if store == "retired" else IosApp.name
+    return db.scalars(_apps_query(store, q).order_by(order).limit(2000)).unique().all()
 
 
 @router.get("/apps/stats", dependencies=use_access)
@@ -290,7 +298,7 @@ def apps_stats(db: DbSession):
         return db.scalar(select(func.count()).select_from(query.subquery())) or 0
 
     return {"all": count(_apps_query()), "removed": count(_apps_query("removed")),
-            "archived": count(_apps_query("archived")),
+            "archived": count(_apps_query("archived")), "retired": count(_apps_query("retired")),
             "unchecked": count(_apps_query().where(IosApp.store_ru.is_(None)))}
 
 
@@ -394,7 +402,8 @@ def import_apps(data: ImportIn, db: DbSession):
                 row.name = item.name[:200]
             if item.bundle_id and not row.bundle_id:
                 row.bundle_id = item.bundle_id[:200]
-        row.is_active = True
+        if row.retired_reason is None:  # убранные вручную обратно не возвращаем
+            row.is_active = True
         touched.append(row)
     db.flush()
     # Сразу узнаём, что снято в РФ. Без ответа Apple просто оставляем «не проверено»
@@ -405,12 +414,57 @@ def import_apps(data: ImportIn, db: DbSession):
             "checked": removed is not None}
 
 
-@router.delete("/apps/{app_id}", status_code=204, dependencies=use_access)
-def hide_app(app_id: int, db: DbSession):
+RETIRE_REASONS = {"broken": "не работает", "unneeded": "больше не нужно"}
+
+
+class RetireIn(BaseModel):
+    reason: Literal["broken", "unneeded"]
+    note: str | None = Field(default=None, max_length=500)
+
+
+def _retire(db, item: IosApp, reason: str, note: str | None, me: Employee | None) -> None:
+    item.is_active = False
+    item.retired_reason, item.retired_note = reason, (note or "").strip() or None
+    item.retired_at, item.retired_by = utcnow(), me
+    # Файл больше не нужен — освобождаем место на сервере; станции сотрут свои копии сами
+    _ipa_path(item).unlink(missing_ok=True)
+    item.ipa_size = item.ipa_sha256 = item.ipa_version = item.ipa_apple_id = None
+    item.ipa_uploaded_at = None
+    for job in db.scalars(select(AppInstallJob).where(AppInstallJob.app_id == item.id,
+                                                       AppInstallJob.state == JobState.QUEUED)):
+        job.state, job.finished_at = JobState.CANCELLED, utcnow()
+        job.message = f"Приложение убрано: {RETIRE_REASONS[reason]}"
+
+
+@router.post("/apps/{app_id}/retire", response_model=AppOut, dependencies=use_access)
+def retire_app(app_id: int, data: RetireIn, db: DbSession, me: CurrentEmployee):
+    """Убрать приложение из библиотеки с причиной. «Не работает» — ставить его больше нельзя."""
     item = db.get(IosApp, app_id)
     if item is None:
         raise NotFound("Приложение")
-    item.is_active = False
+    _retire(db, item, data.reason, data.note, me)
+    db.commit()
+    return item
+
+
+@router.post("/apps/{app_id}/restore", response_model=AppOut, dependencies=use_access)
+def restore_app(app_id: int, db: DbSession):
+    item = db.get(IosApp, app_id)
+    if item is None:
+        raise NotFound("Приложение")
+    item.is_active = True
+    item.retired_reason = item.retired_note = None
+    item.retired_at, item.retired_by = None, None
+    db.commit()
+    return item
+
+
+@router.delete("/apps/{app_id}", status_code=204, dependencies=use_access)
+def hide_app(app_id: int, db: DbSession, me: CurrentEmployee):
+    item = db.get(IosApp, app_id)
+    if item is None:
+        raise NotFound("Приложение")
+    _retire(db, item, "unneeded", None, me)
     db.commit()
 
 
@@ -490,8 +544,13 @@ def create_job(data: JobIn, db: DbSession, me: CurrentEmployee):
 
     if data.kind in (JobKind.INSTALL, JobKind.ARCHIVE):
         app_item = db.get(IosApp, data.app_id) if data.app_id else None
-        if app_item is None or not app_item.is_active:
+        if app_item is None:
             raise NotFound("Приложение")
+        if app_item.retired_reason == "broken":
+            why = f": {app_item.retired_note}" if app_item.retired_note else ""
+            raise BusinessError(f"«{app_item.name}» отмечено как неработающее{why}. Установить нельзя")
+        if not app_item.is_active:
+            raise BusinessError(f"«{app_item.name}» убрано из библиотеки. Верните его во вкладке «Убранные»")
         job.app_id = app_item.id
         job.order_id = data.order_id if data.kind == JobKind.INSTALL else None
         if data.kind == JobKind.ARCHIVE and _ipa_exists(app_item):
@@ -638,6 +697,12 @@ def agent_archive_list(db: DbSession, station: AgentStation):
     ]
 
 
+@router.get("/agent/retired")
+def agent_retired_list(db: DbSession, station: AgentStation):
+    """Номера убранных приложений — станция стирает их копии из своего кэша."""
+    return list(db.scalars(select(IosApp.adam_id).where(IosApp.retired_reason.is_not(None))))
+
+
 @router.post("/agent/heartbeat")
 def agent_heartbeat(data: HeartbeatIn, db: DbSession, station: AgentStation):
     station.last_seen_at = utcnow()
@@ -704,7 +769,9 @@ def _upsert_apps(db, apps: list[AppReport], source: str) -> int:
             row = IosApp(adam_id=item.adam_id, source=source)
             db.add(row)
             known[item.adam_id] = row
-        row.bundle_id, row.name, row.is_active = item.bundle_id, item.name, True
+        row.bundle_id, row.name = item.bundle_id, item.name
+        if row.retired_reason is None:  # убранные вручную скан и покупки обратно не возвращают
+            row.is_active = True
         # Версию с донора помним точной: именно её и надо поставить. Покупки дают только «последнюю».
         if source == "scan" or row.version_id is None:
             row.version, row.version_id = item.version, item.version_id
@@ -998,7 +1065,9 @@ async def upload_ipa(db: DbSession, file: UploadFile = File(...)):
                               version=meta["version"], version_id=meta["version_id"], source="upload")
             db.add(app_item)
             db.flush()
-        app_item.is_active = True
+        app_item.is_active = True  # файл загрузили руками — значит, приложение снова нужно
+        app_item.retired_reason = app_item.retired_note = None
+        app_item.retired_at, app_item.retired_by = None, None
         if meta["version_id"]:
             app_item.version, app_item.version_id = meta["version"], meta["version_id"]
         tmp.replace(_ipa_path(app_item))
