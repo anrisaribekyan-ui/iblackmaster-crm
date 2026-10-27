@@ -193,3 +193,29 @@ def test_mail_test_endpoint_sends_without_real_smtp(client, auth_headers, owner,
     assert response.status_code == 200, response.text
     assert response.json()["sent_to"] == owner.email
     assert sent == {"to": owner.email, "subject": "Проверка почты CRM iBlackMaster", "template": "test", "wait": True}
+
+
+def test_status_sms_ticks_in_order_list_and_card(client, auth_headers, db, owner, order):
+    """Галочки у статуса: ✓ — ушло, ✓✓ — доставлено; после смены статуса старое SMS не светится."""
+    template(db, StatusGroup.FINISH, "Готов {номер}")
+    order_service.change_status(db, order, status(db, StatusGroup.FINISH), owner)
+    db.commit()
+
+    def mark():
+        row = next(i for i in client.get("/api/orders", headers=auth_headers).json()["items"] if i["id"] == order.id)
+        card = client.get(f"/api/orders/{order.id}", headers=auth_headers).json()
+        assert row["status"]["sms"] == card["status"]["sms"]
+        return row["status"]["sms"]
+
+    assert mark() == "queued"
+    gateway = FakeGateway()
+    service.process(db, gateway)
+    db.commit()
+    assert mark() == "sent"
+    service.process(db, gateway)
+    db.commit()
+    assert mark() == "delivered"
+
+    order_service.change_status(db, order, status(db, StatusGroup.WAIT), owner)  # шаблона нет — галочек нет
+    db.commit()
+    assert mark() is None

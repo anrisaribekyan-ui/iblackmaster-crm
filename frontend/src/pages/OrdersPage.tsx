@@ -5,13 +5,13 @@ import { api, ApiError } from '../api/client'
 import { formatPhone } from '../format'
 import { useAuth } from '../auth'
 import { downloadCsv } from '../csv'
-import StatusBadge from '../components/StatusBadge'
+import StatusBadge, { type SmsMark } from '../components/StatusBadge'
 
 type Tab = 'new' | 'inWork' | 'wait' | 'finish' | 'closed' | 'all'
 type OrderRow = {
   id: number
   number: string
-  status: { id: number; group: Exclude<Tab, 'all'>; name: string; color: string }
+  status: { id: number; group: Exclude<Tab, 'all'>; name: string; color: string; sms?: SmsMark }
   deadline: string | null
   manager: string | null
   created_at: string
@@ -305,7 +305,7 @@ export default function OrdersPage() {
                         {order.number}
                       </span>
                       {order.is_deleted && <span className="rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger">удалён</span>}
-                      <StatusBadge className="ml-auto" name={order.status.name} color={order.status.color} />
+                      <StatusBadge className="ml-auto" name={order.status.name} color={order.status.color} sms={order.status.sms} />
                     </div>
                     <p className="mt-1.5 truncate font-medium">{device || 'Устройство не указано'}</p>
                     {order.problems?.length > 0 && <p className="truncate text-sm text-muted">{order.problems.join(', ')}</p>}
@@ -367,7 +367,7 @@ export default function OrdersPage() {
                         <small className="block whitespace-nowrap text-xs text-muted" title={formatDate(order.created_at)}>{ago(order.created_at) ?? formatDate(order.created_at).split(',')[0]}</small>
                         {order.is_deleted && <span className="mt-1 inline-block rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger [text-decoration:none]">удалён</span>}
                       </td>
-                      <td className="px-3 py-2.5"><StatusBadge name={order.status.name} color={order.status.color} /></td>
+                      <td className="px-3 py-2.5"><StatusBadge name={order.status.name} color={order.status.color} sms={order.status.sms} /></td>
                       <td className="min-w-0 px-3 py-2.5">
                         <p className="truncate font-medium" title={device}>{device || <span className="text-muted">Не указано</span>}</p>
                         <p className="truncate text-xs text-muted" title={order.problems?.join(', ')}>

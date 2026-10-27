@@ -564,3 +564,21 @@ def test_retire_app_broken_blocks_install_and_frees_archive(client, auth_headers
     r = client.post(f"/api/app-install/apps/{game.id}/restore", headers=auth_headers)
     assert r.json()["retired_reason"] is None
     assert any(a["id"] == game.id for a in client.get("/api/app-install/apps", headers=auth_headers).json())
+
+
+def test_station_location_binding(client, auth_headers, db):
+    """Компьютер привязывается к точке — в «Приложениях» точки он выбирается сам."""
+    from app.models import Location
+
+    station_id, _ = make_station(client, auth_headers)
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    r = client.patch(f"/api/app-install/stations/{station_id}", json={"location_id": location.id}, headers=auth_headers)
+    assert r.status_code == 200 and r.json()["location_id"] == location.id and r.json()["location_name"] == location.name
+    listed = client.get("/api/app-install/stations", headers=auth_headers).json()
+    assert listed[0]["location_id"] == location.id
+    assert client.patch(f"/api/app-install/stations/{station_id}", json={"location_id": 99999}, headers=auth_headers).status_code == 404
+    assert client.patch(f"/api/app-install/stations/{station_id}", json={"location_id": None}, headers=auth_headers).json()["location_id"] is None
+
+    make_employee(db, name="Мастер", email="m2@x.test", permissions=["appInstallAccess"])
+    master = login(client, "m2@x.test")
+    assert client.patch(f"/api/app-install/stations/{station_id}", json={"location_id": location.id}, headers=master).status_code == 403
