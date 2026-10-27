@@ -52,7 +52,7 @@ export function partQuery(problems: string[], brand: string, model: string): str
   return [part, withBrand.replace(/^galaxy\s+/i, '')].filter(Boolean).join(' ').toLowerCase().trim()
 }
 
-async function doska<T>(path: string, body?: unknown): Promise<T> {
+export async function doska<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(`${DOSKA}${path}`, body === undefined
     ? { cache: 'no-store' }
     : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

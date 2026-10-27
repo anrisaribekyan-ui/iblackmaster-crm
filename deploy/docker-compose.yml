@@ -37,6 +37,11 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-}
       SMS_DAILY_LIMIT: ${SMS_DAILY_LIMIT:-150}
+      # Сервис автозаказа (zakupka_api.py в ~/moba) на этом же сервере — кнопка «Оформить» в «Закупках»
+      ZAKUPKA_URL: ${ZAKUPKA_URL:-}
+      ZAKUPKA_TOKEN: ${ZAKUPKA_TOKEN:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - uploads:/app/uploads
 
