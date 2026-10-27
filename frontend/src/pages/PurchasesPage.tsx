@@ -92,7 +92,7 @@ export default function PurchasesPage() {
             title="Доска закупок"
             className="block w-full rounded-xl"
             style={{ height, border: 0, background: 'transparent' }}
-            allow="camera"
+            allow="camera; clipboard-read; clipboard-write"
           />
         </div>
       )}
