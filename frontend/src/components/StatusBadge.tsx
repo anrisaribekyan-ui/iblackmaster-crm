@@ -40,7 +40,44 @@ export function statusColors(color: string | null | undefined): { text: string; 
   return result
 }
 
-export default function StatusBadge({ name, color, className = '' }: { name: string; color: string | null | undefined; className?: string }) {
+export type SmsMark = 'queued' | 'sending' | 'sent' | 'delivered' | 'failed' | null | undefined
+
+const SMS_TITLE: Record<string, string> = {
+  queued: 'SMS ждёт отправки',
+  sending: 'SMS отправляется',
+  sent: 'SMS отправлено',
+  delivered: 'SMS доставлено',
+  failed: 'SMS не ушло',
+}
+
+/**
+ * Галочки SMS по текущему статусу, как в мессенджерах: часы — в очереди, ✓ — ушло с телефона-шлюза,
+ * ✓✓ — оператор подтвердил доставку, «!» — не отправилось. Нет SMS — ничего не рисуем.
+ */
+export function SmsTicks({ state, onDark = false, className = '' }: { state: SmsMark; onDark?: boolean; className?: string }) {
+  if (!state) return null
+  const title = SMS_TITLE[state]
+  const tone = onDark
+    ? state === 'delivered' ? 'text-[#8cc8ff]' : state === 'failed' ? 'text-[#ff8a72]' : 'text-white/60'
+    : state === 'delivered' ? 'text-success' : state === 'failed' ? 'text-danger' : 'opacity-60'
+  return (
+    <span className={`inline-flex shrink-0 items-center ${tone} ${className}`} title={title}>
+      <span className="sr-only">{title}</span>
+      {state === 'failed' ? (
+        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden><circle cx="6" cy="6" r="5" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M6 3.4v3.2M6 8.4v.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+      ) : state === 'queued' || state === 'sending' ? (
+        <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden><circle cx="6" cy="6" r="4.6" fill="none" stroke="currentColor" strokeWidth="1.3" /><path d="M6 3.6V6l1.6 1" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" /></svg>
+      ) : (
+        <svg width={state === 'delivered' ? 17 : 12} height="12" viewBox={state === 'delivered' ? '0 0 17 12' : '0 0 12 12'} aria-hidden fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M1.5 6.4 4.4 9.2 10.5 2.8" />
+          {state === 'delivered' && <path d="M8.2 8.4l.8.8 6.1-6.4" />}
+        </svg>
+      )}
+    </span>
+  )
+}
+
+export default function StatusBadge({ name, color, sms, className = '' }: { name: string; color: string | null | undefined; sms?: SmsMark; className?: string }) {
   const c = statusColors(color)
   // Цвета через переменные: в тёмных темах CSS берёт светлый текст и полупрозрачный фон того же оттенка
   return (
@@ -51,6 +88,7 @@ export default function StatusBadge({ name, color, className = '' }: { name: str
     >
       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: c.dot }} aria-hidden />
       <span className="truncate">{name}</span>
+      <SmsTicks state={sms} />
     </span>
   )
 }

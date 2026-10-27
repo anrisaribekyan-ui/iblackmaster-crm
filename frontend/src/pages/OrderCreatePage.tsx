@@ -3,6 +3,7 @@ import PriceHints from '../components/PriceHints'
 import { DevicePasswordInput } from '../components/PatternLock'
 import { ChecklistInput, SignaturePad, useChecklistItems, type ChecklistValues } from '../components/Checklist'
 import QuickOrderPicker, { type QuickOrder } from '../components/QuickOrderPicker'
+import PartOrderModal, { DOSKA_BOARDS, INTAKE_MARK, linkPartsToOrder, partQuery, type AddedPart } from '../components/PartOrder'
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
@@ -129,6 +130,8 @@ export default function OrderCreatePage() {
   const [fieldsLoading, setFieldsLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [partOpen, setPartOpen] = useState(false)
+  const [parts, setParts] = useState<AddedPart[]>([])
 
   useEffect(() => {
     let active = true
@@ -320,6 +323,8 @@ export default function OrderCreatePage() {
         // Заказ уже создан — подпись не должна его потерять, поэтому ошибку подписи не показываем как ошибку заказа
         await api.post(`/orders/${created.id}/signature`, { stage: 'in', image: signature }).catch(() => undefined)
       }
+      // Запчасти уже лежат в «Что купить» — дописываем к ним номер заказа
+      if (parts.length) await linkPartsToOrder(parts, created.number, me?.short_name ?? 'CRM')
       dirty.current = false
       navigate(`/orders/${created.id}`)
     } catch (e) {
@@ -453,6 +458,35 @@ export default function OrderCreatePage() {
                   </div>
                   {group === 'counteragent' && hints?.client && <ClientCard client={hints.client} />}
                   {group === 'device' && hints && <div className="mt-3"><WarrantyAlert hints={hints} isWarrantyType={isWarrantyType} onApply={applyWarranty} /></div>}
+                  {group === 'device' && (
+                    <div className="mt-4 grid gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setPartOpen(true)}
+                        className="flex items-center justify-center gap-2 rounded-lg bg-accent px-4 py-3 text-base font-semibold text-accent-ink shadow-sm transition-transform active:scale-[0.98] sm:justify-self-start"
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><circle cx="9" cy="20" r="1.4" /><circle cx="18" cy="20" r="1.4" /><path d="M2.5 3.5h2.6l2.4 11.2a1.6 1.6 0 0 0 1.6 1.3h8.4a1.6 1.6 0 0 0 1.6-1.2l1.6-6.8H6.2" /></svg>
+                        Заказать запчасть
+                      </button>
+                      {parts.length > 0 && (
+                        <ul className="grid gap-1 text-sm" aria-label="Запчасти в «Что купить»">
+                          {parts.map((part) => (
+                            <li key={part.id} className="flex items-start gap-2 rounded-md bg-canvas px-3 py-2">
+                              <span className="text-success" aria-hidden>✓</span>
+                              <span className="min-w-0 flex-1">
+                                <span className="line-clamp-2">{part.text}</span>
+                                <span className="text-xs text-muted">
+                                  в «Что купить» · {DOSKA_BOARDS.find((b) => b.id === part.loc)?.name}
+                                  {part.shop ? ` · ${part.shop}` : ''}
+                                </span>
+                              </span>
+                              {part.price !== null && <span className="num shrink-0 font-medium">{part.price.toLocaleString('ru-RU')} ₽</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
 
                 </section>
               ))}
@@ -477,6 +511,20 @@ export default function OrderCreatePage() {
             </div>
           )}
         </form>
+      )}
+      {partOpen && (
+        <PartOrderModal
+          initialQuery={partQuery(Array.isArray(values.problem) ? (values.problem as string[]) : [], String(values.brand ?? ''), String(values.model ?? ''))}
+          locationName={locations.find((location) => String(location.id) === locationId)?.name ?? null}
+          author={me?.short_name ?? 'CRM'}
+          note={[
+            INTAKE_MARK,
+            [values.brand, values.model].filter(Boolean).join(' '),
+            [values.name, values.phones].filter(Boolean).join(', '),
+          ].filter(Boolean).join(' · ')}
+          onClose={() => setPartOpen(false)}
+          onAdded={(part) => setParts((current) => [...current, part])}
+        />
       )}
     </section>
   )

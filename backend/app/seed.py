@@ -119,7 +119,8 @@ def seed(db: Session, demo: bool = False, owner_password: str | None = None) -> 
         role = Role(
             name=r["name"],
             home_page=r["home_page"],
-            permissions=ALL_PERMISSION_CODES if r["permissions"] == "ALL" else r["permissions"],
+            # «Приложения» доступны всем ролям (станции и Apple ID — по отдельному праву)
+            permissions=ALL_PERMISSION_CODES if r["permissions"] == "ALL" else sorted({*r["permissions"], "appInstallAccess"}),
             scopes=FULL_SCOPES if r["scopes"] == "FULL" else r["scopes"],
             is_system=r["name"] == "БОСС",
         )

@@ -28,6 +28,7 @@ from app.models import (
     OrderType,
     PriceType,
     Location,
+    Notification,
     Store,
     StatusGroup,
     Transaction,
@@ -171,6 +172,7 @@ class OrderDetailStatus(BaseModel):
     group: str
     name: str
     color: str
+    sms: str | None = None  # состояние SMS по текущему статусу (см. status_sms)
 
 
 class OrderDetailType(BaseModel):
@@ -310,6 +312,40 @@ def get_order_for_employee(db: DbSession, order_id: int, employee: CurrentEmploy
 
 
 
+# SMS по текущему статусу: «✓» — ушло на шлюз, «✓✓» — оператор подтвердил доставку.
+SMS_MARK_STATES = {"queued", "sending", "sent", "delivered", "failed"}
+
+
+def status_sms(db: DbSession, order_ids: list[int]) -> dict[int, str]:
+    """Состояние SMS, отправленного при переходе заказа в его ТЕКУЩИЙ статус.
+    Берём последнее SMS «по статусу», созданное не раньше последней смены статуса:
+    старое «готов» не должно светиться галочками, если заказ вернули в работу."""
+    if not order_ids:
+        return {}
+    changed = dict(
+        db.execute(
+            select(OrderHistory.order_id, func.max(OrderHistory.created_at))
+            .where(OrderHistory.order_id.in_(order_ids), OrderHistory.type == "status")
+            .group_by(OrderHistory.order_id)
+        ).all()
+    )
+    result: dict[int, str] = {}
+    rows = db.execute(
+        select(Notification.order_id, Notification.state, Notification.created_at)
+        .where(Notification.order_id.in_(order_ids), Notification.kind == "status")
+        .order_by(Notification.id)
+    ).all()
+    for order_id, state, created_at in rows:
+        since = changed.get(order_id)
+        if since is not None and created_at < since:
+            continue
+        if state in SMS_MARK_STATES:
+            result[order_id] = state
+        else:
+            result.pop(order_id, None)
+    return result
+
+
 def serialize_history(db: DbSession, history: list[OrderHistory]) -> list[dict]:
     """История для карточки и для /history: заголовок события, статус с цветом, имя сотрудника."""
     employee_ids = {item.employee_id for item in history if item.employee_id is not None}
@@ -436,6 +472,7 @@ def list_orders(
     rows = db.execute(query.order_by(Order.created_at.desc(), Order.id.desc()).offset((page - 1) * 50).limit(50)).all()
     manager_ids = {order.manager_id for order, _, _ in rows if order.manager_id}
     managers = dict(db.execute(select(Employee.id, Employee.short_name).where(Employee.id.in_(manager_ids))).all()) if manager_ids else {}
+    sms = status_sms(db, [order.id for order, _, _ in rows])
 
     items = []
     for order, status, counteragent in rows:
@@ -443,7 +480,7 @@ def list_orders(
             {
                 "id": order.id,
                 "number": order.number,
-                "status": {"id": status.id, "group": status.group, "name": status.name, "color": status.color},
+                "status": {"id": status.id, "group": status.group, "name": status.name, "color": status.color, "sms": sms.get(order.id)},
                 "deadline": order.deadline,
                 "manager": managers.get(order.manager_id),
                 "created_at": order.created_at,
@@ -546,7 +583,10 @@ def get_order(order_id: int, db: DbSession, me: CurrentEmployee):
 
     return OrderDetailOut(
         order=model_values(order),
-        status={"id": status.id, "group": status.group, "name": status.name, "color": status.color},
+        status={
+            "id": status.id, "group": status.group, "name": status.name, "color": status.color,
+            "sms": status_sms(db, [order.id]).get(order.id),
+        },
         order_type={"id": order_type.id, "name": order_type.name},
         counteragent={"id": counteragent.id, "name": counteragent.name, "phones": counteragent.phones, "balance": counteragent.balance},
         master={"id": master.id, "short_name": master.short_name} if master else None,

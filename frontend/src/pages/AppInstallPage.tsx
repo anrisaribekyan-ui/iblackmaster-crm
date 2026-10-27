@@ -17,6 +17,7 @@ type Device = { udid: string; name: string | null; product_type: string | null; 
 type Station = {
   id: number
   name: string
+  location_id: number | null
   location_name: string | null
   online: boolean
   last_seen_at: string | null
@@ -346,11 +347,53 @@ function JobRow({ job, onChanged }: { job: Job; onChanged: () => void }) {
 
 // ------------------------------------------------------------------ страница
 
+/** Последний выбранный на этом устройстве компьютер: браузер в сервисе помнит свою станцию. */
+const STATION_KEY = 'apps.station'
+
+function rememberedStation(): number | null {
+  try {
+    const raw = window.localStorage.getItem(STATION_KEY)
+    return raw ? Number(raw) || null : null
+  } catch {
+    return null
+  }
+}
+
+function rememberStation(id: number) {
+  try {
+    window.localStorage.setItem(STATION_KEY, String(id))
+  } catch {
+    // приватный режим — просто не запоминаем
+  }
+}
+
+/**
+ * Какой компьютер открыть по умолчанию: тот, что выбирали на этом устройстве; иначе компьютер точки,
+ * где работает сотрудник (в Панфиловском — компьютер Панфиловского); иначе первый на связи.
+ */
+function defaultStation(list: Station[], myLocations: number[], remembered: number | null): number | null {
+  if (remembered && list.some((s) => s.id === remembered)) return remembered
+  for (const locationId of myLocations) {
+    const own = list.filter((s) => s.location_id === locationId)
+    const pick = own.find((s) => s.online) ?? own[0]
+    if (pick) return pick.id
+  }
+  return (list.find((s) => s.online) ?? list[0])?.id ?? null
+}
+
+type LocationOption = { id: number; name: string }
+
 export default function AppInstallPage() {
-  const { can } = useAuth()
+  const { can, me } = useAuth()
   const manage = can('appInstallStationAccess')
+  const myLocations = useMemo(() => me?.location_ids ?? [], [me])
   const [stations, setStations] = useState<Station[] | null>(null)
-  const [stationId, setStationId] = useState<number | null>(null)
+  const [stationId, setStationIdState] = useState<number | null>(null)
+  const [locations, setLocations] = useState<LocationOption[]>([])
+  const setStationId = useCallback((id: number) => {
+    setStationIdState(id)
+    rememberStation(id)
+  }, [])
   const [jobs, setJobs] = useState<Job[]>([])
   const [apps, setApps] = useState<IosApp[]>([])
   const [query, setQuery] = useState('')
@@ -372,8 +415,23 @@ export default function AppInstallPage() {
   const loadStations = useCallback(async () => {
     const list = await api.get<Station[]>('/app-install/stations')
     setStations(list)
-    setStationId((current) => (current && list.some((s) => s.id === current) ? current : list[0]?.id ?? null))
-  }, [])
+    setStationIdState((current) => (current && list.some((s) => s.id === current) ? current : defaultStation(list, myLocations, rememberedStation())))
+  }, [myLocations])
+
+  useEffect(() => {
+    if (!manage) return
+    api.get<LocationOption[]>('/locations').then(setLocations).catch(() => setLocations([]))
+  }, [manage])
+
+  const bindLocation = async (value: string) => {
+    if (!station) return
+    try {
+      const updated = await api.patch<Station>(`/app-install/stations/${station.id}`, { location_id: value ? Number(value) : null })
+      setStations((list) => list?.map((s) => (s.id === updated.id ? { ...s, location_id: updated.location_id, location_name: updated.location_name } : s)) ?? list)
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Не удалось сохранить точку')
+    }
+  }
 
   const loadJobs = useCallback(async () => {
     setJobs(await api.get<Job[]>('/app-install/jobs?limit=20'))
@@ -576,6 +634,7 @@ export default function AppInstallPage() {
                   className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${s.id === stationId ? 'border-accent text-accent' : 'border-line'}`}>
                   <span className={`h-2 w-2 rounded-full ${s.online ? 'bg-success' : 'bg-line'}`} aria-hidden />
                   {s.name}
+                  {s.location_name && <span className="text-muted">· {s.location_name}</span>}
                 </button>
               ))}
             </nav>
@@ -599,6 +658,13 @@ export default function AppInstallPage() {
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-sm sm:ml-auto">
+                  {manage ? (
+                    <select aria-label="Точка компьютера" className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm"
+                      value={station.location_id ?? ''} onChange={(e) => void bindLocation(e.target.value)}>
+                      <option value="">Точка не выбрана</option>
+                      {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  ) : station.location_name && <span className="text-muted">{station.location_name}</span>}
                   {station.apple_auth === 'ok' && station.apple_id
                     ? <span className="text-muted">Apple ID: {station.apple_id}</span>
                     : <span className="text-warning">Нужен вход в Apple ID</span>}

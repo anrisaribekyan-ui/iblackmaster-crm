@@ -14,7 +14,6 @@ export const MENU: { to: string; label: string; icon: string; permission?: strin
   { to: '/sales', icon: 'sales', label: 'Продажи' },
   { to: '/store/remains', icon: 'store', label: 'Склад', permission: 'remainAccess' },
   { to: '/tasks', icon: 'tasks', label: 'Задачи' },
-  { to: '/boards', icon: 'boards', label: 'Доски' },
   { to: '/zakupki', icon: 'cart', label: 'Закупки' },
   { to: '/apps', icon: 'phone', label: 'Приложения', permission: 'appInstallAccess' },
   { to: '/finance/cashes', icon: 'finance', label: 'Финансы' },

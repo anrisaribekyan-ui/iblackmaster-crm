@@ -23,8 +23,6 @@ const OrdersPage = lazy(() => import('./pages/OrdersPage'))
 const OrderCreatePage = lazy(() => import('./pages/OrderCreatePage'))
 const OrderDetailPage = lazy(() => import('./pages/OrderDetailPage'))
 const TasksPage = lazy(() => import('./pages/TasksPage'))
-const BoardsPage = lazy(() => import('./pages/BoardsPage'))
-const BoardPage = lazy(() => import('./pages/BoardPage'))
 const PurchasesPage = lazy(() => import('./pages/PurchasesPage'))
 const AppInstallPage = lazy(() => import('./pages/AppInstallPage'))
 import DashboardPage from './pages/DashboardPage'
@@ -71,7 +69,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        {/* Редкие разделы (аналитика, доски, настройки) грузятся при первом открытии — приложение стартует быстрее */}
+        {/* Редкие разделы (аналитика, закупки, настройки) грузятся при первом открытии — приложение стартует быстрее */}
         <Suspense fallback={<div className="p-6 text-muted">Загрузка…</div>}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -100,8 +98,8 @@ export default function App() {
               <Route path="inventory" element={<InventoryPage />} />
             </Route>
             <Route path="tasks" element={<TasksPage />} />
-            <Route path="boards" element={<BoardsPage />} />
-            <Route path="boards/:spaceId" element={<BoardPage />} />
+            {/* Старые «Доски» (первая версия закупок) убраны — закладки ведут в «Закупки» */}
+            <Route path="boards/*" element={<Navigate to="/zakupki" replace />} />
             <Route path="zakupki" element={<PurchasesPage />} />
             <Route path="apps" element={<AppInstallPage />} />
             <Route path="finance" element={<FinanceLayout />}>

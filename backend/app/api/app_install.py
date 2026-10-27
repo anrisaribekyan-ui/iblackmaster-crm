@@ -89,6 +89,10 @@ class StationIn(BaseModel):
     location_id: int | None = None
 
 
+class StationPatch(BaseModel):
+    location_id: int | None = None
+
+
 class StationCreated(BaseModel):
     station: StationOut
     token: str
@@ -245,6 +249,18 @@ def create_station(data: StationIn, db: DbSession):
     db.add(station)
     db.commit()
     return StationCreated(station=_station_out(db, station), token=token)
+
+
+@router.patch("/stations/{station_id}", response_model=StationOut, dependencies=station_access)
+def update_station(station_id: int, data: StationPatch, db: DbSession):
+    """Привязка компьютера к точке: в «Приложениях» сотрудник точки сразу видит свой компьютер."""
+    station = _get_station(db, station_id)
+    if "location_id" in data.model_fields_set:
+        if data.location_id is not None and db.get(Location, data.location_id) is None:
+            raise NotFound("Точка")
+        station.location_id = data.location_id
+    db.commit()
+    return _station_out(db, station)
 
 
 @router.post("/stations/{station_id}/token", response_model=StationCreated, dependencies=station_access)

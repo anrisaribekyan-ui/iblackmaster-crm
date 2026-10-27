@@ -11,10 +11,11 @@ import OrderPhotos from '../components/OrderPhotos'
 import OrderChecklistCard, { checklistHtml, signatureHtml, type Signatures } from '../components/OrderChecklistCard'
 import type { ChecklistValues } from '../components/Checklist'
 import { DevicePasswordInput, parsePattern, PatternView } from '../components/PatternLock'
-import StatusBadge, { statusColors } from '../components/StatusBadge'
+import StatusBadge, { SmsTicks, statusColors, type SmsMark } from '../components/StatusBadge'
+import PartOrderModal, { DOSKA_BOARDS, partQuery, type AddedPart } from '../components/PartOrder'
 import Copyable from '../components/Copyable'
 
-type Status = { id: number; group: string; name: string; color: string; pay_required: boolean; comment_mode: string }
+type Status = { id: number; group: string; name: string; color: string; pay_required: boolean; comment_mode: string; sms?: SmsMark }
 type StatusGroup = { group: string; title: string; statuses: Status[] }
 type Employee = { id: number; short_name: string }
 type CashRegister = {
@@ -158,7 +159,9 @@ function displayValue(field: FormField, detail: OrderDetail, masters: Employee[]
 
 export default function OrderDetailPage() {
   const { orderId } = useParams()
-  const { can } = useAuth()
+  const { can, me } = useAuth()
+  const [partOpen, setPartOpen] = useState(false)
+  const [partsAdded, setPartsAdded] = useState<AddedPart[]>([])
   const [detail, setDetail] = useState<OrderDetail | null>(null)
   const [fields, setFields] = useState<FormField[]>([])
   const [statusGroups, setStatusGroups] = useState<StatusGroup[]>([])
@@ -661,6 +664,7 @@ export default function OrderDetailPage() {
                   ))}
                 </select>
               </span>
+              <SmsTicks state={detail.status.sms} onDark />
             </div>
             <p className="mt-2 truncate text-lg text-white/90">{[str(detail.order.brand), str(detail.order.model)].filter(Boolean).join(' ') || str(detail.order.device_type) || 'Устройство не указано'}</p>
             <p className="truncate text-sm text-white/50">
@@ -767,6 +771,30 @@ export default function OrderDetailPage() {
           ) : (
             <section className="rounded-xl border border-line bg-surface p-4">
               <h2 className="sr-only">Работы и материалы</h2>
+              {!isClosed && (
+                <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <button type="button" onClick={() => setPartOpen(true)}
+                    className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink shadow-sm transition-transform active:scale-[0.98]">
+                    Заказать запчасть
+                  </button>
+                  {partsAdded.map((part) => (
+                    <span key={part.id} className="text-sm text-muted">
+                      <span className="text-success" aria-hidden>✓ </span>
+                      {part.text.length > 48 ? `${part.text.slice(0, 48)}…` : part.text} — в «Что купить» ({DOSKA_BOARDS.find((b) => b.id === part.loc)?.name})
+                    </span>
+                  ))}
+                </div>
+              )}
+              {partOpen && (
+                <PartOrderModal
+                  initialQuery={partQuery(Array.isArray(detail.order.problems) ? (detail.order.problems as string[]) : [], str(detail.order.brand), str(detail.order.model))}
+                  locationName={currentLocation?.name ?? null}
+                  author={me?.short_name ?? 'CRM'}
+                  note={[`Заказ ${detail.order.number}`, [str(detail.order.brand), str(detail.order.model)].filter(Boolean).join(' '), detail.counteragent.name].filter(Boolean).join(' · ')}
+                  onClose={() => setPartOpen(false)}
+                  onAdded={(part) => setPartsAdded((current) => [...current, part])}
+                />
+              )}
               {detail.positions.length === 0 ? (
                 <p className="mb-4 text-sm text-muted">Позиций пока нет. Добавьте работу или материал через поиск ниже.</p>
               ) : (
