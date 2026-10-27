@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     mail_from: str = ""  # пусто — как smtp_user
     mail_from_name: str = "iBlackMaster"
     sms_worker: bool = True  # фоновая отправка (в тестах выключено)
+    # Сервис автозаказа на этом же сервере (zakupka_api.py в ~/moba): оформление у поставщиков из «Закупок».
+    # Пусто — кнопка «Оформить» в «Закупках» скрыта.
+    zakupka_url: str = ""
+    zakupka_token: str = ""
 
 
 settings = Settings()

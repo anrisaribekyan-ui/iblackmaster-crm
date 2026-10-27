@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth'
+import SupplierOrders, { useSupplierConfig } from '../components/SupplierOrders'
 
 /**
  * Закупки — общая доска «Что купить → Купил → Отдал» (тот же сервис, что в APK «Доска»).
@@ -19,6 +20,9 @@ export default function PurchasesPage() {
   const boxRef = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState<number>(600)
   const [failed, setFailed] = useState(false)
+  const supplierConfig = useSupplierConfig()
+  const [tab, setTab] = useState<'board' | 'order'>('board')
+  const canOrder = Boolean(supplierConfig?.enabled)
   // Адрес фиксируем при открытии: смена темы идёт сообщением, без перезагрузки доски
   const [src] = useState(() => {
     const q = new URLSearchParams({ embed: '1', theme: currentTheme(), name: me?.short_name ?? '' })
@@ -60,16 +64,28 @@ export default function PurchasesPage() {
     <section>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold">Закупки</h1>
+        {canOrder && (
+          <div className="flex rounded-full border border-line bg-surface p-0.5 text-sm" role="tablist" aria-label="Режим закупок">
+            {([['board', 'Доска'], ['order', 'Оформить']] as const).map(([id, label]) => (
+              <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+                className={`rounded-full px-4 py-1.5 ${tab === id ? 'bg-accent font-medium text-accent-ink' : 'text-muted hover:text-ink'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <a href={APP} target="_blank" rel="noreferrer" className="ml-auto rounded-md border border-line bg-surface px-3 py-2 text-sm text-muted hover:text-ink">
           Открыть отдельно
         </a>
       </div>
-      {failed ? (
+      {tab === 'order' && supplierConfig?.enabled && <SupplierOrders config={supplierConfig} />}
+      {tab !== 'board' ? null : failed ? (
         <p className="rounded-xl border border-line bg-surface p-5 text-muted">
           Доска закупок сейчас недоступна. Проверьте, что сервис доски запущен, и обновите страницу.
         </p>
       ) : (
-        <div ref={boxRef}>
+        // Доска остаётся загруженной и при открытой вкладке «Оформить» — переключение мгновенное
+        <div ref={boxRef} hidden={tab !== 'board'}>
           <iframe
             ref={frameRef}
             src={src}

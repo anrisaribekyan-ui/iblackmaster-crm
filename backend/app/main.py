@@ -16,6 +16,7 @@ from app.api import (
     order_files,
     notifications as notifications_api,
     boards,
+    supplier_orders,
     cash_registers,
     complete_sets,
     counteragents,
@@ -118,3 +119,4 @@ app.include_router(sales.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(transactions.router, prefix="/api")
 app.include_router(app_install.router, prefix="/api")
+app.include_router(supplier_orders.router, prefix="/api")

@@ -109,6 +109,7 @@ PERMISSIONS: dict[str, dict] = {
     "measureAccess": {"section": "Справочники", "title": "Единицы измерения", "parent": None},
     "appInstallAccess": {"section": "Установка приложений", "title": "Может ставить приложения на айфоны", "parent": None},
     "appInstallStationAccess": {"section": "Установка приложений", "title": "Может добавлять станции и входить в Apple ID", "parent": "appInstallAccess"},
+    "supplierOrderAccess": {"section": "Закупки", "title": "Может оформлять заказы у поставщиков (Moba, Master Mobile, Liberti)", "parent": None},
 }
 
 # Права-выборы. Значение хранится в Role.scopes[<ключ>] = <код варианта>.
