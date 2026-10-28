@@ -5,10 +5,11 @@ import { formatPhone, isoToLocalInput, localInputToIso } from '../format'
 import { useAuth } from '../auth'
 import Modal from '../components/Modal'
 import TaskForm, { type TaskEmployee, type TaskFormValues } from '../components/TaskForm'
-import { escapeHtml, openPrint } from '../print'
+import { openPrint } from '../print'
+import { actHtml, checklistHtml as checkSheetHtml, FORMS_STYLE, receiptHtml, refusalHtml, type FormData } from '../printForms'
 import OrderSms from '../components/OrderSms'
 import OrderPhotos from '../components/OrderPhotos'
-import OrderChecklistCard, { checklistHtml, signatureHtml, type Signatures } from '../components/OrderChecklistCard'
+import OrderChecklistCard, { type Signatures } from '../components/OrderChecklistCard'
 import type { ChecklistValues } from '../components/Checklist'
 import { DevicePasswordInput, parsePattern, PatternView } from '../components/PatternLock'
 import StatusBadge, { SmsTicks, statusColors, type SmsMark } from '../components/StatusBadge'
@@ -513,100 +514,55 @@ export default function OrderDetailPage() {
   const orderFields = (detail?.order ?? {}) as Record<string, unknown>
   const str = (value: unknown): string => (value == null ? '' : String(value))
 
-  const printReceipt = () => {
-    if (!detail) return
-    const device = [orderFields.device_type, orderFields.brand, orderFields.model, orderFields.color].filter(Boolean).join(' ')
-    const problems = Array.isArray(orderFields.problems) ? (orderFields.problems as string[]).join(', ') : ''
-    const completeSet = Array.isArray(orderFields.complete_set) ? (orderFields.complete_set as string[]).join(', ') : ''
-    const appearance = Array.isArray(orderFields.appearance) ? (orderFields.appearance as string[]).join(', ') : ''
-    const prepayment = orderFields.has_prepayment
-      ? `Да${detail.order.paid && Number(detail.order.paid) > 0 ? `, ${formatMoney(detail.order.paid)}` : ''}`
-      : 'Нет'
-    const body = `
-      <h1>Квитанция о приёме заказа № ${escapeHtml(detail.order.number)}</h1>
-      <div class="columns" style="display:flex;justify-content:space-between;gap:8mm">
-        <section>
-          <h2>Локация</h2>
-          <p><strong>${escapeHtml(currentLocation?.name)}</strong></p>
-          ${currentLocation?.address ? `<p>${escapeHtml(currentLocation.address)}</p>` : ''}
-          ${currentLocation?.phones ? `<p>Телефон: ${escapeHtml(currentLocation.phones)}</p>` : ''}
-          <p>Дата приёма: ${escapeHtml(String(orderFields.created_at ?? '').slice(0, 10).split('-').reverse().join('.'))}</p>
-        </section>
-        ${trackQr ? `<section style="text-align:center;width:32mm;flex-shrink:0"><div style="width:28mm;height:28mm;margin:0 auto">${trackQr}</div><p style="font-size:11px;margin-top:1mm">Следите за ремонтом — наведите камеру</p></section>` : ''}
-      </div>
-      <h2>Клиент</h2>
-      <p>${escapeHtml(detail.counteragent.name)}</p>
-      ${detail.counteragent.phones ? `<p>Телефон: ${escapeHtml(detail.counteragent.phones)}</p>` : ''}
-      <h2>Устройство</h2>
-      <p>${escapeHtml(device || '—')}</p>
-      <p>Серийный номер / IMEI: ${escapeHtml(str(orderFields.serial) || '—')}</p>
-      <p>Неисправность: ${escapeHtml(problems || '—')}</p>
-      <p>Комплектация: ${escapeHtml(completeSet || '—')}</p>
-      <p>Внешний вид: ${escapeHtml(appearance || '—')}</p>
-      <p>Ориентировочная цена: ${escapeHtml(str(orderFields.approximate_price) || '—')}</p>
-      <p>Предоплата: ${escapeHtml(prepayment)}</p>
-      <p>Мастер: ${escapeHtml(detail.master?.short_name ?? '—')}</p>
-      ${orderFields.note ? `<p>Примечание: ${escapeHtml(String(orderFields.note))}</p>` : ''}
-      ${checklistHtml((orderFields.check_in ?? {}) as ChecklistValues)}
-      ${signatureHtml(signatures.in, 'Подпись клиента при приёме')}
-      <div class="signatures">
-        <div class="signature">Заказчик: ____________________</div>
-        <div class="signature">Принял: ____________________</div>
-      </div>
-      <p class="muted" style="margin-top: 8mm">Подтверждаю, что передал(а) устройство и ознакомлен(а) с условиями диагностики и ремонта.</p>
-    `
-    openPrint(`Квитанция ${detail.order.number}`, body)
+  const buildFormData = (): FormData | null => {
+    if (!detail) return null
+    const list = (value: unknown) => (Array.isArray(value) ? (value as string[]).join(', ') : '')
+    const day = (value: unknown) => String(value ?? '').slice(0, 10).split('-').reverse().join('.')
+    const paid = Number(detail.order.paid)
+    return {
+      number: detail.order.number,
+      date: day(orderFields.created_at),
+      shop: { name: currentLocation?.name ?? '', address: currentLocation?.address ?? '', phones: currentLocation?.phones ?? '' },
+      customer: { name: detail.counteragent.name, phones: detail.counteragent.phones ?? '' },
+      master: detail.master?.short_name ?? '',
+      manager: detail.manager?.short_name ?? '',
+      device: [orderFields.device_type, orderFields.brand, orderFields.model, orderFields.color].filter(Boolean).join(' '),
+      serial: str(orderFields.serial),
+      look: list(orderFields.appearance),
+      completeSet: list(orderFields.complete_set),
+      problems: list(orderFields.problems),
+      note: str(orderFields.note),
+      approximatePrice: str(orderFields.approximate_price),
+      prepaid: orderFields.has_prepayment && paid > 0 ? formatMoney(paid) : 'Нет',
+      ready: orderFields.deadline ? day(orderFields.deadline) : '',
+      positions: detail.positions.map((position) => ({
+        name: position.name,
+        quantity: position.quantity,
+        price: position.sold_price,
+        total: position.total,
+        guaranteeDays: position.guarantee_days,
+      })),
+      total: detail.order.total_price,
+      paid: detail.order.paid,
+      discount: detail.order.discount_sum,
+      trackQr,
+      checkIn: (orderFields.check_in ?? {}) as ChecklistValues,
+      checkOut: (orderFields.check_out ?? {}) as ChecklistValues,
+      signatureIn: signatures.in,
+      signatureOut: signatures.out,
+    }
   }
 
-  const printAct = () => {
-    if (!detail) return
-    const device = [orderFields.device_type, orderFields.brand, orderFields.model].filter(Boolean).join(' ')
-    const rows = detail.positions
-      .map(
-        (position) => `<tr>
-          <td>${escapeHtml(position.name)}</td>
-          <td class="num">${escapeHtml(position.quantity)}</td>
-          <td class="num">${escapeHtml(formatMoney(position.sold_price))}</td>
-          <td class="num">${escapeHtml(formatMoney(position.total))}</td>
-          <td class="num">${position.guarantee_days ? `${position.guarantee_days} дн.` : '—'}</td>
-        </tr>`,
-      )
-      .join('')
-    const body = `
-      <h1>Акт выполненных работ № ${escapeHtml(detail.order.number)}</h1>
-      <div class="columns">
-        <section>
-          <h2>Исполнитель</h2>
-          <p><strong>${escapeHtml(currentLocation?.name)}</strong></p>
-          ${currentLocation?.address ? `<p>${escapeHtml(currentLocation.address)}</p>` : ''}
-          ${currentLocation?.phones ? `<p>Телефон: ${escapeHtml(currentLocation.phones)}</p>` : ''}
-        </section>
-        <section>
-          <h2>Клиент</h2>
-          <p><strong>${escapeHtml(detail.counteragent.name)}</strong></p>
-          ${detail.counteragent.phones ? `<p>Телефон: ${escapeHtml(detail.counteragent.phones)}</p>` : ''}
-        </section>
-      </div>
-      <h2>Устройство</h2>
-      <p>${escapeHtml(device || '—')}</p>
-      <p>Серийный номер / IMEI: ${escapeHtml(str(orderFields.serial) || '—')}</p>
-      <h2>Выполненные работы</h2>
-      <table>
-        <thead><tr><th>Наименование</th><th>Кол-во</th><th>Цена</th><th>Сумма</th><th>Гарантия</th></tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <p style="margin-top: 3mm"><strong>Итого: ${escapeHtml(formatMoney(detail.order.total_price))}</strong></p>
-      <p>Оплачено: ${escapeHtml(formatMoney(detail.order.paid))}</p>
-      ${checklistHtml((orderFields.check_in ?? {}) as ChecklistValues, (orderFields.check_out ?? {}) as ChecklistValues)}
-      <p style="margin-top: 8mm">Претензий к качеству и срокам не имею.</p>
-      ${signatureHtml(signatures.out, 'Подпись клиента при выдаче')}
-      <div class="signatures">
-        <div class="signature">Заказчик: ____________________</div>
-        <div class="signature">Мастер: ____________________</div>
-      </div>
-      <p class="muted">Дата: ${escapeHtml(String(orderFields.created_at ?? '').slice(0, 10).split('-').reverse().join('.'))}</p>
-    `
-    openPrint(`Акт ${detail.order.number}`, body)
+  const printForm = (kind: 'receipt' | 'checklist' | 'act' | 'refusal') => {
+    const data = buildFormData()
+    if (!data) return
+    const forms = {
+      receipt: { title: 'Квитанция', html: (d: FormData) => receiptHtml(d) + checkSheetHtml(d) },
+      checklist: { title: 'Проверка неисправностей', html: checkSheetHtml },
+      act: { title: 'Акт', html: actHtml },
+      refusal: { title: 'Отказной лист', html: refusalHtml },
+    }
+    openPrint(`${forms[kind].title} ${data.number}`, forms[kind].html(data), FORMS_STYLE)
   }
 
   const removePosition = async (position: Position) => {
@@ -634,9 +590,11 @@ export default function OrderDetailPage() {
           <span className="flex gap-1.5">
             <details className="relative">
               <summary className="cursor-pointer list-none rounded-lg px-3 py-1.5 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white">Печать</summary>
-              <div className="pop absolute right-0 z-20 mt-1 flex w-52 flex-col rounded-lg border border-line bg-surface p-1 text-ink shadow-lg">
-                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={printReceipt}>Квитанция о приёме</button>
-                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={printAct}>Акт выдачи</button>
+              <div className="pop absolute right-0 z-20 mt-1 flex w-60 flex-col rounded-lg border border-line bg-surface p-1 text-ink shadow-lg">
+                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('receipt')}>Квитанция о приёме</button>
+                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('checklist')}>Проверка неисправностей</button>
+                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('act')}>Акт выдачи</button>
+                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('refusal')}>Отказной лист</button>
               </div>
             </details>
             {!isDeleted && can('deleteOrderAccess') && (

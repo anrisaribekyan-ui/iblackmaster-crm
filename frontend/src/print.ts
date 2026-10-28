@@ -28,12 +28,12 @@ const BASE_STYLE = `
 `
 
 /** Открывает окно печати с HTML и сразу вызывает печать. bodyHtml — содержимое <body>. */
-export function openPrint(title: string, bodyHtml: string): void {
+export function openPrint(title: string, bodyHtml: string, style: string = BASE_STYLE): void {
   const printWindow = window.open('', '_blank')
   if (!printWindow) return
   printWindow.document.open()
   printWindow.document.write(
-    `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${BASE_STYLE}</style></head><body>${bodyHtml}</body></html>`,
+    `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>${style}</style></head><body>${bodyHtml}</body></html>`,
   )
   printWindow.document.close()
   printWindow.focus()
