@@ -29,3 +29,7 @@ station-agent/dist/
 station-agent/build/
 station-agent/tmp/
 station-agent/*.spec
+
+# обслуживание сервера (deploy/ops)
+deploy/ops.env
+deploy/.ops-state/
