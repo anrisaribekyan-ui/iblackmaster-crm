@@ -15,6 +15,7 @@ from app.models.catalog import (
     Problem,
     StockBalance,
 )
+from app.models.day_note import DayNote
 from app.models.company import AppSetting, CashRegister, Company, Location, Store
 from app.models.counteragent import Counteragent, CounteragentType, HowKnow
 from app.models.finance import CashItem, CashItemType, Transaction

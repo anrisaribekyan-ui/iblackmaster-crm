@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     # Пусто — кнопка «Оформить» в «Закупках» скрыта.
     zakupka_url: str = ""
     zakupka_token: str = ""
+    # ИИ для раздела «Что сегодня было»: любой OpenAI-совместимый сервис (по умолчанию DeepSeek).
+    # Пусто — заметка разбирается простыми правилами без ИИ. В ИИ уходит только текст заметки.
+    llm_api_key: str = ""
+    llm_base_url: str = "https://api.deepseek.com"
+    llm_model: str = "deepseek-chat"
 
 
 settings = Settings()

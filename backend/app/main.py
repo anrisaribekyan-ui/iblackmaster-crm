@@ -22,6 +22,7 @@ from app.api import (
     counteragents,
     counteragent_types,
     dashboard,
+    day_notes,
     devices,
     how_knows,
     locations,
@@ -117,6 +118,7 @@ app.include_router(stock_documents.router, prefix="/api")
 app.include_router(stock_remains.router, prefix="/api")
 app.include_router(sales.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
+app.include_router(day_notes.router, prefix="/api")
 app.include_router(transactions.router, prefix="/api")
 app.include_router(app_install.router, prefix="/api")
 app.include_router(supplier_orders.router, prefix="/api")

@@ -40,6 +40,9 @@ services:
       # Сервис автозаказа (zakupka_api.py в ~/moba) на этом же сервере — кнопка «Оформить» в «Закупках»
       ZAKUPKA_URL: ${ZAKUPKA_URL:-}
       ZAKUPKA_TOKEN: ${ZAKUPKA_TOKEN:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.deepseek.com}
+      LLM_MODEL: ${LLM_MODEL:-deepseek-chat}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

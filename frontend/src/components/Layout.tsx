@@ -12,6 +12,7 @@ export const MENU: { to: string; label: string; icon: string; permission?: strin
   { to: '/', icon: 'home', label: 'Главная' },
   { to: '/orders', icon: 'orders', label: 'Заказы' },
   { to: '/sales', icon: 'sales', label: 'Продажи' },
+  { to: '/day', icon: 'notes', label: 'Что сегодня было' },
   { to: '/store/remains', icon: 'store', label: 'Склад', permission: 'remainAccess' },
   { to: '/tasks', icon: 'tasks', label: 'Задачи' },
   { to: '/zakupki', icon: 'cart', label: 'Закупки' },
