@@ -73,7 +73,7 @@ def read_rows(path: str):
             yield dict(zip(header, values))
 
 
-def run(db: Session, path: str, commit: bool, until: datetime | None) -> int:
+def run(db: Session, path: str, commit: bool, until: datetime | None, targets: list[str] | None = None) -> int:
     started = time.time()
     registers = {r.name: r for r in db.scalars(select(CashRegister))}
     locations = {l.name: l for l in db.scalars(select(Location))}
@@ -199,6 +199,39 @@ def run(db: Session, path: str, commit: bool, until: datetime | None) -> int:
         if ls is not None and abs(now - ls[1]) > Decimal("5"):
             mark = f"   ← расхождение {now - ls[1]:+}"
         print(f"  {names[register_id]:28} {'безнал' if is_bank else 'нал':7} {now:>16,.2f}   LiveSklad: {ls[1] if ls else '—':>16}{mark}")
+    # Приводим остатки к снятым в LiveSklad: разницу фиксируем отдельной операцией, чтобы история и итог сошлись
+    for spec in targets or []:
+        try:
+            name, kind, value = spec.split(":")
+            target = Decimal(value.replace(",", ".")).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        except ValueError:
+            problems.append(f"не понял --set-balance «{spec}», формат «Касса Лента:нал:0»")
+            continue
+        register = registers.get(name.strip())
+        if register is None:
+            problems.append(f"--set-balance: нет кассы «{name}»")
+            continue
+        is_bank = kind.strip().lower().startswith("без")
+        current = register.bank_balance if is_bank else register.cash_balance
+        diff = target - current
+        if diff == 0:
+            continue
+        label = "Корректировка остатка (LiveSklad)"
+        item = items.get((label, diff > 0))
+        if item is None:
+            item = CashItem(name=label, is_income=diff > 0, type=None, affects_balance=False)
+            db.add(item)
+            db.flush()
+            items[(label, diff > 0)] = item
+        db.add(Transaction(date=last_date, cash_register_id=register.id, cash_item_id=item.id, is_income=diff > 0,
+                           is_bank=is_bank, amount=abs(diff), balance_after=target, location_id=register.location_id,
+                           created_by_id=owner.id if owner else None,
+                           note=f"{NOTE_PREFIX}: приведение остатка к LiveSklad ({current} → {target})"))
+        if is_bank:
+            register.bank_balance = target
+        else:
+            register.cash_balance = target
+        print(f"  корректировка {register.name} ({'безнал' if is_bank else 'нал'}): {diff:+,} → {target:,}")
     for problem in problems[:20]:
         print("  !", problem)
     if len(problems) > 20:
@@ -218,13 +251,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("path", help="Файл «Транзакции.xlsx» из LiveSklad")
     parser.add_argument("--commit", action="store_true", help="Записать в базу (без флага — пробный прогон)")
     parser.add_argument("--until", help="Брать операции не позже этого момента по Москве, «дд.мм.гггг чч:мм»")
+    parser.add_argument("--set-balance", action="append", help="«Касса:нал|безнал:сумма» — привести остаток к LiveSklad (можно несколько раз)")
     args = parser.parse_args(argv)
     until = parse_dt(args.until) if args.until else None
     if args.until and until is None:
         sys.exit("Не понял --until. Формат: «30.10.2026 17:00»")
     db = SessionLocal()
     try:
-        return run(db, args.path, args.commit, until)
+        return run(db, args.path, args.commit, until, args.set_balance)
     finally:
         db.close()
 

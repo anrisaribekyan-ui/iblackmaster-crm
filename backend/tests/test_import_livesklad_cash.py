@@ -78,3 +78,13 @@ def test_unknown_register_is_reported_not_imported(db, tmp_path):
     wb.save(path)
     assert run(db, str(path), commit=True, until=None) == 1
     assert db.scalars(select(Transaction)).first() is None
+
+
+def test_set_balance(db, tmp_path):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    path = _file(tmp_path, location.name)
+    register = db.scalars(select(CashRegister).where(CashRegister.name == "Касса Панфиловский")).one()
+    assert run(db, path, True, None, ["Касса Панфиловский:нал:777"]) == 0
+    db.refresh(register)
+    assert register.cash_balance == 777
+    assert db.scalars(select(Transaction).where(Transaction.note.like("%приведение остатка%"))).first()
