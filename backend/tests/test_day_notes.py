@@ -100,3 +100,14 @@ def test_llm_answer_is_used_and_garbage_falls_back(monkeypatch):
     assert items[0]["amount"] == 700 and items[1]["kind"] == "other" and items[1]["amount"] is None and items[1]["method"] is None
     assert service.llm_extract("x", reply("не json")) is None
     assert service.llm_extract("x", httpx.MockTransport(lambda req: httpx.Response(500))) is None
+
+
+def test_work_for_retail_client_is_a_sale_of_work():
+    items = service.rules_extract(
+        "поменял дисп розничному клиенту его за 2000р без себеса и заменил акб на айфон 8 без гарантии за 3000 другому в рознице"
+    )
+    assert [(i["kind"], i["amount"], i["is_work"], i["no_cost"], i["guarantee_days"]) for i in items] == [
+        ("sale", 2000, True, True, None),
+        ("sale", 3000, True, False, 0),
+    ]
+    assert "дисп" in items[0]["title"] and "iphone 8" in items[1]["title"]

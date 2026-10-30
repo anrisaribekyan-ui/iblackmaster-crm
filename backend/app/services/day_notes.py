@@ -20,6 +20,10 @@ KINDS = {"sale", "give_order", "payment", "other"}
 BANK_WORDS = re.compile(r"безнал|без нал|карт[аойуе]|картой|перевод|эквайр|терминал|сбп|qr|кьюар", re.I)
 CASH_WORDS = re.compile(r"наличк|наличны|\bнал\b|кэш|cash", re.I)
 GIVE_WORDS = re.compile(r"выдал|выдан|выдача|отдал|забрал|закрыл", re.I)
+WORK_WORDS = re.compile(r"поменял|заменил|замена|менял|починил|отремонтир|прошил|установил|восстановил|почистил|переклеил|перепаял|сделал", re.I)
+NO_COST = re.compile(r"без\s+себ\w*|себ\w*\s+(?:0|ноль|нет)", re.I)
+NO_WARRANTY = re.compile(r"без\s+гарант\w*", re.I)
+RETAIL = re.compile(r"(?:другому|другой|другим)\s*|(?:другому\s+)?(?:розничному\s+)?клиент\w*|в\s+розниц\w*|розничн\w*|\bего\b", re.I)
 PAY_WORDS = re.compile(r"оплатил|оплата|доплат|предоплат|аванс", re.I)
 FILLER = {"и", "за", "на", "по", "от", "с", "оплатили", "оплатил", "оплата", "оплачено", "руб", "р", "рублей", "клиент"}
 SYNONYMS = {
@@ -65,7 +69,7 @@ def _score(query: list[str], pool: set[str]) -> float:
 # ---------- разбор правилами ----------
 
 def split_segments(text: str) -> list[str]:
-    parts = re.split(r"[/\n;]+", text)
+    parts = re.split(r"[/\n;]+|\s+и\s+(?=(?:поменял|заменил|менял|починил|прошил|установил|восстановил|почистил|сделал))", text)
     return [p.strip(" \t.,") for p in parts if p.strip(" \t.,")]
 
 
@@ -75,13 +79,21 @@ def _parse_segment(segment: str) -> dict | None:
     give = bool(GIVE_WORDS.search(lower))
     paid = bool(PAY_WORDS.search(lower))
     amount = None
-    amount_match = re.search(r"(?<![\w.])(\d{3,6})(?![\w])\s*(?:р\b|руб\w*|₽)?", lower)
+    amount_match = re.search(r"(?<![\w.])(\d{3,6})(?:\s*(?:руб\w*|р|₽)(?![а-яa-z]))?(?![\w])", lower)
     if amount_match:
         amount = int(amount_match.group(1))
+    work = bool(WORK_WORDS.search(lower)) and not give
     # Название: убираем способ оплаты, глаголы, сумму
     cleaned = BANK_WORDS.sub(" ", lower)
     cleaned = CASH_WORDS.sub(" ", cleaned)
     cleaned = GIVE_WORDS.sub(" ", cleaned)
+    no_cost = bool(NO_COST.search(lower))
+    no_warranty = bool(NO_WARRANTY.search(lower))
+    if work:
+        cleaned = NO_COST.sub(" ", NO_WARRANTY.sub(" ", cleaned))
+        cleaned = RETAIL.sub(" ", cleaned)
+        cleaned = re.sub(r"\bза\b", " ", cleaned)
+        cleaned = WORK_WORDS.sub(" ", cleaned)
     if amount_match:
         cleaned = cleaned.replace(amount_match.group(0), " ", 1)
     words = [w for w in _tokens(cleaned) if w not in FILLER]
@@ -90,6 +102,11 @@ def _parse_segment(segment: str) -> dict | None:
         if len(words) <= 2 and not any(w.isdigit() for w in words):
             return {"header": segment}
         return {"kind": "other", "text": segment, "title": title, "amount": None, "method": None}
+    if work and not give:
+        return {
+            "kind": "sale", "text": segment, "title": title, "amount": amount, "method": method,
+            "is_work": True, "no_cost": no_cost, "guarantee_days": 0 if no_warranty else None,
+        }
     if give:
         kind = "give_order"
     elif paid and amount is None:
@@ -123,7 +140,11 @@ PROMPT = (
     '"payment" (клиент внёс оплату по ремонту, но не забрал), "other" (всё прочее), '
     '"title" (что за товар или аппарат, без суммы и способа оплаты, например "Стекло Remax" или "iPhone 8"), '
     '"amount" (сумма в рублях целым числом или null), "method" ("cash" наличные, "bank" безнал/карта/перевод, или null), '
-    '"person" (имя, если записи идут под чьим-то именем, иначе null). '
+    '"person" (имя, если записи идут под чьим-то именем, иначе null), '
+    '"is_work" (true, если это выполненная работа или ремонт для клиента без заказа, например «поменял дисплей розничному клиенту за 2000»: '
+    'это тоже kind "sale"; false для проданного товара), '
+    '"no_cost" (true, если сказано «без себеса»), "guarantee_days" (0 если «без гарантии», число дней если названо, иначе null). '
+    'В title для работы пиши коротко, что сделано: «Замена дисплея», «Замена АКБ iPhone 8». '
     "Слова «нал» — наличные, «безнал» — безналичные. Ничего не выдумывай."
 )
 
@@ -163,6 +184,9 @@ def llm_extract(text: str, transport: httpx.BaseTransport | None = None) -> list
                 "amount": amount,
                 "method": method,
                 "person": (str(row["person"])[:100] if row.get("person") else None),
+                "is_work": bool(row.get("is_work")),
+                "no_cost": bool(row.get("no_cost")),
+                "guarantee_days": (int(row["guarantee_days"]) if isinstance(row.get("guarantee_days"), (int, float)) and row["guarantee_days"] >= 0 else None),
             })
         return items or None
     except Exception:  # сеть, формат ответа, лимиты — не повод ронять заметку, берём правила

@@ -11,6 +11,9 @@ type Item = {
   amount: number | null
   method: 'cash' | 'bank' | null
   person: string | null
+  is_work?: boolean
+  no_cost?: boolean
+  guarantee_days?: number | null
   candidates: Candidate[]
   products: Product[]
   status: 'new' | 'applied' | 'skipped'
@@ -20,7 +23,7 @@ type Note = { id: number; text: string; items: Item[]; analyzed_at: string | nul
 type StatusGroup = { group: string; statuses: { id: number; comment_mode: string }[] }
 
 const KIND_TITLE: Record<Item['kind'], string> = {
-  sale: 'Продажа',
+  sale: 'Продажа',  // для работы название берём ниже
   give_order: 'Выдача ремонта',
   payment: 'Оплата по ремонту',
   other: 'Не распознано',
@@ -161,7 +164,7 @@ export default function DayNotePage() {
       {note && note.analyzed_at && (
         <section className="mt-6" aria-label="Что нашлось в заметке">
           <h2 className="mb-2 text-lg font-semibold">
-            {note.items.length === 0 ? 'Ничего не нашлось' : pending > 0 ? `Осталось внести: ${pending}` : 'Всё внесено'}
+            {note.items.length === 0 ? 'Ничего не нашлось' : pending > 0 ? `Осталось внести: ${pending}` : note.items.some((i) => i.kind !== 'other' && i.status === 'applied') ? 'Всё внесено' : 'Внести нечего'}
           </h2>
           <div className="flex flex-col gap-3">
             {note.items.map((item, index) => (
@@ -255,7 +258,7 @@ function ItemCard({ noteId, index, item, locations, registers, fallbackLocationI
       if (!register) throw new ApiError(400, 'business_error', bank ? 'Нет кассы для безналичной оплаты' : 'Нет кассы для наличных')
       const position = productId
         ? { nomenclature_id: Number(productId), quantity: '1', price: String(sum), no_stock: noStock }
-        : { name: name.trim() || 'Товар', quantity: '1', price: String(sum), purchase_price: '0', no_stock: true }
+        : { name: name.trim() || 'Товар', is_work: Boolean(item.is_work), quantity: '1', price: String(sum), purchase_price: '0', no_stock: true, ...(item.guarantee_days != null ? { guarantee_days: item.guarantee_days } : {}) }
       const sale = await api.post<{ number: string }>('/sales', {
         location_id: location.id,
         store_id: store.id,
@@ -285,7 +288,7 @@ function ItemCard({ noteId, index, item, locations, registers, fallbackLocationI
   return (
     <article className={`rounded-xl border border-line bg-surface p-4 ${done ? 'opacity-60' : ''}`}>
       <div className="mb-1 flex flex-wrap items-baseline gap-2">
-        <b>{KIND_TITLE[item.kind]}</b>
+        <b>{item.kind === 'sale' && item.is_work ? 'Работа (розница)' : KIND_TITLE[item.kind]}</b>{item.no_cost && <span className="text-sm text-muted">без себестоимости</span>}
         {item.person && <span className="text-sm text-muted">{item.person}</span>}
         {item.status === 'applied' && <span className="rounded bg-green-100 px-2 text-sm text-green-800">внесено{item.ref ? ` · ${item.ref.replace(/^\w+:/, '')}` : ''}</span>}
         {item.status === 'skipped' && <span className="rounded bg-black/5 px-2 text-sm text-muted">пропущено</span>}
