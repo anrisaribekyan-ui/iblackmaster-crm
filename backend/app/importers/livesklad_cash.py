@@ -20,6 +20,7 @@
 """
 
 import argparse
+import re
 import sys
 import time
 from collections import Counter, defaultdict
@@ -46,6 +47,20 @@ def exact(value) -> Decimal:
     return Decimal(str(value or 0).replace(" ", "").replace(",", ".").replace("–", "-"))
 
 
+def find_employee(people: list[Employee], text: str) -> int | None:
+    """Сотрудник по «Получатель» из LiveSklad: совпадение по short_name, «фамилия имя» или по фамилии (если однозначно)."""
+    text = " ".join(text.lower().split())
+    if not text:
+        return None
+    exactly = [e for e in people if text in {(e.short_name or "").lower(), f"{e.surname or ''} {e.name}".strip().lower(),
+                                              f"{e.name} {e.surname or ''}".strip().lower()}]
+    if len(exactly) == 1:
+        return exactly[0].id
+    parts = [w for w in re.split(r"[\s.]+", text) if len(w) > 2]
+    found = [e for e in people if any(w in f"{e.surname or ''} {e.name} {e.short_name or ''}".lower() for w in parts)]
+    return found[0].id if len(found) == 1 else None
+
+
 def read_rows(path: str):
     workbook = load_workbook(path, read_only=True)
     rows = workbook.worksheets[0].iter_rows(values_only=True)
@@ -66,6 +81,7 @@ def run(db: Session, path: str, commit: bool, until: datetime | None) -> int:
     orders = {n: i for n, i in db.execute(select(Order.number, Order.id))}
     employees = {e.name: e.id for e in db.scalars(select(Employee))}
     owner = db.scalars(select(Employee).where(Employee.is_owner.is_(True))).first()
+    people = list(db.scalars(select(Employee)))
 
     rows = []
     for row in read_rows(path):
@@ -131,6 +147,9 @@ def run(db: Session, path: str, commit: bool, until: datetime | None) -> int:
             note_parts.append(f"ОФД {row['Номер ОФД']}")
         note_parts.append(f"{NOTE_PREFIX}")
         rest = row.get("Остаток")
+        pay_to = find_employee(people, recipient) if item.type == "salary" else None
+        if item.type == "salary" and recipient and pay_to is None:
+            problems.append(f"выплата зарплаты: не нашёл сотрудника «{recipient}» ({date.astimezone(MSK):%d.%m.%Y})")
         tx = Transaction(
             date=date,
             cash_register_id=register.id,
@@ -141,6 +160,7 @@ def run(db: Session, path: str, commit: bool, until: datetime | None) -> int:
             balance_after=money(rest) if rest not in (None, "") else Decimal("0"),
             location_id=location.id if location else register.location_id,
             created_by_id=responsible,
+            employee_id=pay_to,
             order_id=order_id,
             note="; ".join(note_parts)[:1000],
         )
