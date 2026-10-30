@@ -10,7 +10,7 @@
 
 Запуск (файлы — в контейнер, как для остальных переносов):
     python -m app.importers.livesklad_salary --employee Черкасов --employee Яковлев /app/sal/cherkasov.txt /app/sal/yakovlev.txt
-    ... и то же с --commit для записи. Месяцы позже --until (по умолчанию 30.10.2026) не берутся: дальше считает CRM.
+    ... и то же с --commit для записи. Месяцы после месяца --until (по умолчанию 30.10.2026) не берутся; месяц переноса вносится датой переноса: дальше считает CRM.
 Повторно: если у сотрудника уже есть события LiveSklad за месяц — месяц пропускается.
 """
 
@@ -76,8 +76,10 @@ def run(db: Session, jobs: list[tuple[str, str]], commit: bool, until: datetime)
         for row in parse_file(path):
             date = month_end(row["year"], row["month"])
             if date > until:
-                skipped += 1
-                continue
+                if (date.year, date.month) != (until.year, until.month):
+                    skipped += 1
+                    continue
+                date = until  # последний месяц LiveSklad: начисления до дня переноса, датой переноса
             if (date.year, date.month) in known:
                 skipped += 1
                 continue

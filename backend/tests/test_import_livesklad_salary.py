@@ -27,3 +27,13 @@ def test_import_salary(db, tmp_path):
     # повтор — без задвоения
     run(db, [(employee.name, str(path))], commit=True, until=until)
     assert len(db.scalars(select(SalaryEvent).where(SalaryEvent.employee_id == employee.id)).all()) == 3
+
+
+def test_import_salary_last_month_dated_at_cutover(db, tmp_path):
+    employee = db.scalars(select(Employee)).first()
+    path = tmp_path / "t.txt"
+    path.write_text(TABLE, encoding="utf-8")
+    until = datetime(2026, 10, 30, 23, 59, tzinfo=MSK)
+    run(db, [(employee.name, str(path))], commit=True, until=until)
+    october = db.scalars(select(SalaryEvent).where(SalaryEvent.employee_id == employee.id, SalaryEvent.kind == "penalty")).one()
+    assert october.amount == Decimal("-4520") and october.date.astimezone(MSK).day == 30
