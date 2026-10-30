@@ -13,6 +13,7 @@ type Item = {
   person: string | null
   is_work?: boolean
   no_cost?: boolean
+  cost?: number | null
   guarantee_days?: number | null
   candidates: Candidate[]
   products: Product[]
@@ -201,6 +202,7 @@ function ItemCard({ noteId, index, item, locations, registers, fallbackLocationI
   const [amount, setAmount] = useState<string>(item.amount !== null ? String(item.amount) : item.candidates[0] ? String(item.candidates[0].debt) : '')
   const [bank, setBank] = useState(item.method === 'bank')
   const [noStock, setNoStock] = useState(false)
+  const [cost, setCost] = useState<string>(item.cost != null ? String(item.cost) : '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -256,9 +258,10 @@ function ItemCard({ noteId, index, item, locations, registers, fallbackLocationI
       if (!location || !store) throw new ApiError(400, 'business_error', 'Не найдена точка или склад')
       const register = pickRegister(registers, location.id, bank)
       if (!register) throw new ApiError(400, 'business_error', bank ? 'Нет кассы для безналичной оплаты' : 'Нет кассы для наличных')
+      const costValue = cost.trim() === '' ? null : String(Number(cost))
       const position = productId
-        ? { nomenclature_id: Number(productId), quantity: '1', price: String(sum), no_stock: noStock }
-        : { name: name.trim() || 'Товар', is_work: Boolean(item.is_work), quantity: '1', price: String(sum), purchase_price: '0', no_stock: true, ...(item.guarantee_days != null ? { guarantee_days: item.guarantee_days } : {}) }
+        ? { nomenclature_id: Number(productId), quantity: '1', price: String(sum), no_stock: noStock, ...(costValue !== null ? { purchase_price: costValue } : {}) }
+        : { name: name.trim() || 'Товар', is_work: Boolean(item.is_work), quantity: '1', price: String(sum), purchase_price: costValue ?? '0', no_stock: true, ...(item.guarantee_days != null ? { guarantee_days: item.guarantee_days } : {}) }
       const sale = await api.post<{ number: string }>('/sales', {
         location_id: location.id,
         store_id: store.id,
@@ -343,6 +346,10 @@ function ItemCard({ noteId, index, item, locations, registers, fallbackLocationI
             </label>
           )}
           <PayFields amount={amount} setAmount={setAmount} bank={bank} setBank={setBank} />
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-muted">Себестоимость, ₽ {item.no_cost ? '(в заметке: без себестоимости)' : '(можно оставить пустой)'}</span>
+            <input className={`${inputClass} w-36`} inputMode="numeric" value={cost} placeholder={item.no_cost ? '0' : ''} onChange={(e) => setCost(e.target.value.replace(/\D/g, ''))} />
+          </label>
           <Actions busy={busy} canApply applyLabel="Внести продажу" onApply={applySale} onSkip={skip} />
         </div>
       )}

@@ -111,3 +111,8 @@ def test_work_for_retail_client_is_a_sale_of_work():
         ("sale", 3000, True, False, 0),
     ]
     assert "дисп" in items[0]["title"] and "iphone 8" in items[1]["title"]
+
+
+def test_cost_is_extracted():
+    items = service.rules_extract("заменил акб айфон 8 за 3000 себес 1200 нал / поменял дисп за 2000 без себеса")
+    assert [(i["amount"], i["cost"]) for i in items] == [(3000, 1200), (2000, 0)]

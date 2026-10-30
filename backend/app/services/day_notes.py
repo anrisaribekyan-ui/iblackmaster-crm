@@ -23,6 +23,7 @@ GIVE_WORDS = re.compile(r"выдал|выдан|выдача|отдал|забр
 WORK_WORDS = re.compile(r"поменял|заменил|замена|менял|починил|отремонтир|прошил|установил|восстановил|почистил|переклеил|перепаял|сделал", re.I)
 NO_COST = re.compile(r"без\s+себ\w*|себ\w*\s+(?:0|ноль|нет)", re.I)
 NO_WARRANTY = re.compile(r"без\s+гарант\w*", re.I)
+COST = re.compile(r"(?:себес\w*|себ\w*|закуп\w*)\s*(\d{2,6})", re.I)
 RETAIL = re.compile(r"(?:другому|другой|другим)\s*|(?:другому\s+)?(?:розничному\s+)?клиент\w*|в\s+розниц\w*|розничн\w*|\bего\b", re.I)
 PAY_WORDS = re.compile(r"оплатил|оплата|доплат|предоплат|аванс", re.I)
 FILLER = {"и", "за", "на", "по", "от", "с", "оплатили", "оплатил", "оплата", "оплачено", "руб", "р", "рублей", "клиент"}
@@ -79,12 +80,15 @@ def _parse_segment(segment: str) -> dict | None:
     give = bool(GIVE_WORDS.search(lower))
     paid = bool(PAY_WORDS.search(lower))
     amount = None
-    amount_match = re.search(r"(?<![\w.])(\d{3,6})(?:\s*(?:руб\w*|р|₽)(?![а-яa-z]))?(?![\w])", lower)
+    lower_for_amount = COST.sub(" ", lower)
+    amount_match = re.search(r"(?<![\w.])(\d{3,6})(?:\s*(?:руб\w*|р|₽)(?![а-яa-z]))?(?![\w])", lower_for_amount)
     if amount_match:
         amount = int(amount_match.group(1))
+    cost_match = COST.search(lower)
+    cost = int(cost_match.group(1)) if cost_match else (0 if NO_COST.search(lower) else None)
     work = bool(WORK_WORDS.search(lower)) and not give
     # Название: убираем способ оплаты, глаголы, сумму
-    cleaned = BANK_WORDS.sub(" ", lower)
+    cleaned = COST.sub(" ", BANK_WORDS.sub(" ", lower))
     cleaned = CASH_WORDS.sub(" ", cleaned)
     cleaned = GIVE_WORDS.sub(" ", cleaned)
     no_cost = bool(NO_COST.search(lower))
@@ -105,7 +109,7 @@ def _parse_segment(segment: str) -> dict | None:
     if work and not give:
         return {
             "kind": "sale", "text": segment, "title": title, "amount": amount, "method": method,
-            "is_work": True, "no_cost": no_cost, "guarantee_days": 0 if no_warranty else None,
+            "is_work": True, "no_cost": no_cost, "cost": cost, "guarantee_days": 0 if no_warranty else None,
         }
     if give:
         kind = "give_order"
@@ -143,7 +147,7 @@ PROMPT = (
     '"person" (имя, если записи идут под чьим-то именем, иначе null), '
     '"is_work" (true, если это выполненная работа или ремонт для клиента без заказа, например «поменял дисплей розничному клиенту за 2000»: '
     'это тоже kind "sale"; false для проданного товара), '
-    '"no_cost" (true, если сказано «без себеса»), "guarantee_days" (0 если «без гарантии», число дней если названо, иначе null). '
+    '"no_cost" (true, если сказано «без себеса»), "cost" (себестоимость в рублях целым числом, если названа, при «без себеса» 0, иначе null), "guarantee_days" (0 если «без гарантии», число дней если названо, иначе null). '
     'В title для работы пиши коротко, что сделано: «Замена дисплея», «Замена АКБ iPhone 8». '
     "Слова «нал» — наличные, «безнал» — безналичные. Ничего не выдумывай."
 )
@@ -186,6 +190,7 @@ def llm_extract(text: str, transport: httpx.BaseTransport | None = None) -> list
                 "person": (str(row["person"])[:100] if row.get("person") else None),
                 "is_work": bool(row.get("is_work")),
                 "no_cost": bool(row.get("no_cost")),
+                "cost": (int(row["cost"]) if isinstance(row.get("cost"), (int, float)) and row["cost"] >= 0 else None),
                 "guarantee_days": (int(row["guarantee_days"]) if isinstance(row.get("guarantee_days"), (int, float)) and row["guarantee_days"] >= 0 else None),
             })
         return items or None
