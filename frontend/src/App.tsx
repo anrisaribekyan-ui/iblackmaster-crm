@@ -34,6 +34,7 @@ const FinanceTransactionsPage = lazy(() => import('./pages/finance/FinanceTransa
 const SalaryPage = lazy(() => import('./pages/finance/SalaryPage'))
 const SalaryEmployeePage = lazy(() => import('./pages/finance/SalaryEmployeePage'))
 const CashItemsPage = lazy(() => import('./pages/compendiums/CashItemsPage'))
+const DataTransferPage = lazy(() => import('./pages/DataTransferPage'))
 const IdeasPage = lazy(() => import('./pages/IdeasPage'))
 const DayNotePage = lazy(() => import('./pages/DayNotePage'))
 const SalesPage = lazy(() => import('./pages/SalesPage'))
@@ -94,6 +95,7 @@ export default function App() {
             <Route path="sales" element={<SalesPage />} />
             <Route path="day" element={<DayNotePage />} />
             <Route path="ideas" element={<IdeasPage />} />
+            <Route path="transfer" element={<DataTransferPage />} />
             <Route path="store" element={<StoreLayout />}>
               <Route index element={<Navigate to="remains" replace />} />
               <Route path="remains" element={<RemainsPage />} />
