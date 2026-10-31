@@ -256,6 +256,58 @@ export function refusalHtml(d: FormData): string {
   </section>`
 }
 
+const WARRANTY_TERMS = [
+  'Гарантийный срок на каждую позицию указан в таблице и отсчитывается со дня выдачи устройства.',
+  'Гарантия распространяется только на выполненную работу и установленные запчасти, указанные в этом талоне.',
+  'Гарантия не действует при механических повреждениях, попадании влаги, следах вскрытия или ремонта в другом сервисе, перепадах напряжения и неправильной эксплуатации.',
+  'Гарантия не распространяется на неисправности, не связанные с выполненным ремонтом.',
+  'Для гарантийного обращения предъявите этот талон и устройство. Срок диагностики — до 14 дней.',
+]
+
+export function warrantyHtml(d: FormData): string {
+  const terms = WARRANTY_TERMS.map((text, index) => `<p><b>${index + 1}.</b> ${e(text)}</p>`).join('')
+  return `<section class="sheet">
+    ${head(d, 'Гарантийный талон')}
+    ${parties(d)}
+    <div class="cols"><section class="card wide"><h3>Устройство</h3><div>${val([d.device, d.serial ? `SN / IMEI: ${d.serial}` : ''].filter(Boolean).join(' · '))}</div></section></div>
+    ${positionsTable(d)}
+    <div class="terms one">${terms}</div>
+    ${sign(`Исполнитель · ${e(d.master || d.manager)}`, `Заказчик · ${e(d.customer.name)}`, d.signatureOut)}
+  </section>`
+}
+
+export function saleCheckHtml(d: FormData): string {
+  return `<section class="sheet">
+    ${head(d, 'Товарный чек')}
+    ${parties(d)}
+    ${positionsTable(d)}
+    ${totalsBlock(d, true)}
+    ${sign(`Продавец · ${e(d.manager || d.master)}`, `Покупатель · ${e(d.customer.name)}`)}
+  </section>`
+}
+
+/** Бирка на аппарат: 58 × 40 мм. */
+export const LABEL_STYLE = `
+  @page { size: 58mm 40mm; margin: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font: 8pt/1.25 Arial, sans-serif; color: #000; }
+  .label { width: 58mm; height: 40mm; padding: 2.5mm 3mm; overflow: hidden; break-after: page; }
+  .label .n { font-size: 15pt; font-weight: 700; letter-spacing: -.01em; }
+  .label .d { font-weight: 700; margin-top: 1mm; }
+  .label .r { margin-top: 1mm; }
+  .label .m { color: #333; margin-top: 1mm; font-size: 7pt; }
+`
+
+export function labelHtml(d: FormData): string {
+  return `<div class="label">
+    <div class="n">${e(d.number)}</div>
+    <div class="d">${e(d.device) || '—'}</div>
+    <div class="r">${e(d.customer.name)} ${e(d.customer.phones)}</div>
+    <div class="r">${e(d.problems)}</div>
+    <div class="m">Принят ${e(d.date)}${d.ready ? ` · срок ${e(d.ready)}` : ''}</div>
+  </div>`
+}
+
 /** Стиль бланков. Фиксированная монохромная палитра: печать не зависит от темы интерфейса. */
 export const FORMS_STYLE = `
   :root { --ink:#0f1115; --ink-2:#4a505c; --ink-3:#8a909c; --line:#d9dce2; --tint:#f4f5f7; }

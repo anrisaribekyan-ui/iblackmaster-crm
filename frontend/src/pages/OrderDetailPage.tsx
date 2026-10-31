@@ -6,7 +6,7 @@ import { useAuth } from '../auth'
 import Modal from '../components/Modal'
 import TaskForm, { type TaskEmployee, type TaskFormValues } from '../components/TaskForm'
 import { openPrint } from '../print'
-import { actHtml, checklistHtml as checkSheetHtml, FORMS_STYLE, receiptHtml, refusalHtml, type FormData } from '../printForms'
+import { actHtml, checklistHtml as checkSheetHtml, FORMS_STYLE, labelHtml, LABEL_STYLE, receiptHtml, refusalHtml, saleCheckHtml, warrantyHtml, type FormData } from '../printForms'
 import OrderSms from '../components/OrderSms'
 import OrderPhotos from '../components/OrderPhotos'
 import OrderChecklistCard, { type Signatures } from '../components/OrderChecklistCard'
@@ -573,7 +573,7 @@ export default function OrderDetailPage() {
     }
   }
 
-  const printForm = (kind: 'receipt' | 'checklist' | 'act' | 'refusal') => {
+  const printForm = (kind: 'receipt' | 'checklist' | 'act' | 'refusal' | 'warranty' | 'check' | 'label') => {
     const data = buildFormData()
     if (!data) return
     const forms = {
@@ -581,8 +581,11 @@ export default function OrderDetailPage() {
       checklist: { title: 'Проверка неисправностей', html: checkSheetHtml },
       act: { title: 'Акт', html: actHtml },
       refusal: { title: 'Отказной лист', html: refusalHtml },
+      warranty: { title: 'Гарантийный талон', html: warrantyHtml },
+      check: { title: 'Товарный чек', html: saleCheckHtml },
+      label: { title: 'Бирка', html: labelHtml },
     }
-    openPrint(`${forms[kind].title} ${data.number}`, forms[kind].html(data), FORMS_STYLE)
+    openPrint(`${forms[kind].title} ${data.number}`, forms[kind].html(data), kind === 'label' ? LABEL_STYLE : FORMS_STYLE)
   }
 
   const removePosition = async (position: Position) => {
@@ -615,6 +618,9 @@ export default function OrderDetailPage() {
                 <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('checklist')}>Проверка неисправностей</button>
                 <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('act')}>Акт выдачи</button>
                 <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('refusal')}>Отказной лист</button>
+                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('warranty')}>Гарантийный талон</button>
+                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('check')}>Товарный чек</button>
+                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('label')}>Бирка на аппарат</button>
               </div>
             </details>
             {!isDeleted && can('deleteOrderAccess') && (
