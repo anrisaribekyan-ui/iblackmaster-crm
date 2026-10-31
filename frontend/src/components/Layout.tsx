@@ -8,6 +8,7 @@ import ThemeSwitch from './ThemeSwitch'
 import Skeleton from './Skeleton'
 import LocationSwitcher from './LocationSwitcher'
 import ShiftPrompt from './ShiftPrompt'
+import IdeaButton from './IdeaButton'
 
 /** Меню как в LiveSklad. permission — право, без которого пункт скрыт (пусто — виден всем). */
 export const MENU: { to: string; label: string; icon: string; permission?: string }[] = [
@@ -15,6 +16,8 @@ export const MENU: { to: string; label: string; icon: string; permission?: strin
   { to: '/orders', icon: 'orders', label: 'Заказы' },
   { to: '/sales', icon: 'sales', label: 'Продажи' },
   { to: '/day', icon: 'notes', label: 'Что сегодня было' },
+  // Идеи сотрудников видит только владелец: такого права нет ни в одной роли, у владельца «можно всё»
+  { to: '/ideas', icon: 'idea', label: 'Идеи для Анри', permission: 'ideasAccess' },
   { to: '/store/remains', icon: 'store', label: 'Склад', permission: 'remainAccess' },
   { to: '/tasks', icon: 'tasks', label: 'Задачи' },
   { to: '/zakupki', icon: 'cart', label: 'Закупки' },
@@ -177,6 +180,7 @@ export default function Layout() {
         </Suspense>
       </main>
       <ShiftPrompt />
+      <IdeaButton />
       <MobileTabBar onMore={() => setMenuOpen(true)} canCreate={can('createOrderAccess')} />
     </div>
   )
