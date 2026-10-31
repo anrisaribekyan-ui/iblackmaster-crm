@@ -298,3 +298,14 @@ def import_archive(items: list[ArchiveSaleIn], db: DbSession, me: CurrentEmploye
         created += 1
     db.commit()
     return {"created": created, "skipped": len(items) - created}
+
+
+@router.post("/hide-duplicates", dependencies=[Depends(require("settingAccess"))])
+def hide_duplicates(numbers: list[str], db: DbSession, me: CurrentEmployee):
+    """Скрывает чеки (дубли архива LiveSklad и пробные) из отчётов. Деньги в кассах остаются как есть."""
+    sales = db.scalars(select(Sale).where(Sale.number.in_(numbers), Sale.is_deleted.is_(False))).all()
+    for sale in sales:
+        sale.is_deleted = True
+        sale.note = ((sale.note or "") + " Скрыт: дубль продажи из LiveSklad").strip()
+    db.commit()
+    return {"hidden": len(sales)}
