@@ -1,3 +1,4 @@
+from datetime import datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends
@@ -265,3 +266,35 @@ def get_sale(sale_id: int, db: DbSession, me: CurrentEmployee):
             for p in sale.positions
         ],
     }
+
+
+# --- Перенос архива продаж из LiveSklad (без касс и склада: деньги уже в кассах) ---------
+
+
+class ArchiveSaleIn(BaseModel):
+    number: str = Field(min_length=1, max_length=20)
+    date: datetime
+    location_id: int
+    seller_id: int
+    total: int = Field(ge=0)
+    cost: int = Field(ge=0)
+    paid: int = Field(ge=0)
+
+
+@router.post("/import-archive", dependencies=[Depends(require("settingAccess"))])
+def import_archive(items: list[ArchiveSaleIn], db: DbSession, me: CurrentEmployee):
+    """Идемпотентно добавляет проданные чеки одной позицией «Продажа из LiveSklad»."""
+    existing = set(db.scalars(select(Sale.number).where(Sale.number.in_([i.number for i in items]))))
+    stores = {s.location_id: s.id for s in db.scalars(select(Store).order_by(Store.is_default.desc(), Store.id)).all()[::-1]}
+    created = 0
+    for i in items:
+        if i.number in existing or i.location_id not in stores:
+            continue
+        sale = Sale(number=i.number, date=i.date, location_id=i.location_id, store_id=stores[i.location_id], seller_id=i.seller_id,
+                    total_price=Decimal(i.total), total_purchase=Decimal(i.cost), paid=Decimal(i.paid), note="Перенесено из LiveSklad")
+        sale.positions.append(SalePosition(name="Продажа из LiveSklad", quantity=Decimal(1), price=Decimal(i.total),
+                                           sold_price=Decimal(i.total), purchase_price=Decimal(i.cost)))
+        db.add(sale)
+        created += 1
+    db.commit()
+    return {"created": created, "skipped": len(items) - created}
