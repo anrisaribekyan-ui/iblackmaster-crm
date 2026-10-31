@@ -1,3 +1,4 @@
+import { getCurrentLocation } from '../currentLocation'
 import { ClientCard, useIntakeHints, WarrantyAlert } from '../components/IntakeHints'
 import PriceHints from '../components/PriceHints'
 import { DevicePasswordInput } from '../components/PatternLock'
@@ -156,7 +157,7 @@ export default function OrderCreatePage() {
         setHowKnows(howKnowData)
         setMasters(masterData)
         setManagers(managerData)
-        if (locationData.length) setLocationId(String(locationData[0].id))
+        if (locationData.length) setLocationId(locationData.some((l) => String(l.id) === getCurrentLocation()) ? String(getCurrentLocation()) : String(locationData[0].id))
         if (typeData.length) setOrderTypeId(String(typeData[0].id))
       } catch (e) {
         if (active) setError(e instanceof ApiError ? e.message : 'Не удалось загрузить данные для создания заказа')

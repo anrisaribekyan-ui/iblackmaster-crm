@@ -1,3 +1,4 @@
+import { setCurrentLocation, useCurrentLocation } from '../currentLocation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRowLink } from '../components/rowLink'
 import { Link } from 'react-router-dom'
@@ -66,7 +67,7 @@ export default function DashboardPage() {
   const { can, me } = useAuth()
   const canPeriod = can('dashboardOrderPeriodAccess')
   const [locations, setLocations] = useState<Location[]>([])
-  const [locationId, setLocationId] = useState('')
+  const locationId = useCurrentLocation()
   const [period, setPeriod] = useState<Period>('today')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -123,7 +124,7 @@ export default function DashboardPage() {
       <header className="mb-5 flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-xl font-semibold">{greeting()}{me?.short_name ? `, ${me.short_name.split(' ').slice(-1)[0]}` : ''}</h1>
         <label className="sr-only" htmlFor="dash-location">Локация</label>
-          <select id="dash-location" className="rounded-md border border-line bg-surface px-3 py-2" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
+          <select id="dash-location" className="rounded-md border border-line bg-surface px-3 py-2" value={locationId} onChange={(e) => setCurrentLocation(e.target.value)}>
             <option value="">Все локации</option>
             {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>

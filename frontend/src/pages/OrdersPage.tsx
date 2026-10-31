@@ -1,3 +1,5 @@
+import { useCurrentLocation } from '../currentLocation'
+import LocationSwitcher from '../components/LocationSwitcher'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useRowLink } from '../components/rowLink'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -64,6 +66,7 @@ const listCache = new Map<string, OrderList>()
 
 export default function OrdersPage() {
   const rowLink = useRowLink()
+  const currentLocation = useCurrentLocation()
   const { can } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [data, setData] = useState<OrderList | null>(null)
@@ -84,8 +87,9 @@ export default function OrdersPage() {
   const queryString = useMemo(() => {
     const params = new URLSearchParams(searchParams)
     if (!params.has('tab')) params.set('tab', lastTab)
+    if (!params.has('location_id') && currentLocation) params.set('location_id', currentLocation)
     return params.toString()
-  }, [searchParams, lastTab])
+  }, [searchParams, lastTab, currentLocation])
   const currentTab = (searchParams.get('tab') ?? lastTab) as Tab
   useEffect(() => {
     try { localStorage.setItem('orders:tab', currentTab) } catch { /* приватный режим */ }
@@ -198,17 +202,11 @@ export default function OrdersPage() {
   return (
     <section>
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Заказы</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold">Заказы</h1>
+          <LocationSwitcher className="max-md:hidden" />
+        </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            aria-label="Локация"
-            className={filterInput}
-            value={searchParams.get('location_id') ?? ''}
-            onChange={(event) => selectFilter('location_id', event.target.value)}
-          >
-            <option value="">Все локации</option>
-            {locations.map((location) => <option key={location.id} value={location.id}>{location.name}</option>)}
-          </select>
           {can('createOrderAccess') && <Link className="hidden rounded-md bg-accent px-3 py-2 font-medium text-accent-ink md:inline-block" to="/orders/new">Создать</Link>}
           <Link className="whitespace-nowrap rounded-md border border-line bg-surface px-3 py-2" to="/orders/forgotten">Забытые</Link>
           <button className="hidden whitespace-nowrap rounded-md border border-line bg-surface px-3 py-2 sm:block" onClick={() => void exportCsv()}>Скачать CSV</button>

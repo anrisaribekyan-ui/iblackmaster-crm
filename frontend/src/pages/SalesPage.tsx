@@ -1,3 +1,4 @@
+import { getCurrentLocation, setCurrentLocation, useCurrentLocation } from '../currentLocation'
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
@@ -50,7 +51,7 @@ export default function SalesPage() {
   const { can } = useAuth()
   const { locations, registers } = useLocationsAndRegisters()
   const [params, setParams] = useSearchParams()
-  const [locationId, setLocationId] = useState(() => remember('sale:location') ?? '')
+  const [locationId, setLocationId] = useState(() => getCurrentLocation() || remember('sale:location') || '')
   const [storeId, setStoreId] = useState('')
   const [lines, setLines] = useState<Line[]>([])
   const [top, setTop] = useState<Top[] | null>(null)
@@ -73,6 +74,18 @@ export default function SalesPage() {
     const id = Number(params.get('open'))
     if (id) void api.get<SaleDetail>(`/sales/${id}`).then(setViewing).catch(() => undefined)
   }, [params])
+
+  // Переключили локацию в шапке — продажа открывается на ней
+  const globalLocation = useCurrentLocation()
+  useEffect(() => {
+    if (globalLocation && globalLocation !== locationId) {
+      setLocationId(globalLocation)
+      setLines([])
+      setSplit(false)
+      setTop(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [globalLocation])
 
   // Точка: запомненная, иначе первая
   useEffect(() => {
@@ -210,6 +223,7 @@ export default function SalesPage() {
           <select aria-label="Точка" className="rounded-md border border-line bg-surface px-3 py-2 text-sm" value={locationId} onChange={(e) => {
             setLocationId(e.target.value)
             remember('sale:location', e.target.value)
+            setCurrentLocation(e.target.value)
             setLines([])
             setSplit(false)
             setTop(null)
