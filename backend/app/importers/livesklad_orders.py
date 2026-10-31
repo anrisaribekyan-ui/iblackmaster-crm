@@ -363,6 +363,7 @@ class Importer:
                         sold_price=price,
                         purchase_price=cost,
                         performer_id=performer.id,
+                        guarantee_days=90,  # в выгрузке гарантии нет; точнее — python -m app.importers.livesklad_guarantee
                         created_at=created,
                     )
                 )
