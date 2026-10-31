@@ -7,6 +7,7 @@ import InstallApp from './InstallApp'
 import ThemeSwitch from './ThemeSwitch'
 import Skeleton from './Skeleton'
 import LocationSwitcher from './LocationSwitcher'
+import ShiftPrompt from './ShiftPrompt'
 
 /** Меню как в LiveSklad. permission — право, без которого пункт скрыт (пусто — виден всем). */
 export const MENU: { to: string; label: string; icon: string; permission?: string }[] = [
@@ -175,6 +176,7 @@ export default function Layout() {
           <Outlet />
         </Suspense>
       </main>
+      <ShiftPrompt />
       <MobileTabBar onMore={() => setMenuOpen(true)} canCreate={can('createOrderAccess')} />
     </div>
   )

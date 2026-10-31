@@ -126,3 +126,36 @@ def test_salary_kinds_payouts_and_recalc(client, auth_headers, owner):
     recalc = client.post("/api/salary/recalc", json={"year": year, "month": month}, headers=auth_headers)
     assert recalc.status_code == 200, recalc.text
     assert isinstance(recalc.json()["documents"], int)
+
+
+def test_shift_prompt_asks_once_a_day_and_accrues_salary(client, auth_headers, owner):
+    # без правила-оклада вопроса нет
+    assert client.get("/api/salary/shift", headers=auth_headers).json()["ask"] is False
+
+    body = {
+        "employee_id": owner.id, "kind": "money", "value_type": "fixed",
+        "steps": [{"from": 0, "value": 1200}], "options": {"period": "day", "onDemand": True},
+    }
+    assert client.post("/api/salary/rules", json=body, headers=auth_headers).status_code == 200
+    first = client.get("/api/salary/shift", headers=auth_headers).json()
+    assert first["ask"] is True and Decimal(str(first["amount"])) == Decimal("1200")
+
+    answer = client.post("/api/salary/shift", json={"worked": True}, headers=auth_headers)
+    assert answer.status_code == 200 and Decimal(str(answer.json()["amount"])) == Decimal("1200")
+    assert client.get("/api/salary/shift", headers=auth_headers).json()["ask"] is False
+    # повторный ответ в тот же день не удваивает оклад
+    assert client.post("/api/salary/shift", json={"worked": True}, headers=auth_headers).json().get("already") is True
+    year, month = month_now()
+    mine = client.get("/api/salary/me", headers=auth_headers).json()
+    assert Decimal(str(mine["today"])) == Decimal("1200")
+
+
+def test_shift_no_means_no_salary_and_no_more_questions(client, auth_headers, owner):
+    body = {
+        "employee_id": owner.id, "kind": "money", "value_type": "fixed",
+        "steps": [{"from": 0, "value": 1200}], "options": {"onDemand": True},
+    }
+    client.post("/api/salary/rules", json=body, headers=auth_headers)
+    client.post("/api/salary/shift", json={"worked": False}, headers=auth_headers)
+    assert client.get("/api/salary/shift", headers=auth_headers).json()["ask"] is False
+    assert Decimal(str(client.get("/api/salary/me", headers=auth_headers).json()["today"])) == Decimal("0")

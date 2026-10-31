@@ -348,7 +348,7 @@ class Step(BaseModel):
 
 class RuleIn(BaseModel):
     employee_id: int
-    kind: Literal["workOrder", "productOrder", "newOrder", "managerOrder", "closedOrder", "saleShop"]
+    kind: Literal["workOrder", "productOrder", "newOrder", "managerOrder", "closedOrder", "saleShop", "money"]
     location_id: int | None = None
     order_type_id: int | None = None
     base: Literal["margin", "summ"] = "margin"
@@ -469,3 +469,65 @@ def recalc(data: RecalcIn, db: DbSession, me: CurrentEmployee):
 @router.get("/kinds")
 def kinds(me: CurrentEmployee):
     return [{"code": k.value, "title": t} for k, t in KIND_TITLES.items()]
+
+
+# --- Оклад «за смену»: спрашиваем сотрудника при первом заходе за день -------------------
+
+
+class ShiftAnswer(BaseModel):
+    worked: bool
+
+
+def _shift_rule(db: DbSession, employee_id: int) -> SalaryRule | None:
+    """Правило-оклад «по запросу»: kind=money, options.onDemand — сумма за день, когда сотрудник подтвердил смену."""
+    rules = db.scalars(
+        select(SalaryRule).where(SalaryRule.employee_id == employee_id, SalaryRule.kind == AccrualKind.MONEY.value)
+    ).all()
+    return next((r for r in rules if (r.options or {}).get("onDemand")), None)
+
+
+def _shift_today(db: DbSession, employee_id: int) -> SalaryEvent | None:
+    day_start = datetime.now(MSK).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+    return db.scalars(
+        select(SalaryEvent).where(
+            SalaryEvent.employee_id == employee_id,
+            SalaryEvent.kind == AccrualKind.MONEY.value,
+            SalaryEvent.date >= day_start,
+            SalaryEvent.is_manual.is_(True),
+        )
+    ).first()
+
+
+@router.get("/shift")
+def shift_prompt(db: DbSession, me: CurrentEmployee):
+    """Нужно ли спросить «у тебя сегодня смена?» — только сотрудникам с окладом по запросу и один раз в день."""
+    rule = _shift_rule(db, me.id)
+    if rule is None:
+        return {"ask": False, "amount": 0}
+    amount = rule.steps[0]["value"] if rule.steps else 0
+    return {"ask": _shift_today(db, me.id) is None, "amount": Decimal(str(amount))}
+
+
+@router.post("/shift")
+def shift_answer(data: ShiftAnswer, db: DbSession, me: CurrentEmployee):
+    rule = _shift_rule(db, me.id)
+    if rule is None:
+        raise BusinessError("Для вас оклад не настроен")
+    if _shift_today(db, me.id) is not None:
+        return {"ok": True, "already": True}
+    amount = Decimal(str(rule.steps[0]["value"])) if (data.worked and rule.steps) else Decimal("0")
+    db.add(
+        SalaryEvent(
+            employee_id=me.id,
+            kind=AccrualKind.MONEY.value,
+            date=utcnow(),
+            amount=amount,
+            rule_id=rule.id,
+            details={"shift": data.worked},
+            is_manual=True,
+            note="Смена" if data.worked else "Смены нет",
+            created_by_id=me.id,
+        )
+    )
+    db.commit()
+    return {"ok": True, "amount": amount}
