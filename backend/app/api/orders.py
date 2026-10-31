@@ -1005,3 +1005,25 @@ def import_archive_orders(items: list[ArchiveOrderIn], db: DbSession, me: Curren
         created += 1
     db.commit()
     return {"created": created, "skipped": len(items) - created}
+
+
+class ArchiveCostFix(BaseModel):
+    number: str
+    cost: int = Field(ge=0)
+
+
+@router.post("/fix-archive-costs", dependencies=[Depends(require("settingAccess"))])
+def fix_archive_costs(items: list[ArchiveCostFix], db: DbSession, me: CurrentEmployee):
+    """Сверка с LiveSklad: выставляет итоговую себестоимость выданного заказа, меняя первую позицию (без истории и касс)."""
+    fixed = 0
+    for item in items:
+        order = db.scalar(select(Order).where(Order.number == item.number))
+        if order is None or not order.positions:
+            continue
+        others = sum((p.purchase_price * p.quantity for p in order.positions[1:]), Decimal("0"))
+        first = order.positions[0]
+        first.purchase_price = (Decimal(item.cost) - others) / (first.quantity or Decimal("1"))
+        order.total_purchase = Decimal(item.cost)
+        fixed += 1
+    db.commit()
+    return {"fixed": fixed}
