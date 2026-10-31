@@ -31,7 +31,6 @@ type OrderRow = {
   is_deleted?: boolean
 }
 type OrderList = { items: OrderRow[]; total: number; counts: Record<Exclude<Tab, 'all'>, number> }
-type Location = { id: number; name: string }
 type StatusGroup = { group: string; title: string; statuses: { id: number; name: string; color: string }[] }
 type OrderType = { id: number; name: string }
 type Employee = { id: number; short_name: string }
@@ -70,7 +69,6 @@ export default function OrdersPage() {
   const { can } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [data, setData] = useState<OrderList | null>(null)
-  const [locations, setLocations] = useState<Location[]>([])
   const [statusGroups, setStatusGroups] = useState<StatusGroup[]>([])
   const [orderTypes, setOrderTypes] = useState<OrderType[]>([])
   const [masters, setMasters] = useState<Employee[]>([])
@@ -108,14 +106,12 @@ export default function OrdersPage() {
 
   const loadReferences = useCallback(async () => {
     try {
-      const [locationData, statuses, typeData, masterData, managerData] = await Promise.all([
-        api.get<Location[]>('/locations'),
+      const [statuses, typeData, masterData, managerData] = await Promise.all([
         api.get<StatusGroup[]>('/order-statuses'),
         api.get<OrderType[]>('/order-types'),
         api.get<Employee[]>('/employees/short?master=1'),
         api.get<Employee[]>('/employees/short?manager=1'),
       ])
-      setLocations(locationData)
       setStatusGroups(statuses)
       setOrderTypes(typeData)
       setMasters(masterData)
