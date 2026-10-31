@@ -24,6 +24,7 @@ export type FormData = {
   problems: string
   note: string
   approximatePrice: string
+  verdict?: string // вердикт / рекомендации клиенту
   prepaid: string // «Нет» или сумма
   ready: string // срок готовности
   positions: FormPosition[]
@@ -231,7 +232,7 @@ export function actHtml(d: FormData): string {
     ${positionsTable(d)}
     ${totalsBlock(d, true)}
     ${actCheck(d)}
-    <div class="verdict"><h3>Вердикт</h3>Вышеперечисленные услуги выполнены полностью и в срок. Заказчик претензий по объёму, качеству и срокам оказания услуг не имеет.</div>
+    <div class="verdict"><h3>Вердикт</h3>${d.verdict ? `${e(d.verdict)}<br>` : ''}Вышеперечисленные услуги выполнены полностью и в срок. Заказчик претензий по объёму, качеству и срокам оказания услуг не имеет.</div>
     ${sign(`Исполнитель · ${e(d.master || d.manager)}`, `Заказчик · ${e(d.customer.name)}`, d.signatureOut)}
     <div class="promo">
       <img src="/print/store-qr.png" alt="QR-код телеграм-канала @iblackmaster_store">

@@ -821,3 +821,21 @@ def test_order_delete_rules_and_stock(client, auth_headers, db, owner):
     db.commit()
     blocked = client.delete(f"/api/orders/{order.id}", headers=auth_headers)
     assert blocked.status_code == 400 and "возврат" in blocked.json()["message"]
+
+
+def test_order_transfer_to_location_and_verdict(client, auth_headers, db, owner):
+    locations = list(db.scalars(select(Location).order_by(Location.sort)))
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    status = db.scalars(select(OrderStatus).where(OrderStatus.group == StatusGroup.NEW)).first()
+    customer = Counteragent(name="Передача")
+    db.add(customer)
+    db.flush()
+    order = add_order(db, owner=owner, location=locations[0], order_type=order_type, counteragent=customer,
+                      status=status, number="MOVE-1")
+
+    response = client.put(f"/api/orders/{order.id}", json={"location_id": locations[1].id, "verdict": "Заменили экран"},
+                          headers=auth_headers)
+    assert response.status_code == 200
+    db.refresh(order)
+    assert order.location_id == locations[1].id and order.verdict == "Заменили экран"
+    assert client.put(f"/api/orders/{order.id}", json={"location_id": 999999}, headers=auth_headers).status_code == 404

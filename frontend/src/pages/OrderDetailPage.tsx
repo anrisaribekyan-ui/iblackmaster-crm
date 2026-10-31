@@ -553,6 +553,7 @@ export default function OrderDetailPage() {
       problems: list(orderFields.problems),
       note: str(orderFields.note),
       approximatePrice: str(orderFields.approximate_price),
+      verdict: str((detail.order as unknown as { verdict?: string | null }).verdict),
       prepaid: orderFields.has_prepayment && paid > 0 ? formatMoney(paid) : 'Нет',
       ready: orderFields.deadline ? day(orderFields.deadline) : '',
       positions: detail.positions.map((position) => ({
@@ -623,6 +624,22 @@ export default function OrderDetailPage() {
                 <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('label')}>Бирка на аппарат</button>
               </div>
             </details>
+            {!isDeleted && locations.length > 1 && (
+              <select
+                aria-label="Передать в локацию"
+                title="Передать в другую локацию"
+                className="rounded-lg bg-transparent px-2 py-1.5 text-sm text-white/80 hover:bg-white/10"
+                value={detail.order.location_id}
+                onChange={(event) => {
+                  const target = locations.find((location) => location.id === Number(event.target.value))
+                  if (target && confirm(`Передать заказ в «${target.name}»?`)) {
+                    void run(() => api.put(`/orders/${detail.order.id}`, { location_id: target.id }), 'Не удалось передать заказ')
+                  }
+                }}
+              >
+                {locations.map((location) => <option key={location.id} value={location.id} className="text-ink">{location.name}</option>)}
+              </select>
+            )}
             {!isDeleted && can('deleteOrderAccess') && (
               <button className="rounded-lg px-3 py-1.5 text-sm text-white/60 transition-colors hover:bg-white/10 hover:text-[#ff8a72]" onClick={() => setDeleting(true)}>Удалить</button>
             )}
@@ -940,6 +957,14 @@ export default function OrderDetailPage() {
             />
           </div>
           <div className="mt-4">
+            <VerdictBlock
+              key={detail.order.id}
+              initial={String((detail.order as unknown as { verdict?: string | null }).verdict ?? '')}
+              disabled={isDeleted}
+              onSave={(verdict) => run(() => api.put(`/orders/${detail.order.id}`, { verdict }), 'Не удалось сохранить вердикт')}
+            />
+          </div>
+          <div className="mt-4">
             <OrderPhotos orderId={detail.order.id} disabled={isDeleted} onChanged={() => void loadDetail()} />
           </div>
         </div>
@@ -1174,6 +1199,33 @@ function PositionCard({ position, canEdit, canViewMargin, canViewCost, onSavePri
         </label>
       )}
     </li>
+  )
+}
+
+// Вердикт мастера / рекомендации клиенту — печатается в акте выдачи.
+function VerdictBlock({ initial, disabled, onSave }: { initial: string; disabled: boolean; onSave: (verdict: string) => Promise<boolean> }) {
+  const [text, setText] = useState(initial)
+  const [saved, setSaved] = useState(initial)
+  const [busy, setBusy] = useState(false)
+  const dirty = text.trim() !== saved.trim()
+  return (
+    <section className="rounded-xl border border-line bg-surface p-4">
+      <h2 className="mb-2 font-semibold">Вердикт / рекомендации клиенту</h2>
+      <textarea className={inputClass} rows={3} maxLength={2000} value={text} disabled={disabled} onChange={(event) => setText(event.target.value)} placeholder="Что сделано и что рекомендуем клиенту" />
+      {dirty && !disabled && (
+        <div className="mt-2 flex justify-end">
+          <button
+            disabled={busy}
+            className="rounded-md bg-accent px-3 py-2 text-sm text-accent-ink disabled:opacity-60"
+            onClick={async () => {
+              setBusy(true)
+              if (await onSave(text.trim())) setSaved(text.trim())
+              setBusy(false)
+            }}
+          >{busy ? 'Сохранение…' : 'Сохранить вердикт'}</button>
+        </div>
+      )}
+    </section>
   )
 }
 

@@ -104,6 +104,7 @@ class OrderUpdate(BaseModel):
     custom_fields: dict | None = None
     master_id: int | None = None
     manager_id: int | None = None
+    location_id: int | None = None  # передать заказ в другую локацию
 
 
 class OrderPositionCreate(BaseModel):
@@ -659,6 +660,9 @@ def update_order(order_id: int, data: OrderUpdate, db: DbSession, me: CurrentEmp
             if not has_permission(me, "changeOrderManagerAccess"):
                 raise Forbidden("Нет права менять менеджера заказа")
             get_employee(db, value, "Менеджер")
+        elif field == "location_id":
+            if value is None or db.get(Location, value) is None:
+                raise NotFound("Локация")
         elif field == "order_type_id" and value is not None:
             get_order_type(db, value)
         elif field == "counteragent_id" and value is not None:
