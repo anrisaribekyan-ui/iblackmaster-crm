@@ -203,3 +203,42 @@ def test_reports_profit_needs_margin_access(client, db):
     date_from, date_to = period()
     r = client.get(f"/api/reports/profit?date_from={date_from}&date_to={date_to}", headers=login(client, "nomargin-profit@test.ru"))
     assert r.status_code == 403
+
+
+def test_reports_profit_tax_and_fixed_expenses(client, auth_headers, db):
+    """Налог — процент от поступлений по облагаемой кассе за вычетом возвратов; постоянные расходы — долей за каждый день."""
+    order = base_order(db)
+    register = db.scalars(select(CashRegister).order_by(CashRegister.id)).first()
+    income = CashItem(name="Оплата тест", is_income=True, type="order")
+    refund = CashItem(name="Возврат тест", is_income=False, type="orderReturn")
+    db.add_all([income, refund])
+    db.flush()
+    for item, amount, is_income in ((income, "10000", True), (refund, "2000", False)):
+        db.add(Transaction(date=utcnow(), cash_register_id=register.id, cash_item_id=item.id, is_income=is_income, is_bank=True,
+                           amount=Decimal(amount), balance_after=Decimal("0"), location_id=order.location_id))
+    db.commit()
+    body = {
+        "tax_percent": 10,
+        "tax_register_ids": [register.id],
+        "fixed": [
+            {"name": "Аренда тест", "amount": 31000, "location_id": order.location_id},
+            {"name": "Общий тест", "amount": 3100, "location_id": None},
+        ],
+        "shares": [{"name": "Доля тест", "percent": 5, "location_id": None}],
+    }
+    assert client.put("/api/reports/profit/settings", json=body, headers=auth_headers).status_code == 200
+    date_from, date_to = period()  # два дня: вчера и сегодня (по МСК)
+    r = client.get(f"/api/reports/profit?date_from={date_from}&date_to={date_to}&group_by=month", headers=auth_headers)
+    assert r.status_code == 200, r.text
+    total = r.json()["total"]
+    assert total["tax"] == 800  # (10000 − 2000) × 10%
+    assert 2000 <= total["fixed"] <= 3800  # 34100 в месяц, 2–3 дня периода
+    before_share = total["gross"] - total["salary"] - total["bank_fee"] - total["expenses"] - total["tax"] - total["fixed"]
+    assert abs(total["share"] - max(before_share, 0) * 0.05) <= 1  # 5 % от прибыли после всех расходов
+    assert total["net"] == before_share - total["share"]
+    assert r.json()["share_items"][0]["name"] == "Доля тест"
+    assert {i["name"] for i in r.json()["fixed_items"]} == {"Аренда тест", "Общий тест"}
+
+    # по одной точке общий расход не попадает
+    r = client.get(f"/api/reports/profit?date_from={date_from}&date_to={date_to}&location_id={order.location_id}", headers=auth_headers)
+    assert {i["name"] for i in r.json()["fixed_items"]} == {"Аренда тест"}

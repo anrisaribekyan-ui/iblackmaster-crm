@@ -5,14 +5,17 @@
 """
 
 from collections import defaultdict
+import calendar
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
 
+from app.services import settings as settings_service
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids, require
 from app.errors import Forbidden
 from app.models import (
@@ -381,7 +384,7 @@ def report_profit(
     period_from = _ensure_utc(date_from)
     period_to = _ensure_utc(date_to)
 
-    empty = lambda: {k: Decimal("0") for k in ("revenue", "cost", "salary", "bank_fee", "expenses")} | {"orders": 0, "sales": 0}
+    empty = lambda: {k: Decimal("0") for k in ("revenue", "cost", "salary", "bank_fee", "expenses", "tax", "fixed")} | {"orders": 0, "sales": 0}
     buckets: dict[str, dict] = defaultdict(empty)
 
     order_query = select(Order.closed_at, Order.total_price, Order.total_purchase).where(
@@ -441,9 +444,71 @@ def report_profit(
             b["expenses"] += amount
             expense_items[name] += amount
 
+    # Налог: процент от поступлений по облагаемым кассам (терминал) за вычетом возвратов покупателям
+    cfg = settings_service.get(db, "profit")
+    tax_percent = Decimal(str(cfg.get("tax_percent") or 0))
+    tax_registers = [int(i) for i in cfg.get("tax_register_ids") or []]
+    if tax_percent and tax_registers:
+        tax_query = (
+            select(Transaction.date, Transaction.amount, Transaction.is_income, CashItem.type)
+            .join(CashItem, CashItem.id == Transaction.cash_item_id)
+            .where(
+                Transaction.is_deleted.is_(False),
+                Transaction.cash_register_id.in_(tax_registers),
+                Transaction.date >= period_from,
+                Transaction.date < period_to,
+                CashItem.type.in_(("order", "sale", "invoice", "orderReturn", "saleReturn")),
+            )
+        )
+        if location_id is not None:
+            tax_query = tax_query.where(Transaction.location_id == location_id)
+        elif allowed:
+            tax_query = tax_query.where(or_(Transaction.location_id.is_(None), Transaction.location_id.in_(allowed)))
+        for date_, amount, is_income, _type in db.execute(tax_query):
+            buckets[_bucket(date_, group_by)]["tax"] += (amount if is_income else -amount) * tax_percent / 100
+
+    # Постоянные расходы за месяц делим по дням периода
+    fixed_items: dict[str, Decimal] = defaultdict(Decimal)
+    items = [
+        i for i in cfg.get("fixed") or []
+        if Decimal(str(i.get("amount") or 0)) > 0
+        and (
+            (location_id is not None and i.get("location_id") == location_id)
+            or (location_id is None and (i.get("location_id") is None or not allowed or i.get("location_id") in allowed))
+        )
+    ]
+    if items:
+        day = period_from.astimezone(MSK).replace(hour=0, minute=0, second=0, microsecond=0)
+        end = period_to.astimezone(MSK)
+        while day < end:
+            days_in_month = calendar.monthrange(day.year, day.month)[1]
+            for item in items:
+                share = Decimal(str(item["amount"])) / days_in_month
+                buckets[_bucket(day, group_by)]["fixed"] += share
+                fixed_items[item["name"]] += share
+            day += timedelta(days=1)
+
+    # Доли от чистой прибыли (например, процент Гора): считаются от прибыли после всех расходов
+    shares = [
+        i for i in cfg.get("shares") or []
+        if Decimal(str(i.get("percent") or 0)) > 0
+        and (
+            (location_id is not None and i.get("location_id") == location_id)
+            or (location_id is None and (i.get("location_id") is None or not allowed or i.get("location_id") in allowed))
+        )
+    ]
+    share_items: dict[str, Decimal] = defaultdict(Decimal)
+
     def finish(key: str, b: dict) -> dict:
         gross = b["revenue"] - b["cost"]
-        net = gross - b["salary"] - b["bank_fee"] - b["expenses"]
+        net = gross - b["salary"] - b["bank_fee"] - b["expenses"] - b["tax"] - b["fixed"]
+        share = Decimal("0")
+        for item in shares:
+            part = max(net, Decimal("0")) * Decimal(str(item["percent"])) / 100
+            share += part
+            if key == "total":
+                share_items[item["name"]] += part
+        net -= share
         return {
             "key": key,
             "orders": b["orders"],
@@ -454,6 +519,9 @@ def report_profit(
             "salary": _money(b["salary"]),
             "bank_fee": _money(b["bank_fee"]),
             "expenses": _money(b["expenses"]),
+            "tax": _money(b["tax"]),
+            "fixed": _money(b["fixed"]),
+            "share": _money(share),
             "net": _money(net),
             "margin": round(float(net / b["revenue"] * 100), 1) if b["revenue"] else None,
         }
@@ -463,10 +531,57 @@ def report_profit(
     for b in buckets.values():
         for k in total:
             total[k] += b[k]
+    total_row = finish("total", total)
     return {
         "group_by": group_by,
         "rows": rows,
-        "total": finish("total", total),
+        "total": total_row,
+        "share_items": [{"name": n, "amount": _money(a)} for n, a in share_items.items()],
+        "fixed_items": sorted(({"name": n, "amount": _money(a)} for n, a in fixed_items.items()), key=lambda x: -x["amount"]),
+        "tax_percent": float(tax_percent) if tax_registers else 0,
         "expense_items": sorted(({"name": n, "amount": _money(a)} for n, a in expense_items.items()), key=lambda x: -x["amount"]),
         "not_counted": sorted(({"name": n, "amount": _money(a)} for n, a in skipped_items.items()), key=lambda x: -x["amount"]),
     }
+
+
+# --- Настройки чистой прибыли: налог и постоянные расходы --------------------------------
+
+
+class FixedExpenseIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    amount: int = Field(ge=0, le=100_000_000)  # рублей в месяц
+    location_id: int | None = None
+
+
+class ShareIn(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    percent: Decimal = Field(ge=0, le=100)  # % от чистой прибыли
+    location_id: int | None = None
+
+
+class ProfitSettingsIn(BaseModel):
+    shares: list[ShareIn] = Field(default_factory=list, max_length=20)
+    tax_percent: Decimal = Field(ge=0, le=100)
+    tax_register_ids: list[int] = Field(default_factory=list, max_length=20)
+    fixed: list[FixedExpenseIn] = Field(default_factory=list, max_length=60)
+
+
+@router.get("/profit/settings", dependencies=[Depends(require("reportAccess"))])
+def get_profit_settings(db: DbSession, me: CurrentEmployee):
+    return settings_service.get(db, "profit")
+
+
+@router.put("/profit/settings", dependencies=[Depends(require("settingAccess"))])
+def put_profit_settings(data: ProfitSettingsIn, db: DbSession, me: CurrentEmployee):
+    saved = settings_service.put(
+        db,
+        "profit",
+        {
+            "tax_percent": float(data.tax_percent),
+            "tax_register_ids": data.tax_register_ids,
+            "fixed": [i.model_dump() for i in data.fixed],
+            "shares": [{**i.model_dump(), "percent": float(i.percent)} for i in data.shares],
+        },
+    )
+    db.commit()
+    return saved

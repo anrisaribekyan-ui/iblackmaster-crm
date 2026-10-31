@@ -6,6 +6,7 @@ import TimeChart from './charts/TimeChart'
 import BarList from './charts/BarList'
 import { compact, dayLong, dayShort, rub } from './charts/format'
 import Skeleton from './Skeleton'
+import ProfitSettings from './ProfitSettings'
 
 type GroupBy = 'day' | 'week' | 'month'
 
@@ -19,6 +20,9 @@ type ProfitRow = {
   salary: number
   bank_fee: number
   expenses: number
+  tax: number
+  fixed: number
+  share: number
   net: number
   margin: number | null
 }
@@ -27,6 +31,9 @@ type ProfitData = {
   rows: ProfitRow[]
   total: ProfitRow
   expense_items: { name: string; amount: number }[]
+  fixed_items: { name: string; amount: number }[]
+  share_items: { name: string; amount: number }[]
+  tax_percent: number
   not_counted: { name: string; amount: number }[]
 }
 
@@ -66,7 +73,7 @@ function fillKeys(rows: ProfitRow[], groupBy: GroupBy): ProfitRow[] {
   const end = new Date(`${rows[rows.length - 1].key}T00:00:00Z`)
   for (let d = new Date(`${rows[0].key}T00:00:00Z`); d <= end; ) {
     const key = d.toISOString().slice(0, 10)
-    result.push(byKey.get(key) ?? { key, orders: 0, sales: 0, revenue: 0, cost: 0, gross: 0, salary: 0, bank_fee: 0, expenses: 0, net: 0, margin: null })
+    result.push(byKey.get(key) ?? { key, orders: 0, sales: 0, revenue: 0, cost: 0, gross: 0, salary: 0, bank_fee: 0, expenses: 0, tax: 0, fixed: 0, share: 0, net: 0, margin: null })
     if (groupBy === 'month') d.setUTCMonth(d.getUTCMonth() + 1)
     else d.setUTCDate(d.getUTCDate() + (groupBy === 'week' ? 7 : 1))
   }
@@ -81,6 +88,7 @@ export default function ProfitReport({ range, locationId, filenameBase }: { rang
   const [data, setData] = useState<ProfitData | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [reload, setReload] = useState(0)
 
   // Длинный период по дням нечитаем — подбираем группировку сами, но её можно сменить
   const days = range ? Math.round((Date.parse(range.to) - Date.parse(range.from)) / 86_400_000) : 0
@@ -111,20 +119,21 @@ export default function ProfitReport({ range, locationId, filenameBase }: { rang
     return () => {
       cancelled = true
     }
-  }, [range?.from, range?.to, locationId, groupBy]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [range?.from, range?.to, locationId, groupBy, reload]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const filled = useMemo(() => (data ? fillKeys(data.rows, groupBy) : []), [data, groupBy])
 
   const download = () => {
     if (!data) return
-    const headers = ['Период', 'Заказов', 'Чеков', 'Выручка', 'Себестоимость', 'Валовая прибыль', 'Зарплата', 'Комиссия банка', 'Расходы', 'Чистая прибыль', 'Рентабельность, %']
-    const line = (r: ProfitRow, name: string) => [name, r.orders, r.sales, r.revenue, r.cost, r.gross, r.salary, r.bank_fee, r.expenses, r.net, r.margin ?? '']
+    const headers = ['Период', 'Заказов', 'Чеков', 'Выручка', 'Себестоимость', 'Валовая прибыль', 'Зарплата', 'Комиссия банка', 'Расходы по кассам', 'Налог', 'Постоянные расходы', 'Доли от прибыли', 'Чистая прибыль', 'Рентабельность, %']
+    const line = (r: ProfitRow, name: string) => [name, r.orders, r.sales, r.revenue, r.cost, r.gross, r.salary, r.bank_fee, r.expenses, r.tax, r.fixed, r.share, r.net, r.margin ?? '']
     downloadCsv(`${filenameBase}.csv`, headers, [...data.rows.map((r) => line(r, periodLabel(r.key, groupBy))), line(data.total, 'Итого')])
   }
 
   const t = data?.total
   return (
     <div className={loading && data ? 'opacity-60 transition-opacity' : ''}>
+      <ProfitSettings onSaved={() => setReload((n) => n + 1)} />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="flex rounded-md border border-line bg-surface p-0.5" role="group" aria-label="Группировка">
           {GROUPS.map(([value, title]) => (
@@ -181,13 +190,16 @@ export default function ProfitReport({ range, locationId, filenameBase }: { rang
                 <Line label="= Валовая прибыль" value={signed(t.gross)} strong />
                 <Line label="− Зарплата" value={rub(t.salary)} hint="начисленная за период, а не выплаченная" />
                 <Line label="− Комиссия банка" value={rub(t.bank_fee)} />
-                <Line label="− Расходы" value={rub(t.expenses)} hint="аренда, связь и прочие расходы по кассам" />
+                <Line label="− Расходы по кассам" value={rub(t.expenses)} hint="то, что проведено расходом в кассах" />
+                <Line label="− Налог" value={rub(t.tax)} hint={data.tax_percent ? `${data.tax_percent} % от поступлений по терминалу` : 'не настроен'} />
+                <Line label="− Постоянные расходы" value={rub(t.fixed)} hint="аренда, свет, уборка и др.: месячная сумма по дням периода" />
+                <Line label="− Доли от прибыли" value={rub(t.share)} hint={data.share_items.map((i) => `${i.name} ${rub(i.amount)}`).join(', ') || 'не настроены'} />
                 <Line label="= Чистая прибыль" value={signed(t.net)} strong />
               </dl>
             </section>
             <ChartCard title="Расходы по статьям">
-              {data.expense_items.length ? (
-                <BarList share format={rub} items={data.expense_items.map((i) => ({ key: i.name, name: i.name, value: i.amount }))} />
+              {data.expense_items.length + data.fixed_items.length ? (
+                <BarList share format={rub} items={[...data.fixed_items, ...data.expense_items].map((i) => ({ key: i.name, name: i.name, value: i.amount }))} />
               ) : (
                 <p className="text-sm text-muted">Расходов нет.</p>
               )}
@@ -199,7 +211,7 @@ export default function ProfitReport({ range, locationId, filenameBase }: { rang
               <thead className="bg-canvas text-xs text-muted">
                 <tr>
                   <th className="px-3 py-2 font-medium">Период</th>
-                  {['Выручка', 'Себестоимость', 'Валовая', 'Зарплата', 'Комиссия', 'Расходы', 'Чистая', '%'].map((h) => (
+                  {['Выручка', 'Себестоимость', 'Валовая', 'Зарплата', 'Комиссия', 'Расходы', 'Налог', 'Пост. расходы', 'Доли', 'Чистая', '%'].map((h) => (
                     <th key={h} className="whitespace-nowrap px-3 py-2 text-right font-medium">{h}</th>
                   ))}
                 </tr>
@@ -260,6 +272,9 @@ function TableRow({ row, name }: { row: ProfitRow; name: string }) {
       <td className={cell}>{rub(row.salary)}</td>
       <td className={cell}>{rub(row.bank_fee)}</td>
       <td className={cell}>{rub(row.expenses)}</td>
+      <td className={cell}>{rub(row.tax)}</td>
+      <td className={cell}>{rub(row.fixed)}</td>
+      <td className={cell}>{rub(row.share)}</td>
       <td className={`${cell} ${row.net < 0 ? 'text-danger' : ''}`}>{signed(row.net)}</td>
       <td className={cell}>{percent(row.margin)}</td>
     </tr>
