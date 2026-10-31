@@ -397,6 +397,9 @@ export default function AppInstallPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [apps, setApps] = useState<IosApp[]>([])
   const [query, setQuery] = useState('')
+  const [libraryOpen, setLibraryOpen] = useState(false) // длинный список приложений не раскрываем сам
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [appLimit, setAppLimit] = useState(40)
   const [storeFilter, setStoreFilter] = useState<StoreFilter>('all')
   const [stats, setStats] = useState<AppStats | null>(null)
   const [importOpen, setImportOpen] = useState(false)
@@ -715,6 +718,39 @@ export default function AppInstallPage() {
             <p role={error ? 'alert' : 'status'} className={`text-sm ${error ? 'text-danger' : 'text-muted'}`}>{error || notice}</p>
           )}
 
+          {(() => {
+            const active = jobs.filter((j) => OPEN.includes(j.state))
+            const past = jobs.filter((j) => !OPEN.includes(j.state))
+            const shownPast = historyOpen ? past : past.slice(0, 3)
+            return (
+              <section className="grid gap-3" aria-labelledby="jobs-title">
+                <div className="flex items-center gap-2">
+                  <h2 id="jobs-title" className="font-semibold">{active.length > 0 ? `Сейчас выполняется · ${active.length}` : 'Задачи'}</h2>
+                  {past.length > 0 && (
+                    <button className={`${button} ml-auto`} onClick={() => void clearHistory()}>Очистить историю</button>
+                  )}
+                </div>
+                {active.length > 0 && (
+                  <ul className="grid gap-2 rounded-xl border-2 border-accent/40 bg-accent/5 p-2" aria-label="Идущие задачи">
+                    {active.map((j) => <JobRow key={j.id} job={j} onChanged={() => void loadJobs()} />)}
+                  </ul>
+                )}
+                {active.length === 0 && past.length === 0 && <p className="text-sm text-muted">Здесь появится ход скана, входа и установки.</p>}
+                {shownPast.length > 0 && (
+                  <>
+                    {active.length > 0 && <h3 className="text-sm font-medium text-muted">Недавно завершённые</h3>}
+                    <ul className="grid gap-2">{shownPast.map((j) => <JobRow key={j.id} job={j} onChanged={() => void loadJobs()} />)}</ul>
+                  </>
+                )}
+                {past.length > 3 && (
+                  <button className={`${button} justify-self-start`} onClick={() => setHistoryOpen((v) => !v)}>
+                    {historyOpen ? 'Свернуть историю' : `Показать все завершённые (${past.length})`}
+                  </button>
+                )}
+              </section>
+            )
+          })()}
+
           <section className="grid gap-3" aria-labelledby="library-title">
             <div className="flex flex-wrap items-center gap-2">
               <h2 id="library-title" className="font-semibold">Приложения</h2>
@@ -763,13 +799,18 @@ export default function AppInstallPage() {
                 ))}
               </div>
             )}
-            {apps.length === 0 ? (
+            {!(libraryOpen || query || storeFilter !== 'all') && apps.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-4">
+                <p className="text-sm text-muted">В библиотеке {stats?.all ?? apps.length} приложений. Найдите нужное поиском или откройте весь список.</p>
+                <button className={`${primary} sm:ml-auto`} onClick={() => setLibraryOpen(true)}>Показать список</button>
+              </div>
+            ) : apps.length === 0 ? (
               <p className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
                 {query || storeFilter !== 'all' ? 'Ничего не нашлось.' : 'Библиотека пуста. Подключите телефон-донор и нажмите «Это донор: прочитать приложения» или загрузите покупки Apple ID.'}
               </p>
             ) : (
               <ul className="divide-y divide-line rounded-xl border border-line bg-surface">
-                {apps.map((a) => (
+                {apps.slice(0, appLimit).map((a) => (
                   <li key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{a.name}</div>
@@ -821,22 +862,17 @@ export default function AppInstallPage() {
                 ))}
               </ul>
             )}
+            {(libraryOpen || query || storeFilter !== 'all') && apps.length > appLimit && (
+              <button className={`${button} justify-self-start`} onClick={() => setAppLimit((n) => n + 40)}>Показать ещё (осталось {apps.length - appLimit})</button>
+            )}
+            {libraryOpen && !query && storeFilter === 'all' && apps.length > 0 && (
+              <button className={`${button} justify-self-start`} onClick={() => { setLibraryOpen(false); setAppLimit(40) }}>Свернуть список</button>
+            )}
             {apps.length > 0 && !targetUdid && station?.online && storeFilter !== 'retired' && (
               <p className="text-sm text-muted">Чтобы установить, нажмите «Ставить сюда» у нужного телефона.</p>
             )}
           </section>
 
-          <section className="grid gap-3" aria-labelledby="jobs-title">
-            <div className="flex items-center gap-2">
-              <h2 id="jobs-title" className="font-semibold">Последние задачи</h2>
-              {jobs.some((j) => !OPEN.includes(j.state)) && (
-                <button className={`${button} ml-auto`} onClick={() => void clearHistory()}>Очистить историю</button>
-              )}
-            </div>
-            {jobs.length === 0
-              ? <p className="text-sm text-muted">Здесь появится ход скана, входа и установки.</p>
-              : <ul className="grid gap-2">{jobs.map((j) => <JobRow key={j.id} job={j} onChanged={() => void loadJobs()} />)}</ul>}
-          </section>
         </>
       )}
 
