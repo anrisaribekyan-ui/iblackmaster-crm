@@ -209,7 +209,7 @@ function CashOperationModal({
           </label>
         )}
         <label className="grid gap-1 text-sm text-muted">Сумма
-          <input className={inputClass} name="amount" type="number" min="0.01" step="1" required />
+          <input className={inputClass} name="amount" type="number" min="1" step="1" required />
         </label>
         <label className="grid gap-1 text-sm text-muted">Тип средств
           <select

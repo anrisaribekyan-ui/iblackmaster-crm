@@ -351,7 +351,7 @@ export default function OrderDetailPage() {
     const defaultRegister = available.find((register) => register.accepts_cash) ?? available[0]
     setPaymentMode(mode)
     setCloseAfterPay(forClosure)
-    setPaymentAmount(mode === 'payment' ? String(Math.max(0, Number(detail?.debt ?? 0))) : '')
+    setPaymentAmount(mode === 'payment' ? String(Math.max(0, Math.round(Number(detail?.debt ?? 0)))) : '')
     setPaymentRegisterId(defaultRegister ? String(defaultRegister.id) : '')
     setPaymentMethod(defaultRegister?.accepts_cash ? 'cash' : 'bank')
     setPaymentError('')
@@ -367,7 +367,7 @@ export default function OrderDetailPage() {
     const commentText = askStatusComment(status)
     if (commentText === null) return
     if (Number(detail.debt) > 0) {
-      setPaymentAmount(String(detail.debt))
+      setPaymentAmount(String(Math.round(Number(detail.debt))))
       setPaymentMode('payment')
       setCloseAfterPay(true)
       setCloseComment(commentText)
@@ -408,7 +408,7 @@ export default function OrderDetailPage() {
         setPaymentMode(null)
         setCloseAfterPay(false)
       } else if (shouldClose && mode === 'payment') {
-        setPaymentAmount(String(result.debt))
+        setPaymentAmount(String(Math.round(Number(result.debt))))
         setPaymentError('Оплатите оставшуюся сумму, чтобы выдать заказ.')
       } else {
         setPaymentMode(null)
@@ -1009,7 +1009,7 @@ export default function OrderDetailPage() {
                   </select>
                 </label>
                 <label className="grid gap-1 text-sm text-muted">Сумма, ₽
-                  <input className={inputClass} name="amount" type="number" min="0.01" step="1" required value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
+                  <input className={inputClass} name="amount" type="number" min="1" step="1" required value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
                 </label>
                 <label className="grid gap-1 text-sm text-muted">Способ
                   <select className={inputClass} name="method" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as 'cash' | 'bank')}>

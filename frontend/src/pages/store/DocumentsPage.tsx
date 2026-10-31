@@ -320,7 +320,7 @@ function DocumentForm({ type, onDone, onCancel }: { type: DocType; onDone: () =>
             </select>
           </label>
           <label className="grid gap-1 text-xs text-muted">Сумма, ₽
-            <input className={inputClass} type="number" min="0.01" step="1" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder={total ? String(total) : ''} disabled={!payRegister} />
+            <input className={inputClass} type="number" min="1" step="1" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} placeholder={total ? String(total) : ''} disabled={!payRegister} />
           </label>
           <label className="grid gap-1 text-xs text-muted">Способ
             <select className={inputClass} value={payBank ? 'bank' : 'cash'} onChange={(e) => setPayBank(e.target.value === 'bank')} disabled={!payRegister}>
