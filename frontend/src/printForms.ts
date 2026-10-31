@@ -258,20 +258,33 @@ export function refusalHtml(d: FormData): string {
 }
 
 const WARRANTY_TERMS = [
-  'Гарантийный срок на каждую позицию указан в таблице и отсчитывается со дня выдачи устройства.',
+  'Гарантийный срок на каждую позицию указан в таблице и отсчитывается со дня выдачи устройства (дата окончания указана в таблице).',
   'Гарантия распространяется только на выполненную работу и установленные запчасти, указанные в этом талоне.',
   'Гарантия не действует при механических повреждениях, попадании влаги, следах вскрытия или ремонта в другом сервисе, перепадах напряжения и неправильной эксплуатации.',
   'Гарантия не распространяется на неисправности, не связанные с выполненным ремонтом.',
   'Для гарантийного обращения предъявите этот талон и устройство. Срок диагностики — до 14 дней.',
 ]
 
-export function warrantyHtml(d: FormData): string {
+function addDays(from: Date, days: number): string {
+  const date = new Date(from.getTime() + days * 86_400_000)
+  return date.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })
+}
+
+export function warrantyHtml(d: FormData, issued: Date = new Date()): string {
+  const rows = d.positions.length
+    ? d.positions
+        .map(
+          (p, index) => `<tr><td>${index + 1}</td><td>${e(p.name)}</td><td>${p.guaranteeDays ? `${p.guaranteeDays} дн.` : 'без гарантии'}</td><td class="r">${p.guaranteeDays ? addDays(issued, p.guaranteeDays) : '—'}</td></tr>`,
+        )
+        .join('')
+    : '<tr class="empty"><td colspan="4">Позиции не добавлены</td></tr>'
+  const table = `<table class="items"><thead><tr><th>№</th><th>Работа / запчасть</th><th>Гарантия</th><th class="r">Действует до</th></tr></thead><tbody>${rows}</tbody></table>`
   const terms = WARRANTY_TERMS.map((text, index) => `<p><b>${index + 1}.</b> ${e(text)}</p>`).join('')
   return `<section class="sheet">
     ${head(d, 'Гарантийный талон')}
     ${parties(d)}
     <div class="cols"><section class="card wide"><h3>Устройство</h3><div>${val([d.device, d.serial ? `SN / IMEI: ${d.serial}` : ''].filter(Boolean).join(' · '))}</div></section></div>
-    ${positionsTable(d)}
+    ${table}
     <div class="terms one">${terms}</div>
     ${sign(`Исполнитель · ${e(d.master || d.manager)}`, `Заказчик · ${e(d.customer.name)}`, d.signatureOut)}
   </section>`
@@ -392,7 +405,8 @@ export const FORMS_STYLE = `
   .items { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 9.5pt; font-variant-numeric: tabular-nums; }
   .items th { font-size: 7.5pt; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3); text-align: left; padding: 6px 8px; border-bottom: 1.5px solid var(--ink); }
   .items td { padding: 8px; border-bottom: 1px solid var(--line); }
-  .items .r { text-align: right; }
+  .items .r { text-align: right; white-space: nowrap; }
+  .items th.r { white-space: nowrap; }
   .items .empty td { color: var(--ink-3); text-align: center; padding: 14px; }
   .totals { margin: 10px 0 0 auto; width: 66mm; font-size: 9.5pt; font-variant-numeric: tabular-nums; }
   .totals div { display: flex; justify-content: space-between; padding: 3px 0; }

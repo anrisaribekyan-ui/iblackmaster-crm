@@ -628,7 +628,7 @@ export default function OrderDetailPage() {
               <select
                 aria-label="Передать в локацию"
                 title="Передать в другую локацию"
-                className="rounded-lg bg-transparent px-2 py-1.5 text-sm text-white/80 hover:bg-white/10"
+                className="max-w-[10.5rem] truncate rounded-lg bg-transparent px-2 py-1.5 text-sm text-white/80 hover:bg-white/10"
                 value={detail.order.location_id}
                 onChange={(event) => {
                   const target = locations.find((location) => location.id === Number(event.target.value))
@@ -637,7 +637,7 @@ export default function OrderDetailPage() {
                   }
                 }}
               >
-                {locations.map((location) => <option key={location.id} value={location.id} className="text-ink">{location.name}</option>)}
+                {locations.map((location) => <option key={location.id} value={location.id} className="text-ink">{location.name.replace(/^iBlackMaster \((.*)\)$/, '$1')}</option>)}
               </select>
             )}
             {!isDeleted && can('deleteOrderAccess') && (
@@ -857,8 +857,8 @@ export default function OrderDetailPage() {
               })()}
               {can('changeOrderPositionAccess') && !isClosed && (
                 <div className="mb-5 rounded-lg border border-line p-3">
-                  <form onSubmit={(event) => void searchCatalog(event)} className="flex gap-2">
-                    <input className={`${inputClass} min-w-0 flex-1`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Найти товар или работу" />
+                  <form onSubmit={(event) => void searchCatalog(event)} className="flex flex-wrap gap-2">
+                    <input className={`${inputClass} min-w-[12rem] flex-1`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Найти товар или работу" />
                     <button className="rounded-md border border-line px-3 py-2">Найти</button>
                     <button
                       type="button"
