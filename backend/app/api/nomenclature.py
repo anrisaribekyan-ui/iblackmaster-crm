@@ -494,3 +494,45 @@ def nomenclature_card(item_id: int, db: DbSession, me: CurrentEmployee):
         "days_left": days_left,
         "history": history[:150],
     }
+
+
+class ArchiveItemIn(BaseModel):
+    code: int = Field(gt=0)
+    name: str = Field(min_length=1, max_length=300)
+    group_path: str | None = Field(default=None, max_length=500)  # «/Магазин/Кабели»
+    unit: str | None = Field(default=None, max_length=30)
+    purchase_price: int = Field(default=0, ge=0)
+    guarantee_days: int = Field(default=0, ge=0)
+
+
+@router.post("/nomenclature/import-archive", dependencies=[Depends(require("settingAccess"))])
+def import_archive_nomenclature(items: list[ArchiveItemIn], db: DbSession):
+    """Идемпотентно добавляет товары из каталога LiveSklad по коду. Существующие коды не трогаем."""
+    existing = set(db.scalars(select(Nomenclature.code).where(Nomenclature.code.in_([i.code for i in items]))))
+    measures = {m.name.strip().lower(): m.id for m in db.scalars(select(Measure))}
+    groups = {(g.parent_id, g.name.strip().lower()): g.id for g in db.scalars(select(NomenclatureGroup))}
+    created = created_groups = 0
+
+    def group_for(path: str | None) -> int | None:
+        nonlocal created_groups
+        parent = None
+        for part in [p.strip() for p in (path or "").split("/") if p.strip()]:
+            key = (parent, part.lower())
+            if key not in groups:
+                node = NomenclatureGroup(name=part, parent_id=parent)
+                db.add(node)
+                db.flush()
+                groups[key] = node.id
+                created_groups += 1
+            parent = groups[key]
+        return parent
+
+    for i in items:
+        if i.code in existing:
+            continue
+        db.add(Nomenclature(code=i.code, name=i.name.strip(), group_id=group_for(i.group_path), measure_id=measures.get((i.unit or "").strip().lower()),
+                            purchase_price=Decimal(i.purchase_price), guarantee_days=i.guarantee_days, note="Перенесено из LiveSklad"))
+        existing.add(i.code)
+        created += 1
+    db.commit()
+    return {"created": created, "skipped": len(items) - created, "groups_created": created_groups}

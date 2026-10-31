@@ -174,3 +174,22 @@ def test_nomenclature_group_update_and_delete(client, auth_headers, db):
 
     assert client.delete(f"/api/nomenclature-groups/{child_id}", headers=auth_headers).status_code == 204
     assert client.delete(f"/api/nomenclature-groups/{parent_id}", headers=auth_headers).status_code == 204
+
+
+def test_import_archive_nomenclature_is_idempotent(client, auth_headers, db):
+    from sqlalchemy import select
+
+    from app.models import Nomenclature, NomenclatureGroup
+
+    items = [
+        {"code": 9901, "name": "Кабель Hoco X1", "group_path": "/Тестовая/Подгруппа", "unit": "шт.", "purchase_price": 120, "guarantee_days": 14},
+        {"code": 9902, "name": "Чехол", "group_path": "/Тестовая/Подгруппа", "purchase_price": 0},
+        {"code": 9903, "name": "Без группы"},
+    ]
+    first = client.post("/api/nomenclature/import-archive", json=items, headers=auth_headers)
+    assert first.status_code == 200, first.text
+    assert first.json()["created"] == 3 and first.json()["groups_created"] == 2
+    again = client.post("/api/nomenclature/import-archive", json=items, headers=auth_headers).json()
+    assert again == {"created": 0, "skipped": 3, "groups_created": 0}
+    assert len(db.scalars(select(Nomenclature).where(Nomenclature.code.in_([9901, 9902, 9903]))).all()) == 3
+    assert len(db.scalars(select(NomenclatureGroup).where(NomenclatureGroup.name == "Подгруппа")).all()) == 1
