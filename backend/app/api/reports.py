@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
 from app.services import settings as settings_service
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids, require
@@ -23,6 +23,7 @@ from app.models import (
     CashRegister,
     Employee,
     HowKnow,
+    Location,
     Nomenclature,
     Order,
     OrderPosition,
@@ -409,11 +410,19 @@ def report_profit(
         b["cost"] += cost
         b["sales"] += 1
 
-    salary_query = select(SalaryEvent.date, SalaryEvent.amount).where(SalaryEvent.date >= period_from, SalaryEvent.date < period_to)
+    # Точка начисления: своя, иначе точка заказа/чека; ручные без точки (оклад, премии) относим к основной точке
+    main_location = db.scalar(select(func.min(Location.id)))
+    event_location = func.coalesce(SalaryEvent.location_id, Order.location_id, Sale.location_id, main_location)
+    salary_query = (
+        select(SalaryEvent.date, SalaryEvent.amount)
+        .outerjoin(Order, Order.id == SalaryEvent.order_id)
+        .outerjoin(Sale, Sale.id == SalaryEvent.sale_id)
+        .where(SalaryEvent.date >= period_from, SalaryEvent.date < period_to)
+    )
     if location_id is not None:
-        salary_query = salary_query.where(SalaryEvent.location_id == location_id)
+        salary_query = salary_query.where(event_location == location_id)
     elif allowed:
-        salary_query = salary_query.where(or_(SalaryEvent.location_id.is_(None), SalaryEvent.location_id.in_(allowed)))
+        salary_query = salary_query.where(event_location.in_(allowed))
     for date_, amount in db.execute(salary_query):
         buckets[_bucket(date_, group_by)]["salary"] += amount
 
