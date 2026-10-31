@@ -350,8 +350,9 @@ def report_stock_value(
 NOT_EXPENSE_TYPES = {
     "move", "productMoveFrom", "collection", "purchase", "salary", "orderReturn", "saleReturn", "bankPercent",
 }
-# Выдачи учредителю/работнику — это движение денег владельца и подотчёт, а не расход
-NOT_EXPENSE_NAMES = ("учредител", "работник")
+# Выдачи учредителю/работнику — это движение денег владельца и подотчёт, а не расход.
+# «Корректировка остатка» — служебная проводка переноса из LiveSklad, «инкассац»/«перемещ» — движение денег между кассами
+NOT_EXPENSE_NAMES = ("учредител", "работник", "корректировка остатка", "инкассац", "перемещ")
 
 
 def _bucket(value: datetime, group_by: str) -> str:
