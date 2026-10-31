@@ -26,6 +26,7 @@ from app.models import (
 from app.services import money, notifications, salary, stock
 
 CENT = MONEY_STEP  # без копеек
+DEFAULT_GUARANTEE_DAYS = 90  # гарантия на позицию, если не указана иная
 
 
 # --- Нумерация ---------------------------------------------------------------------
@@ -146,7 +147,7 @@ def add_position(
         price=unit_price,
         sold_price=unit_price,
         purchase_price=purchase_price,
-        guarantee_days=guarantee_days if guarantee_days is not None else (nom.guarantee_days if nom else 0),
+        guarantee_days=guarantee_days if guarantee_days is not None else ((nom.guarantee_days if nom else 0) or DEFAULT_GUARANTEE_DAYS),
         performer_id=performer_id or order.master_id or employee.id,
         store_id=store_id if (nom is not None and not nom.is_work) else None,
     )
@@ -178,7 +179,8 @@ def remove_position(db: Session, order: Order, position: OrderPosition, employee
 
 
 def update_position_price(
-    db: Session, order: Order, position: OrderPosition, employee: Employee, *, price=None, sold_price=None, purchase_price=None
+    db: Session, order: Order, position: OrderPosition, employee: Employee, *, price=None, sold_price=None, purchase_price=None,
+    guarantee_days: int | None = None,
 ) -> None:
     """Меняет цену / цену со скидкой / себестоимость. Права (minPriceAccess, orderPurchasePriceAccess) проверяет роутер."""
     ensure_editable(order)
@@ -187,6 +189,10 @@ def update_position_price(
         if value < 0:
             raise BusinessError("Себестоимость не может быть отрицательной")
         position.purchase_price = value
+    if guarantee_days is not None:
+        if guarantee_days < 0:
+            raise BusinessError("Гарантия не может быть отрицательной")
+        position.guarantee_days = guarantee_days
     if price is not None:
         position.price = money.to_money(price)
         position.sold_price = position.price
@@ -195,7 +201,7 @@ def update_position_price(
     recalc_totals(order)
     add_history(
         db, order, "change_work" if position.is_work else "change_product", employee,
-        text=f"{position.name}: цена {position.sold_price}, себестоимость {position.purchase_price}",
+        text=f"{position.name}: цена {position.sold_price}, себестоимость {position.purchase_price}, гарантия {position.guarantee_days} дн.",
     )
     salary.recalc_order(db, order)
 

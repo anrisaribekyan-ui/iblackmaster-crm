@@ -114,7 +114,7 @@ class OrderPositionCreate(BaseModel):
     price: Decimal | None = None
     performer_id: int | None = None
     store_id: int | None = None
-    guarantee_days: int | None = None
+    guarantee_days: int | None = Field(default=None, ge=0, le=3650)
     purchase_price: Decimal | None = None
 
 
@@ -122,6 +122,7 @@ class OrderPositionPrice(BaseModel):
     price: Decimal | None = None
     sold_price: Decimal | None = None
     purchase_price: Decimal | None = None
+    guarantee_days: int | None = Field(default=None, ge=0, le=3650)
 
 
 class OrderDeleteIn(BaseModel):
@@ -781,8 +782,8 @@ def update_order_position_price(
     position = db.get(OrderPosition, position_id)
     if position is None or position.order_id != order.id:
         raise NotFound("Позиция заказа")
-    if data.price is None and data.sold_price is None and data.purchase_price is None:
-        raise BusinessError("Укажите цену для изменения")
+    if data.price is None and data.sold_price is None and data.purchase_price is None and data.guarantee_days is None:
+        raise BusinessError("Укажите цену или гарантию для изменения")
     if data.purchase_price is not None and not has_permission(me, "orderPurchasePriceAccess"):
         raise Forbidden("Нет права менять себестоимость")
     minimum = position.min_price
@@ -797,6 +798,7 @@ def update_order_position_price(
         price=data.price,
         sold_price=data.sold_price,
         purchase_price=data.purchase_price,
+        guarantee_days=data.guarantee_days,
     )
     position.min_price = minimum
     db.commit()

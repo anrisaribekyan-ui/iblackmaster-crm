@@ -99,7 +99,7 @@ type OrderDetail = {
   debt: string
 }
 type OrderFieldValues = Record<string, unknown>
-type CatalogItem = { id: number; name: string; article?: string | null; prices?: { price: string }[]; is_work: boolean }
+type CatalogItem = { id: number; name: string; article?: string | null; prices?: { price: string }[]; is_work: boolean; guarantee_days?: number }
 type PaymentMode = 'payment' | 'refund'
 type TaskRow = { id: number; title: string; text: string | null; assignee_name: string | null; deadline: string | null; is_done: boolean }
 type LocationInfo = { id: number; name: string; address: string | null; phones: string | null }
@@ -193,6 +193,7 @@ export default function OrderDetailPage() {
   const [quantity, setQuantity] = useState('1')
   const [positionPrice, setPositionPrice] = useState('0')
   const [positionCost, setPositionCost] = useState('')
+  const [positionGuarantee, setPositionGuarantee] = useState('90')
   const [storeId, setStoreId] = useState('')
   const [discountKind, setDiscountKind] = useState<'percent' | 'sum'>('percent')
   const [discountValue, setDiscountValue] = useState('')
@@ -451,7 +452,8 @@ export default function OrderDetailPage() {
           store_id: selectedItem.is_work ? null : Number(storeId),
         }
     // Пустая себестоимость — берётся из справочника / средней цены склада
-    const payload = can('orderPurchasePriceAccess') && positionCost !== '' ? { ...base, purchase_price: positionCost } : base
+    const withCost = can('orderPurchasePriceAccess') && positionCost !== '' ? { ...base, purchase_price: positionCost } : base
+    const payload = { ...withCost, guarantee_days: Number(positionGuarantee === '' ? 0 : positionGuarantee) }
     const success = await run(
       () => api.post(`/orders/${detail.order.id}/positions`, payload),
       'Не удалось добавить позицию',
@@ -461,6 +463,7 @@ export default function OrderDetailPage() {
     setSearchResults([])
     setSearch('')
     setPositionCost('')
+    setPositionGuarantee('90')
   }
 
   const saveDiscount = async () => {
@@ -487,6 +490,14 @@ export default function OrderDetailPage() {
     await run(
       () => api.put(`/orders/${detail.order.id}/positions/${position.id}`, { price }),
       'Не удалось обновить цену позиции',
+    )
+  }
+
+  const editPositionGuarantee = async (position: Position, days: string) => {
+    if (!detail) return
+    await run(
+      () => api.put(`/orders/${detail.order.id}/positions/${position.id}`, { guarantee_days: Number(days || 0) }),
+      'Не удалось обновить гарантию',
     )
   }
 
@@ -767,13 +778,14 @@ export default function OrderDetailPage() {
                       canViewMargin={can('marginPriceAccess')}
                       canViewCost={canSeeCost}
                       onSavePrice={(price) => void editPositionPrice(position, price)}
+                      onSaveGuarantee={(days) => void editPositionGuarantee(position, days)}
                       onDelete={() => void removePosition(position)}
                     />
                   ))}
                 </ul>
                 <div className="mb-4 hidden overflow-x-auto md:block">
                   <table className="w-full min-w-[740px] text-left text-sm">
-                    <thead className="bg-canvas text-muted"><tr>{['Позиция', 'Тип', 'Кол-во', 'Цена', ...(canSeeCost ? ['Себестоимость'] : []), 'Итого', ...(can('marginPriceAccess') ? ['Прибыль'] : []), ''].map((item) => <th key={item} className="px-2 py-2 font-medium">{item}</th>)}</tr></thead>
+                    <thead className="bg-canvas text-muted"><tr>{['Позиция', 'Тип', 'Кол-во', 'Цена', ...(canSeeCost ? ['Себестоимость'] : []), 'Гарантия, дн.', 'Итого', ...(can('marginPriceAccess') ? ['Прибыль'] : []), ''].map((item) => <th key={item} className="px-2 py-2 font-medium">{item}</th>)}</tr></thead>
                     <tbody>
                       {detail.positions.map((position) => (
                         <PositionRow
@@ -785,6 +797,7 @@ export default function OrderDetailPage() {
                           canEditCost={can('changeOrderPositionAccess') && can('orderPurchasePriceAccess') && !isClosed}
                           onSavePrice={(price) => void editPositionPrice(position, price)}
                           onSaveCost={(cost) => void editPositionCost(position, cost)}
+                          onSaveGuarantee={(days) => void editPositionGuarantee(position, days)}
                           onDelete={() => void removePosition(position)}
                         />
                       ))}
@@ -805,6 +818,7 @@ export default function OrderDetailPage() {
                         setSelectedItem({ id: 0, name: search.trim(), is_work: true })
                         setPositionPrice('')
                         setPositionCost('')
+                        setPositionGuarantee('90')
                         setQuantity('1')
                         setSearchResults([])
                       }}
@@ -820,6 +834,7 @@ export default function OrderDetailPage() {
                             setSelectedItem(item)
                             setPositionPrice(item.prices?.[0]?.price ?? '0')
                             setPositionCost('')
+                            setPositionGuarantee(String(item.guarantee_days || 90))
                             setSearchResults([])
                           }}>
                             <span>{item.name}<small className="ml-2 text-muted">{item.article}</small></span>
@@ -845,6 +860,9 @@ export default function OrderDetailPage() {
                           <input className={inputClass} type="number" min="0" step="1" value={positionCost} onChange={(event) => setPositionCost(event.target.value)} placeholder={selectedItem.id === 0 ? '0' : 'Из справочника'} />
                         </label>
                       )}
+                      <label className="grid gap-1 text-xs text-muted">Гарантия, дней
+                        <input className={inputClass} type="number" min="0" step="1" required value={positionGuarantee} onChange={(event) => setPositionGuarantee(event.target.value)} />
+                      </label>
                       {!selectedItem.is_work && (
                         <label className="grid gap-1 text-xs text-muted">Склад
                           <select className={inputClass} required value={storeId} onChange={(event) => setStoreId(event.target.value)}>
@@ -1044,6 +1062,7 @@ function PositionRow({
   canEditCost,
   onSavePrice,
   onSaveCost,
+  onSaveGuarantee,
   onDelete,
 }: {
   position: Position
@@ -1053,12 +1072,15 @@ function PositionRow({
   canEditCost: boolean
   onSavePrice: (price: string) => void
   onSaveCost: (cost: string) => void
+  onSaveGuarantee: (days: string) => void
   onDelete: () => void
 }) {
   const [price, setPrice] = useState(position.price)
   useEffect(() => setPrice(position.price), [position.price])
   const [cost, setCost] = useState(position.purchase_price ?? '')
   useEffect(() => setCost(position.purchase_price ?? ''), [position.purchase_price])
+  const [guarantee, setGuarantee] = useState(String(position.guarantee_days))
+  useEffect(() => setGuarantee(String(position.guarantee_days)), [position.guarantee_days])
   return (
     <tr className="border-t border-line">
       <td className="px-2 py-2">{position.name}</td>
@@ -1070,6 +1092,7 @@ function PositionRow({
           ? <input className={`${inputClass} w-28 text-right num`} type="number" min="0" step="1" value={cost} title="Себестоимость за единицу" onChange={(event) => setCost(event.target.value)} onBlur={() => { if (cost !== (position.purchase_price ?? '')) onSaveCost(cost) }} />
           : <span className="num">{position.purchase_price === null ? '—' : formatMoney(position.purchase_price)}</span>}</td>
       )}
+      <td className="px-2 py-2">{canEdit ? <input className={`${inputClass} w-20 text-right num`} type="number" min="0" step="1" value={guarantee} title="Гарантия на позицию, дней" onChange={(event) => setGuarantee(event.target.value)} onBlur={() => { if (guarantee !== String(position.guarantee_days)) onSaveGuarantee(guarantee) }} /> : <span className="num">{position.guarantee_days}</span>}</td>
       <td className="px-2 py-2 num">{formatMoney(position.total)}</td>
       {canViewMargin && <td className="px-2 py-2 num">{position.margin === null ? '—' : formatMoney(position.margin)}</td>}
       <td className="px-2 py-2">{canEdit && <button className="text-danger" onClick={onDelete}>Удалить</button>}</td>
@@ -1077,16 +1100,19 @@ function PositionRow({
   )
 }
 
-function PositionCard({ position, canEdit, canViewMargin, canViewCost, onSavePrice, onDelete }: {
+function PositionCard({ position, canEdit, canViewMargin, canViewCost, onSavePrice, onSaveGuarantee, onDelete }: {
   position: Position
   canEdit: boolean
   canViewMargin: boolean
   canViewCost: boolean
   onSavePrice: (price: string) => void
+  onSaveGuarantee: (days: string) => void
   onDelete: () => void
 }) {
   const [price, setPrice] = useState(position.price)
   useEffect(() => setPrice(position.price), [position.price])
+  const [guarantee, setGuarantee] = useState(String(position.guarantee_days))
+  useEffect(() => setGuarantee(String(position.guarantee_days)), [position.guarantee_days])
   const qtyNum = Number(position.quantity)
   return (
     <li className="py-3">
@@ -1095,6 +1121,7 @@ function PositionCard({ position, canEdit, canViewMargin, canViewCost, onSavePri
           <p className="[overflow-wrap:anywhere]">{position.name}</p>
           <p className="text-xs text-muted">
             {position.is_work ? 'работа' : 'материал'}{qtyNum !== 1 && ` · ${qtyNum.toLocaleString('ru-RU')} шт`}
+            {` · гарантия ${position.guarantee_days} дн.`}
             {canViewCost && position.purchase_price !== null && ` · себест. ${formatMoney(position.purchase_price)}`}
             {canViewMargin && position.margin !== null && <span className="text-success"> · +{formatMoney(position.margin)}</span>}
           </p>
@@ -1106,6 +1133,9 @@ function PositionCard({ position, canEdit, canViewMargin, canViewCost, onSavePri
         <label className="mt-2 flex items-center gap-2 text-xs text-muted">Цена
           <input className="h-9 w-28 rounded-md border border-line bg-surface px-2 text-right text-sm text-ink num" inputMode="numeric" value={price}
             onChange={(event) => setPrice(event.target.value.replace(/[^\d]/g, ''))} onBlur={() => { if (price !== position.price) onSavePrice(price) }} />
+          Гарантия, дн.
+          <input className="h-9 w-20 rounded-md border border-line bg-surface px-2 text-right text-sm text-ink num" inputMode="numeric" value={guarantee}
+            onChange={(event) => setGuarantee(event.target.value.replace(/[^\d]/g, ''))} onBlur={() => { if (guarantee !== String(position.guarantee_days)) onSaveGuarantee(guarantee) }} />
         </label>
       )}
     </li>

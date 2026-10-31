@@ -399,6 +399,21 @@ def test_order_product_stock_writeoff_and_restore(client, auth_headers, db, owne
     assert update.status_code == 200
     assert Decimal(str(update.json()["sold_price"])) == Decimal("160.00")
 
+    # Гарантия на позицию: по умолчанию 90 дней, меняется отдельно от цены
+    assert response.json()["guarantee_days"] == 90
+    warranty = client.put(
+        f"/api/orders/{order.id}/positions/{position_id}",
+        json={"guarantee_days": 30},
+        headers=auth_headers,
+    )
+    assert warranty.status_code == 200 and warranty.json()["guarantee_days"] == 30
+    manual = client.post(
+        f"/api/orders/{order.id}/positions",
+        json={"name": "Замена дисплея", "is_work": True, "price": "2000", "guarantee_days": 0},
+        headers=auth_headers,
+    )
+    assert manual.status_code == 200 and manual.json()["guarantee_days"] == 0
+
     response = client.delete(f"/api/orders/{order.id}/positions/{position_id}", headers=auth_headers)
     assert response.status_code == 204
     assert db.scalars(select(StockBalance).where(StockBalance.store_id == store.id)).one().quantity == Decimal("5.000")
