@@ -242,3 +242,15 @@ def test_reports_profit_tax_and_fixed_expenses(client, auth_headers, db):
     # по одной точке общий расход не попадает
     r = client.get(f"/api/reports/profit?date_from={date_from}&date_to={date_to}&location_id={order.location_id}", headers=auth_headers)
     assert {i["name"] for i in r.json()["fixed_items"]} == {"Аренда тест"}
+
+
+def test_import_archive_orders_is_idempotent_and_counts_in_profit(client, auth_headers, db):
+    location = db.scalars(select(Location).order_by(Location.id)).first()
+    item = {"number": "D9001", "location_id": location.id, "created_at": "2026-10-01T10:00:00+03:00", "closed_at": "2026-10-02T12:00:00+03:00",
+            "work_price": 5000, "parts_price": 1000, "work_cost": 500, "parts_cost": 700, "paid": 6000}
+    r = client.post("/api/orders/import-archive", json=[item], headers=auth_headers)
+    assert r.status_code == 200 and r.json() == {"created": 1, "skipped": 0}
+    assert client.post("/api/orders/import-archive", json=[item], headers=auth_headers).json() == {"created": 0, "skipped": 1}
+    r = client.get(f"/api/reports/profit?date_from=2026-09-30T21:00:00Z&date_to=2026-10-31T21:00:00Z&group_by=month&location_id={location.id}", headers=auth_headers)
+    total = r.json()["total"]
+    assert total["revenue"] >= 6000 and total["orders"] >= 1

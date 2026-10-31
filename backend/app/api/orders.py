@@ -1,3 +1,4 @@
+import secrets
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -956,3 +957,51 @@ def delete_order_payment(order_id: int, tx_id: int, db: DbSession, me: CurrentEm
         raise NotFound("Оплата заказа")
     order_service.delete_payment(db, order, transaction, me)
     db.commit()
+
+# --- Перенос архива выданных заказов из LiveSklad (отчёт «Заказы»): только суммы и даты ----
+
+
+class ArchiveOrderIn(BaseModel):
+    number: str = Field(min_length=1, max_length=20)
+    location_id: int
+    created_at: datetime
+    closed_at: datetime
+    work_price: int = Field(ge=0)
+    parts_price: int = Field(ge=0)
+    work_cost: int = Field(ge=0)
+    parts_cost: int = Field(ge=0)
+    paid: int = Field(ge=0)
+    master_id: int | None = None
+
+
+@router.post("/import-archive", dependencies=[Depends(require("settingAccess"))])
+def import_archive_orders(items: list[ArchiveOrderIn], db: DbSession, me: CurrentEmployee):
+    """Идемпотентно добавляет закрытые заказы с клиентом «Архив LiveSklad». Касс, склада и зарплаты не трогает."""
+    status = db.scalar(select(OrderStatus).where(OrderStatus.group == StatusGroup.CLOSED).order_by(OrderStatus.id))
+    order_type = db.scalar(select(OrderType).order_by(OrderType.id))
+    client = db.scalar(select(Counteragent).where(Counteragent.name == "Архив LiveSklad"))
+    if client is None:
+        client = Counteragent(name="Архив LiveSklad", note="Клиент для заказов, перенесённых из LiveSklad без карточки клиента")
+        db.add(client)
+        db.flush()
+    existing = set(db.scalars(select(Order.number).where(Order.number.in_([i.number for i in items]))))
+    created = 0
+    for i in items:
+        if i.number in existing:
+            continue
+        price, cost = Decimal(i.work_price + i.parts_price), Decimal(i.work_cost + i.parts_cost)
+        order = Order(
+            number=i.number, location_id=i.location_id, order_type_id=order_type.id, status_id=status.id, counteragent_id=client.id,
+            created_at=i.created_at, closed_at=i.closed_at, finished_at=i.closed_at, last_action_at=i.closed_at,
+            created_by_id=me.id, master_id=i.master_id, closed_by_id=i.master_id,
+            total_price=price, total_purchase=cost, paid=Decimal(i.paid), note="Перенесено из LiveSklad (отчёт «Заказы»)",
+            tracking_code=secrets.token_hex(6),
+        )
+        if i.work_price or i.work_cost:
+            order.positions.append(OrderPosition(is_work=True, name="Работы (LiveSklad)", price=Decimal(i.work_price), sold_price=Decimal(i.work_price), purchase_price=Decimal(i.work_cost)))
+        if i.parts_price or i.parts_cost:
+            order.positions.append(OrderPosition(is_work=False, name="Запчасти (LiveSklad)", price=Decimal(i.parts_price), sold_price=Decimal(i.parts_price), purchase_price=Decimal(i.parts_cost)))
+        db.add(order)
+        created += 1
+    db.commit()
+    return {"created": created, "skipped": len(items) - created}
