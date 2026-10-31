@@ -196,7 +196,8 @@ def top_positions(db: DbSession, me: CurrentEmployee, location_id: int, store_id
 
 
 @router.get("")
-def list_sales(db: DbSession, me: CurrentEmployee, location_id: int | None = None, page: int = 1):
+def list_sales(db: DbSession, me: CurrentEmployee, location_id: int | None = None, page: int = 1, month: str | None = None):
+    """month=2026-09 — только чеки этого месяца (по московскому времени)."""
     from sqlalchemy import func
 
     from app.api.deps import location_ids
@@ -209,6 +210,19 @@ def list_sales(db: DbSession, me: CurrentEmployee, location_id: int | None = Non
         q = q.where(Sale.location_id == location_id)
     elif allowed:
         q = q.where(Sale.location_id.in_(allowed))
+    if month:
+        import re
+        from datetime import timedelta, timezone
+
+        from app.config import settings as app_settings
+
+        if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month):
+            raise BusinessError("Месяц указывается как 2026-09")
+        year, mon = int(month[:4]), int(month[5:])
+        shift = timedelta(minutes=app_settings.company_utc_offset_minutes)
+        start = datetime(year, mon, 1) - shift
+        end = datetime(year + (mon == 12), mon % 12 + 1, 1) - shift
+        q = q.where(Sale.date >= start.replace(tzinfo=timezone.utc), Sale.date < end.replace(tzinfo=timezone.utc))
     total = db.scalar(select(func.count()).select_from(q.subquery())) or 0
     rows = db.scalars(q.order_by(Sale.date.desc(), Sale.id.desc()).offset((max(page, 1) - 1) * 50).limit(50)).all()
     can_see_buyer = has_permission(me, "counteragentShopAccess")

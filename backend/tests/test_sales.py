@@ -151,3 +151,23 @@ def test_quick_sale_free_position_and_top(client, auth_headers, db):
     top = client.get(f"/api/sales/top?location_id={location.id}&store_id={store.id}", headers=auth_headers).json()
     assert top[0]["name"] == "Кабель Type-C" and top[0]["count"] == 2 and top[0]["nomenclature_id"] is None
     assert any(t["nomenclature_id"] == product.id and Decimal(str(t["stock"])) == 0 for t in top)
+
+
+def test_sales_history_month_filter_and_paging(client, auth_headers, db):
+    from datetime import datetime, timezone
+
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    store = db.scalars(select(Store).where(Store.location_id == location.id)).first()
+    seller = db.scalars(select(__import__("app.models", fromlist=["Employee"]).Employee)).first()
+    # 30 сентября 22:00 UTC = 1 октября 01:00 по Москве; 30 сентября 20:00 UTC = 30 сентября 23:00 МСК
+    for i, moment in enumerate([datetime(2026, 9, 30, 20, 0), datetime(2026, 9, 30, 22, 0), datetime(2026, 8, 5, 10, 0)]):
+        db.add(Sale(number=f"M{i}", date=moment.replace(tzinfo=timezone.utc), location_id=location.id, store_id=store.id,
+                    seller_id=seller.id, total_price=Decimal("100"), paid=Decimal("100")))
+    db.commit()
+
+    sept = client.get(f"/api/sales?location_id={location.id}&month=2026-09", headers=auth_headers).json()
+    assert [x["number"] for x in sept["items"]] == ["M0"] and sept["total"] == 1
+    octo = client.get(f"/api/sales?location_id={location.id}&month=2026-10", headers=auth_headers).json()
+    assert [x["number"] for x in octo["items"]] == ["M1"]
+    assert client.get(f"/api/sales?location_id={location.id}", headers=auth_headers).json()["total"] == 3
+    assert client.get(f"/api/sales?location_id={location.id}&month=bad", headers=auth_headers).status_code == 400

@@ -67,6 +67,8 @@ export default function SalesPage() {
   const [done, setDone] = useState<{ id: number; number: string; total: number; debt: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const [history, setHistory] = useState<SaleRow[] | null>(null)
+  const [historyTotal, setHistoryTotal] = useState(0)
+  const [month, setMonth] = useState('') // '' — все чеки, иначе 2026-09
   const [viewing, setViewing] = useState<SaleDetail | null>(null)
   const [quick, setQuick] = useState(params.get('quick') === '1')
   // ?open=15 — сразу показать чек (ссылка из карточки товара)
@@ -106,11 +108,32 @@ export default function SalesPage() {
   const loadHistory = useCallback(async () => {
     if (!locationId) return
     try {
-      setHistory((await api.get<{ items: SaleRow[] }>(`/sales?location_id=${locationId}`)).items)
+      const r = await api.get<{ items: SaleRow[]; total: number }>(`/sales?location_id=${locationId}${month ? `&month=${month}` : ''}`)
+      setHistory(r.items)
+      setHistoryTotal(r.total)
     } catch {
       setHistory([])
+      setHistoryTotal(0)
     }
-  }, [locationId])
+  }, [locationId, month])
+  // Чеки старше первых 50 подгружаем по кнопке «Показать ещё»
+  const loadMoreHistory = async () => {
+    if (!locationId || !history) return
+    const page = Math.floor(history.length / 50) + 1
+    try {
+      const r = await api.get<{ items: SaleRow[] }>(`/sales?location_id=${locationId}&page=${page}${month ? `&month=${month}` : ''}`)
+      setHistory((cur) => [...(cur ?? []), ...r.items.filter((x) => !(cur ?? []).some((c) => c.id === x.id))])
+    } catch {
+      /* оставляем то, что уже загружено */
+    }
+  }
+  const monthOptions = Array.from({ length: 40 }, (_, i) => {
+    const d = new Date()
+    d.setDate(1)
+    d.setMonth(d.getMonth() - i)
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    return { value, label: d.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }) }
+  })
   const loadTop = useCallback(async () => {
     if (!locationId || !storeId) return
     try {
@@ -422,7 +445,11 @@ export default function SalesPage() {
       </div>
 
       <div className="mb-3 mt-8 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-medium">История чеков</h2>
+        <h2 className="font-medium">История чеков{historyTotal > 0 && <span className="ml-2 text-sm font-normal text-muted">{historyTotal.toLocaleString('ru-RU')} шт.</span>}</h2>
+        <select value={month} onChange={(e) => setMonth(e.target.value)} className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm" aria-label="Месяц">
+          <option value="">Все месяцы</option>
+          {monthOptions.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
         {todaySales.length > 0 && <p className="text-sm text-muted">Сегодня {todaySales.length} чек. на <span className="num text-ink">{money(todaySales.reduce((s, x) => s + Number(x.total_price), 0))}</span></p>}
       </div>
       {history === null ? <Skeleton /> : history.length === 0 ? (
@@ -447,6 +474,11 @@ export default function SalesPage() {
             </tbody>
           </table>
         </div>
+      )}
+      {history !== null && history.length < historyTotal && (
+        <button type="button" onClick={() => void loadMoreHistory()} className="mt-3 w-full rounded-xl border border-line bg-surface py-2.5 text-sm font-medium hover:bg-canvas">
+          Показать ещё (осталось {historyTotal - history.length})
+        </button>
       )}
 
       {/* Телефон: итог и «Пробить» всегда под пальцем, над нижним меню — не надо листать до кнопки */}
