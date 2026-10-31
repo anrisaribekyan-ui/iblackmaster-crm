@@ -8,6 +8,7 @@ const links = [
   { to: 'notifications', label: 'Уведомления' },
   { to: 'quick-orders', label: 'Быстрые заказы' },
   { to: 'checklist', label: 'Чек-лист' },
+  { to: 'livesklad-import', label: 'Перенос из LiveSklad' },
 ]
 
 export default function SettingsLayout() {

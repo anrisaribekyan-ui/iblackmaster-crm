@@ -145,8 +145,10 @@ def spread_cost(lines: list[tuple[Decimal, str, Decimal]], cost_total: Decimal) 
 
 
 class Importer:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, protect_locations: set[str] | None = None):
         self.db = db
+        # Точки, чьи уже перенесённые заказы не трогаем (в CRM их могли править): берём только новые номера
+        self.protect_locations = {name.casefold() for name in (protect_locations or set())}
         self.stats = Counter()
         self.warnings: list[str] = []
         self.owner = db.scalars(select(Employee).where(Employee.is_owner.is_(True))).first()
@@ -285,9 +287,21 @@ class Importer:
 
     # --- заказ ---
 
-    def import_row(self, row: dict) -> None:
+    def number_for(self, row: dict, location: Location) -> str | None:
+        """Номер в CRM. Нумерация LiveSklad у каждой точки своя, поэтому у Ленты номера получают приставку «ЛН-»
+        (так же номера Ленты уже были заведены из отчёта «Заказы»), а у остальных остаются как есть."""
         number = text(row.get("Номер заказа"))
         if not number:
+            return None
+        return f"ЛН-{number}" if "лента" in location.name.casefold() else number
+
+    def import_row(self, row: dict) -> None:
+        location = self.location(row["Локация"])
+        number = self.number_for(row, location)
+        if not number:
+            return
+        if self.protect_locations and number in self.orders and any(key in location.name.casefold() for key in self.protect_locations):
+            self.stats["уже в CRM, не тронуты"] += 1
             return
         status = self.status(row["Статус"])
         created = parse_dt(row.get("Дата создания")) or datetime.now(timezone.utc)
@@ -304,7 +318,7 @@ class Importer:
 
         client = self.client(row)  # до создания заказа: client() пишет в базу
         how_know_id = _id(self.how_know(row.get("Источник рекламы заказа")))
-        location_id = self.location(row["Локация"]).id
+        location_id = location.id
         order_type_id = self.order_type(row.get("Тип заказа") or "Негарантийный").id
 
         order = self.orders.get(number)
@@ -411,44 +425,57 @@ def read_rows(path: str):
             yield dict(zip(header, values))
 
 
+def run_import(path: str, commit: bool, protect_locations: set[str] | None = None, progress=None) -> dict:
+    """Общий прогон для командной строки и страницы загрузки. Возвращает итоги."""
+    started = time.time()
+    db = SessionLocal()
+    try:
+        importer = Importer(db, protect_locations)
+        errors = []
+        for index, row in enumerate(read_rows(path), start=2):
+            try:
+                with db.begin_nested():
+                    importer.import_row(row)
+            except Exception as error:  # одна битая строка не должна ронять весь перенос
+                errors.append(f"строка {index} ({row.get('Номер заказа')}): {str(error).splitlines()[0]}")
+            if progress and index % 500 == 0:
+                progress(index - 1)
+        importer.finish()
+        archive = db.scalars(select(Counteragent).where(Counteragent.name == "Архив LiveSklad")).first()
+        if archive is not None and not db.scalars(select(Order.id).where(Order.counteragent_id == archive.id).limit(1)).first():
+            db.delete(archive)  # временный клиент заказов из отчёта больше не нужен
+            importer.stats["клиент «Архив LiveSklad» удалён"] += 1
+        db.flush()
+        if commit:
+            db.commit()
+        else:
+            db.rollback()
+        return {
+            "stats": dict(importer.stats), "warnings": importer.warnings, "errors": errors[:50], "errors_total": len(errors),
+            "seconds": round(time.time() - started), "committed": commit,
+        }
+    finally:
+        db.close()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Перенос заказов из выгрузки LiveSklad")
     parser.add_argument("path", help="Файл «Заказы.xlsx» из LiveSklad")
     parser.add_argument("--commit", action="store_true", help="Записать в базу (без флага — пробный прогон)")
+    parser.add_argument("--protect", action="append", default=[], help="Точка, у которой уже перенесённые заказы не обновлять (можно несколько)")
     args = parser.parse_args(argv)
-
-    started = time.time()
-    db = SessionLocal()
-    importer = Importer(db)
-    errors = []
-    for index, row in enumerate(read_rows(args.path), start=2):
-        try:
-            with db.begin_nested():
-                importer.import_row(row)
-        except Exception as error:  # одна битая строка не должна ронять весь перенос
-            errors.append(f"строка {index} ({row.get('Номер заказа')}): {str(error).splitlines()[0]}")
-            importer.orders.pop(str(row.get("Номер заказа") or ""), None)
-        if index % 1000 == 0:
-            print(f"  … {index - 1} строк", flush=True)
-    importer.finish()
-
+    result = run_import(args.path, args.commit, set(args.protect), progress=lambda n: print(f"  … {n} строк", flush=True))
     print("\nИтог:")
-    for key, value in importer.stats.items():
+    for key, value in result["stats"].items():
         print(f"  {key}: {value}")
-    for warning in importer.warnings:
+    for warning in result["warnings"]:
         print(f"  ! {warning}")
-    if errors:
-        print(f"\nОшибок: {len(errors)} (первые 20):")
-        for error in errors[:20]:
+    if result["errors_total"]:
+        print(f"\nОшибок: {result['errors_total']} (первые 20):")
+        for error in result["errors"][:20]:
             print("  ", error)
-    if args.commit:
-        db.commit()
-        print(f"\nЗаписано в базу за {time.time() - started:.0f} с.")
-    else:
-        db.rollback()
-        print(f"\nПробный прогон за {time.time() - started:.0f} с — ничего не сохранено. Для записи добавьте --commit.")
-    db.close()
-    return 1 if errors else 0
+    print(f"\n{'Записано в базу' if result['committed'] else 'Пробный прогон, ничего не сохранено'} за {result['seconds']} с.")
+    return 1 if result["errors_total"] else 0
 
 
 if __name__ == "__main__":

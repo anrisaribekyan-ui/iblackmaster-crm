@@ -14,6 +14,7 @@ const QuickOrdersPage = lazy(() => import('./pages/settings/QuickOrdersPage'))
 const ChecklistSettingsPage = lazy(() => import('./pages/settings/ChecklistSettingsPage'))
 const StaffPage = lazy(() => import('./pages/settings/StaffPage'))
 const OrderTypesPage = lazy(() => import('./pages/settings/OrderTypesPage'))
+const LiveskladImportPage = lazy(() => import('./pages/settings/LiveskladImportPage'))
 const CompendiumsLayout = lazy(() => import('./pages/compendiums/CompendiumsLayout'))
 const DevicesPage = lazy(() => import('./pages/compendiums/DevicesPage'))
 const NomenclaturePage = lazy(() => import('./pages/compendiums/NomenclaturePage'))
@@ -135,6 +136,7 @@ export default function App() {
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="quick-orders" element={<QuickOrdersPage />} />
               <Route path="checklist" element={<ChecklistSettingsPage />} />
+              <Route path="livesklad-import" element={<LiveskladImportPage />} />
             </Route>
             <Route path="*" element={<Stub title="Страница не найдена" task="—" />} />
           </Route>
