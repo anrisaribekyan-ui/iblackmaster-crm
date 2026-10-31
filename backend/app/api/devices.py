@@ -224,3 +224,44 @@ def suggest_devices(db: DbSession, _: CurrentEmployee, q: str = ""):
         if len(suggestions) == 20:
             break
     return suggestions
+
+class ArchiveBrandIn(BaseModel):
+    type: str | None = Field(default=None, max_length=100)
+    brand: str = Field(min_length=1, max_length=100)
+    models: list[str] = Field(default_factory=list)
+
+
+@router.post("/devices/import-archive", dependencies=[Depends(require("settingAccess"))])
+def import_archive_devices(items: list[ArchiveBrandIn], db: DbSession):
+    """Идемпотентно добавляет марки и модели из справочника LiveSklad (совпадение без учёта регистра)."""
+    types = {t.name.strip().lower(): t.id for t in db.scalars(select(DeviceType))}
+    brands = {b.name.strip().lower(): b for b in db.scalars(select(Brand))}
+    have = {(m.brand_id, m.name.strip().lower()) for m in db.scalars(select(DeviceModel))}
+    new_brands = new_models = 0
+    for item in items:
+        name = item.brand.strip()
+        brand = brands.get(name.lower())
+        if brand is None:
+            type_id = None
+            if item.type and item.type.strip():
+                key = item.type.strip().lower()
+                if key not in types:
+                    created = DeviceType(name=item.type.strip())
+                    db.add(created)
+                    db.flush()
+                    types[key] = created.id
+                type_id = types[key]
+            brand = Brand(name=name, device_type_id=type_id)
+            db.add(brand)
+            db.flush()
+            brands[name.lower()] = brand
+            new_brands += 1
+        for model in item.models:
+            model = model.strip()[:200]
+            if len(model) < 2 or not any(ch.isalnum() for ch in model) or (brand.id, model.lower()) in have:
+                continue
+            db.add(DeviceModel(brand_id=brand.id, name=model))
+            have.add((brand.id, model.lower()))
+            new_models += 1
+    db.commit()
+    return {"brands_created": new_brands, "models_created": new_models}

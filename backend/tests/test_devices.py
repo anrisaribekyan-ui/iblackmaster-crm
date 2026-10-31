@@ -78,3 +78,11 @@ def test_device_types_list_and_update(client, auth_headers):
     )
     assert renamed.status_code == 200
     assert renamed.json()["name"] == "Lenovo Tab"
+
+
+def test_import_archive_devices_is_idempotent(client, auth_headers):
+    items = [{"type": "Смартфон", "brand": "Tecno", "models": ["Spark 8", "spark 8", "=", "Pova"]}, {"brand": "tecno", "models": ["Camon"]}]
+    first = client.post("/api/devices/import-archive", json=items, headers=auth_headers)
+    assert first.status_code == 200, first.text
+    assert first.json() == {"brands_created": 1, "models_created": 3}
+    assert client.post("/api/devices/import-archive", json=items, headers=auth_headers).json() == {"brands_created": 0, "models_created": 0}
