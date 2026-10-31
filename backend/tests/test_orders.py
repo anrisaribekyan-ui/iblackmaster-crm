@@ -414,6 +414,23 @@ def test_order_product_stock_writeoff_and_restore(client, auth_headers, db, owne
     )
     assert manual.status_code == 200 and manual.json()["guarantee_days"] == 0
 
+    # Правка позиции пишется в историю: что было → что стало; без изменений записи нет
+    edit = client.put(
+        f"/api/orders/{order.id}/positions/{position_id}",
+        json={"purchase_price": "55", "guarantee_days": 60},
+        headers=auth_headers,
+    )
+    assert edit.status_code == 200
+    detail = client.get(f"/api/orders/{order.id}", headers=auth_headers).json()
+    latest = [h for h in detail["history"] if h["type"] in ("change_work", "change_product")][0]
+    fields = {c["field"]: (c["from"], c["to"]) for c in latest["data"]["changes"]}
+    assert fields["guarantee_days"] == ("30", "60") and fields["purchase_price"][1] == "55"
+    assert "→" in latest["text"]
+    count = len([h for h in detail["history"] if h["type"] in ("change_work", "change_product")])
+    client.put(f"/api/orders/{order.id}/positions/{position_id}", json={"guarantee_days": 60}, headers=auth_headers)
+    again = client.get(f"/api/orders/{order.id}", headers=auth_headers).json()
+    assert len([h for h in again["history"] if h["type"] in ("change_work", "change_product")]) == count
+
     response = client.delete(f"/api/orders/{order.id}/positions/{position_id}", headers=auth_headers)
     assert response.status_code == 204
     assert db.scalars(select(StockBalance).where(StockBalance.store_id == store.id)).one().quantity == Decimal("5.000")

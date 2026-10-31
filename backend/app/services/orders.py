@@ -178,31 +178,68 @@ def remove_position(db: Session, order: Order, position: OrderPosition, employee
     salary.recalc_order(db, order)
 
 
+POSITION_FIELD_LABELS = {
+    "price": "цена",
+    "sold_price": "цена со скидкой",
+    "purchase_price": "себестоимость",
+    "guarantee_days": "гарантия, дн.",
+}
+
+
+def describe_position_changes(name: str, changes: list[dict], *, hide_cost: bool = False) -> str:
+    """«Замена дисплея: цена 3000 → 3500; себестоимость изменена». Себестоимость скрываем от тех, кто её не видит."""
+    parts = []
+    for change in changes:
+        label = POSITION_FIELD_LABELS.get(change["field"], change["field"])
+        if change["field"] == "purchase_price" and hide_cost:
+            parts.append(f"{label} изменена")
+        else:
+            parts.append(f"{label} {change['from']} → {change['to']}")
+    return f"{name}: " + "; ".join(parts)
+
+
 def update_position_price(
     db: Session, order: Order, position: OrderPosition, employee: Employee, *, price=None, sold_price=None, purchase_price=None,
     guarantee_days: int | None = None,
 ) -> None:
-    """Меняет цену / цену со скидкой / себестоимость. Права (minPriceAccess, orderPurchasePriceAccess) проверяет роутер."""
+    """Меняет цену / цену со скидкой / себестоимость / гарантию. Права (minPriceAccess, orderPurchasePriceAccess) проверяет роутер.
+    В истории заказа пишется, что и с какого значения на какое изменилось, и кем."""
     ensure_editable(order)
+    changes: list[dict] = []
+
+    def record(field: str, before, after) -> None:
+        if str(before) != str(after):
+            changes.append({"field": field, "from": str(before), "to": str(after)})
+
     if purchase_price is not None:
         value = money.to_money(purchase_price)
         if value < 0:
             raise BusinessError("Себестоимость не может быть отрицательной")
+        record("purchase_price", position.purchase_price, value)
         position.purchase_price = value
     if guarantee_days is not None:
         if guarantee_days < 0:
             raise BusinessError("Гарантия не может быть отрицательной")
+        record("guarantee_days", position.guarantee_days, guarantee_days)
         position.guarantee_days = guarantee_days
     if price is not None:
+        before_sold = position.sold_price
+        record("price", position.price, money.to_money(price))
         position.price = money.to_money(price)
         position.sold_price = position.price
+        if position.sold_price != before_sold and sold_price is None:
+            record("sold_price", before_sold, position.sold_price)
     if sold_price is not None:
-        position.sold_price = money.to_money(sold_price)
+        value = money.to_money(sold_price)
+        record("sold_price", position.sold_price, value)
+        position.sold_price = value
     recalc_totals(order)
-    add_history(
-        db, order, "change_work" if position.is_work else "change_product", employee,
-        text=f"{position.name}: цена {position.sold_price}, себестоимость {position.purchase_price}, гарантия {position.guarantee_days} дн.",
-    )
+    if changes:
+        add_history(
+            db, order, "change_work" if position.is_work else "change_product", employee,
+            text=describe_position_changes(position.name, changes),
+            position_id=position.id, position=position.name, changes=changes,
+        )
     salary.recalc_order(db, order)
 
 

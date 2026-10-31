@@ -347,21 +347,28 @@ def status_sms(db: DbSession, order_ids: list[int]) -> dict[int, str]:
     return result
 
 
-def serialize_history(db: DbSession, history: list[OrderHistory]) -> list[dict]:
+def serialize_history(db: DbSession, history: list[OrderHistory], me: Employee | None = None) -> list[dict]:
     """История для карточки и для /history: заголовок события, статус с цветом, имя сотрудника."""
     employee_ids = {item.employee_id for item in history if item.employee_id is not None}
     employees = db.scalars(select(Employee).where(Employee.id.in_(employee_ids))).all() if employee_ids else []
     employee_names = {employee.id: employee.short_name for employee in employees}
+    hide_cost = me is not None and not has_permission(me, "purchasePriceAccess")
     result = []
     for item in history:
+        text = item.text
+        data = item.data
+        if item.type in ("change_work", "change_product") and isinstance(data, dict) and data.get("changes"):
+            if hide_cost:
+                text = order_service.describe_position_changes(data.get("position") or "", data["changes"], hide_cost=True)
+                data = {**data, "changes": [c for c in data["changes"] if c.get("field") != "purchase_price"]}
         status = db.get(OrderStatus, item.status_id) if item.status_id is not None else None
         result.append(
             {
                 "id": item.id,
                 "type": item.type,
                 "title": HISTORY_TYPES.get(item.type, item.type),
-                "text": item.text,
-                "data": item.data,
+                "text": text,
+                "data": data,
                 "created_at": item.created_at,
                 "employee_name": employee_names.get(item.employee_id),
                 "status": {"id": status.id, "name": status.name, "color": status.color} if status else None,
@@ -575,7 +582,7 @@ def get_order(order_id: int, db: DbSession, me: CurrentEmployee):
     history = db.scalars(
         select(OrderHistory).where(OrderHistory.order_id == order.id).order_by(OrderHistory.created_at.desc(), OrderHistory.id.desc())
     ).all()
-    history_values = serialize_history(db, history)
+    history_values = serialize_history(db, history, me)
     transactions = db.scalars(
         select(Transaction)
         .where(Transaction.order_id == order.id, Transaction.is_deleted.is_(False))
@@ -879,7 +886,7 @@ def get_order_history(order_id: int, db: DbSession, me: CurrentEmployee):
         .where(OrderHistory.order_id == order.id)
         .order_by(OrderHistory.created_at.desc(), OrderHistory.id.desc())
     ).all()
-    return serialize_history(db, history)
+    return serialize_history(db, history, me)
 
 
 def get_order_cash_register(db: DbSession, me: CurrentEmployee, register_id: int) -> CashRegister:
