@@ -511,6 +511,8 @@ def install_standard_set(data: StandardSetIn, db: DbSession, me: CurrentEmployee
     _expire_stale(db)
     if not _is_online(station):
         raise BusinessError("Станция не на связи: проверьте, что компьютер включён и помощник запущен")
+    if data.target_udid.startswith("android:"):
+        raise BusinessError("Для Android-телефонов доступно только копирование данных")
     device = {d["udid"]: d for d in (station.devices or [])}.get(data.target_udid)
     if device is None:
         raise BusinessError("Этот телефон сейчас не подключён к станции")
@@ -607,6 +609,9 @@ def create_job(data: JobIn, db: DbSession, me: CurrentEmployee):
 
     devices = {d["udid"]: d for d in (station.devices or [])}
     job = AppInstallJob(station_id=station.id, kind=data.kind, created_by_id=me.id, payload={})
+
+    if (data.target_udid or "").startswith("android:") and data.kind != JobKind.BACKUP:
+        raise BusinessError("Для Android-телефонов доступно только копирование данных")
 
     if data.kind in (JobKind.SCAN, JobKind.INSTALL, JobKind.BACKUP, JobKind.REPORT):
         device = devices.get(data.target_udid or "")

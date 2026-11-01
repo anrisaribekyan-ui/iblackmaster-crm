@@ -157,8 +157,16 @@ async def _list_devices() -> list[dict]:
 
 
 def list_devices() -> list[dict]:
-    """[{udid, name, product_type, ios_version, paired, problem}]"""
-    return asyncio.run(_list_devices())
+    """[{udid, name, product_type, ios_version, paired, problem}] — айфоны и (если есть adb) Android-телефоны."""
+    from . import android
+
+    try:
+        phones = asyncio.run(_list_devices())
+    except DeviceError:
+        phones = []
+        if not android.adb_path():
+            raise
+    return phones + android.list_android()
 
 
 # ---------------- скан приложений ----------------

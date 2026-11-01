@@ -642,3 +642,16 @@ def test_standard_set_installs_marked_apps(client, auth_headers, db):
     assert run.json() == {"created": 1, "total": 1}
     again = client.post("/api/app-install/jobs/standard-set", json={"station_id": station_id, "target_udid": DONOR["udid"]}, headers=auth_headers)
     assert again.json()["created"] == 0
+
+
+def test_android_device_only_backup(client, auth_headers, db):
+    station_id, agent = make_station(client, auth_headers)
+    android = {"udid": "android:ABC123", "name": "SM-G991B", "product_type": "Android o1s", "ios_version": "Android 14", "paired": True, "problem": None}
+    beat(client, agent, devices=(android,))
+    url = "/api/app-install/jobs"
+    for kind in ("scan", "report"):
+        bad = client.post(url, json={"station_id": station_id, "kind": kind, "target_udid": android["udid"]}, headers=auth_headers)
+        assert bad.status_code == 400
+    ok = client.post(url, json={"station_id": station_id, "kind": "backup", "backup_mode": "media", "target_udid": android["udid"]}, headers=auth_headers)
+    assert ok.status_code == 200, ok.text
+    assert client.post("/api/app-install/jobs/standard-set", json={"station_id": station_id, "target_udid": android["udid"]}, headers=auth_headers).status_code == 400

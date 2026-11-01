@@ -89,8 +89,8 @@ const STATE_CLASS: Record<Job['state'], string> = {
 const button = 'rounded-md border border-line px-3 py-1.5 text-sm hover:border-accent hover:text-accent disabled:opacity-50 disabled:hover:border-line disabled:hover:text-inherit'
 const primary = 'rounded-md bg-accent px-3 py-1.5 text-sm text-accent-ink disabled:opacity-50'
 
-function deviceTitle(d: { name: string | null }) {
-  return d.name || 'iPhone'
+function deviceTitle(d: { name: string | null; udid: string }) {
+  return d.name || (d.udid.startsWith('android:') ? 'Android' : 'iPhone')
 }
 
 function jobTitle(job: Job) {
@@ -188,7 +188,7 @@ function BackupModal({ device, onClose, onStart }: {
       <div className="grid gap-4">
         <div className="grid gap-2">
           {option('media', 'Только фото и видео', 'Папка DCIM целиком, как есть. Быстро, подходит для клиента, который просит «сохрани снимки».')}
-          {option('full', 'Вся копия телефона', 'Как резервная копия в Finder/iTunes: контакты, сообщения, настройки, данные приложений. Долго и занимает столько, сколько занято на телефоне.')}
+          {option('full', device.udid.startsWith('android:') ? 'Вся память телефона' : 'Вся копия телефона', device.udid.startsWith('android:') ? 'Фото, видео, документы и загрузки из памяти телефона. Приложения и системные данные не копируются. Нужна отладка по USB.' : 'Как резервная копия в Finder/iTunes: контакты, сообщения, настройки, данные приложений. Долго и занимает столько, сколько занято на телефоне.')}
         </div>
         <label className="grid gap-1 text-sm">
           Куда сохранить на компьютере станции
@@ -807,11 +807,18 @@ export default function AppInstallPage() {
                     <li key={d.udid} className={`grid gap-2 rounded-lg border p-3 ${d.udid === targetUdid ? 'border-accent' : 'border-line'}`}>
                       <div className="flex items-baseline gap-2">
                         <span className="font-medium">{deviceTitle(d)}</span>
-                        <span className="text-xs text-muted">{[d.product_type, d.ios_version && `iOS ${d.ios_version}`].filter(Boolean).join(' · ')}</span>
+                        <span className="text-xs text-muted">{[d.product_type, d.ios_version && (d.ios_version.startsWith('Android') ? d.ios_version : `iOS ${d.ios_version}`)].filter(Boolean).join(' · ')}</span>
                       </div>
                       {d.problem
                         ? <p className="text-sm text-warning">{d.problem}</p>
-                        : (
+                        : d.udid.startsWith('android:') ? (
+                          <div className="flex flex-wrap gap-2">
+                            <button className={button} onClick={() => setBackupDevice(d)}
+                              title="Копия фото и видео или всей памяти телефона на компьютер станции">
+                              Скопировать данные
+                            </button>
+                          </div>
+                        ) : (
                           <div className="flex flex-wrap gap-2">
                             <button className={button} onClick={() => void startJob({ kind: 'scan', target_udid: d.udid },
                               `Читаю приложения с «${deviceTitle(d)}»`)}>

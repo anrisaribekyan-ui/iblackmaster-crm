@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from . import config, device
+from . import android, config, device
 from .ipatool import AppUnavailable, AuthRequired, Ipatool, IpatoolError
 from .tunnel import APPLE_PROXY
 
@@ -275,7 +275,7 @@ class Agent:
                         message="Нужен вход в Apple ID: нажмите «Войти» у станции и повторите")
         except AppUnavailable as exc:
             self.report(job_id, state="failed", error_code=exc.code, message=str(exc))
-        except (IpatoolError, device.DeviceError) as exc:
+        except (IpatoolError, device.DeviceError, android.AndroidError) as exc:
             self.report(job_id, state="failed", error_code=exc.code, message=str(exc))
         except Exception as exc:  # noqa: BLE001
             log.exception("Задача %s упала", job_id)
@@ -546,7 +546,16 @@ class Agent:
 
         threading.Thread(target=keepalive, daemon=True).start()
         try:
-            if mode == "media":
+            if udid.startswith("android:"):
+                serial = udid.split(":", 1)[1]
+                if mode == "media":
+                    stats = android.backup_media(serial, folder, progress=on_progress)
+                    note = f"Фото и видео скопированы: {stats['files']} файлов, {stats['bytes'] / 1_073_741_824:.1f} ГБ. Папка: {folder}."
+                else:
+                    target = android.backup_full(serial, folder, progress=on_progress)
+                    size = sum(f.stat().st_size for f in target.rglob("*") if f.is_file()) / 1_073_741_824
+                    note = f"Память телефона скопирована: {size:.1f} ГБ. Папка: {target}. Приложения и системные данные не копируются."
+            elif mode == "media":
                 stats = device.backup_media(udid, folder, progress=on_progress)
                 gb = stats["bytes"] / 1_073_741_824
                 note = (f"Фото и видео скопированы: {stats['files']} файлов, {gb:.1f} ГБ. Папка: {folder}. "

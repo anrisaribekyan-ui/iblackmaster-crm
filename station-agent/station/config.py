@@ -24,7 +24,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 APP_NAME = "iBlackMaster Station"
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 
 
 def app_dir() -> Path:

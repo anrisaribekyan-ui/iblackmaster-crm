@@ -29,3 +29,8 @@ pip install -r requirements.txt
 python -m station connect <код>   # один раз
 python -m station run
 ```
+
+
+## Android
+
+Для Android-телефонов нужен `adb` (Android platform-tools): положите папку `platform-tools` в каталог помощника или добавьте её в PATH. На телефоне включите «Отладку по USB» и разрешите компьютеру. В CRM у такого телефона доступна кнопка «Скопировать данные» (фото и видео или вся память).
