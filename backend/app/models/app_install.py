@@ -72,8 +72,9 @@ class JobKind:
     LOGIN = "login"  # вход в Apple ID на станции
     INSTALL = "install"  # скачать IPA и поставить на телефон
     ARCHIVE = "archive"  # заранее скачать у Apple и положить в архив CRM (телефон не нужен)
+    BACKUP = "backup"  # копия данных телефона на компьютер станции: полная или только фото и видео
 
-    ALL = (SCAN, PURCHASES, LOGIN, INSTALL, ARCHIVE)
+    ALL = (SCAN, PURCHASES, LOGIN, INSTALL, ARCHIVE, BACKUP)
 
 
 class JobState:

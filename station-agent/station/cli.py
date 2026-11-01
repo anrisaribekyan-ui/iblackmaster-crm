@@ -154,6 +154,16 @@ def transfer(adam_id: int, target_udid: str,
     install(target_udid, Ipatool(config.load()).cached_path(adam_id, version_id))
 
 
+@app.command()
+def backup(udid: str, folder: str, media: bool = typer.Option(False, "--media", help="Только фото и видео")) -> None:
+    """Копия телефона: backup <UDID> <папка> [--media]. Без --media — полная копия."""
+    if media:
+        stats = device.backup_media(udid, folder, progress=lambda p: console.print(f"{p}%"))
+        console.print(f"Готово: {stats['files']} файлов, {stats['bytes'] / 1_073_741_824:.1f} ГБ")
+    else:
+        console.print(f"Готово: {device.backup_full(udid, folder, progress=lambda p: console.print(f'{p}%'))}")
+
+
 def entry() -> None:
     # Сборка без окна (Windows): stdout нет — пишем вывод в файл, иначе rich упадёт
     if sys.stdout is None or sys.stderr is None:

@@ -82,6 +82,12 @@ export default function DataTransferPage() {
               className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm sm:ml-auto" />
             <button type="button" className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink" onClick={print}>Распечатать</button>
           </div>
+          {source === 'iphone' && (dest === 'flash' || dest === 'pc') && (
+            <p className="rounded-lg bg-accent/10 p-3 text-sm">
+              Айфон можно скопировать автоматически: подключите его кабелем к компьютеру станции, откройте раздел «Приложения» и нажмите «Скопировать данные» у нужного телефона.
+              Выберите «Только фото и видео» или «Вся копия» и папку или флешку на этом компьютере. Для этого на станции должна стоять версия помощника 1.1 и выше.
+            </p>
+          )}
           {guide.warnings.map((w) => <p key={w} className="rounded-lg bg-warning/10 p-3 text-sm">{w}</p>)}
           <Block title="Перед началом" steps={guide.before} />
           {guide.sections.map((s) => <Block key={s.title} title={s.title} steps={s.steps} />)}

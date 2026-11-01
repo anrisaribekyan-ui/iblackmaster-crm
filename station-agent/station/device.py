@@ -23,7 +23,9 @@ from pymobiledevice3.exceptions import (
     UserDeniedPairingError,
 )
 from pymobiledevice3.lockdown import create_using_usbmux
+from pymobiledevice3.services.afc import AfcService
 from pymobiledevice3.services.installation_proxy import InstallationProxyService
+from pymobiledevice3.services.mobilebackup2 import Mobilebackup2Service
 from pymobiledevice3.usbmux import list_devices as usbmux_list_devices
 
 log = logging.getLogger(__name__)
@@ -225,7 +227,95 @@ def install_ipa(udid: str, ipa_path: str | Path, progress: Optional[ProgressCb] 
     asyncio.run(_install(udid, ipa, progress))
 
 
+# ---------------- копия данных ----------------
+
+class BackupFailed(DeviceError):
+    code = "BACKUP_FAILED"
+
+
+def _backup_error(exc: BaseException, udid: str) -> DeviceError:
+    if isinstance(exc, OSError) and getattr(exc, "errno", None) == 28:
+        return BackupFailed("На диске не хватает места. Освободите место или выберите другую папку или флешку.")
+    err = _translate(exc, udid)
+    if type(err) is DeviceError:
+        text = str(err)
+        if "password" in text.lower() or "encrypt" in text.lower():
+            return BackupFailed("Телефон просит пароль резервной копии. Отключите шифрование копий в Finder/iTunes или сообщите пароль мастеру.")
+        return BackupFailed(f"Копирование не удалось: {text}")
+    return err
+
+
+async def _backup_full(udid: str, folder: Path, progress: Optional[ProgressCb]) -> None:
+    lockdown = await _lockdown(udid)
+
+    def handler(percent: Any, *_: Any) -> None:
+        if progress is not None:
+            try:
+                progress(int(percent))
+            except Exception:  # noqa: BLE001
+                log.debug("progress callback failed", exc_info=True)
+
+    try:
+        async with Mobilebackup2Service(lockdown) as svc:
+            await svc.backup(full=True, backup_directory=folder, progress_callback=handler)
+    except Exception as exc:  # noqa: BLE001
+        raise _backup_error(exc, udid) from exc
+    finally:
+        await lockdown.close()
+
+
+def backup_full(udid: str, folder: str | Path, progress: Optional[ProgressCb] = None) -> Path:
+    """Полная резервная копия (как в Finder/iTunes). Возвращает папку копии: <folder>/<UDID>."""
+    target = Path(folder)
+    target.mkdir(parents=True, exist_ok=True)
+    asyncio.run(_backup_full(udid, target, progress))
+    return target / udid
+
+
+async def _backup_media(udid: str, folder: Path, progress: Optional[ProgressCb]) -> dict:
+    lockdown = await _lockdown(udid)
+    stats = {"files": 0, "bytes": 0}
+    try:
+        async with AfcService(lockdown) as afc:
+            if not await afc.exists("DCIM"):
+                raise BackupFailed("На телефоне нет папки с фото и видео (DCIM). Возможно, снимки хранятся только в iCloud.")
+            total = 0
+            async for _, _, files in afc.walk("DCIM"):
+                total += len(files)
+            if total == 0:
+                raise BackupFailed("В папке DCIM нет файлов. Если «Фото iCloud» с оптимизацией хранилища, оригиналы лежат в облаке.")
+
+            async def on_file(_src: str, dst: str) -> None:
+                stats["files"] += 1
+                try:
+                    stats["bytes"] += Path(dst).stat().st_size
+                except OSError:
+                    pass
+                if progress is not None:
+                    try:
+                        progress(min(99, int(stats["files"] * 100 / total)))
+                    except Exception:  # noqa: BLE001
+                        log.debug("progress callback failed", exc_info=True)
+
+            await afc.pull("DCIM", str(folder), callback=on_file, ignore_errors=True, progress_bar=False)
+    except DeviceError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise _backup_error(exc, udid) from exc
+    finally:
+        await lockdown.close()
+    stats["total"] = total
+    return stats
+
+
+def backup_media(udid: str, folder: str | Path, progress: Optional[ProgressCb] = None) -> dict:
+    """Только фото и видео: папка DCIM телефона целиком в <folder>/DCIM. Возвращает {files, bytes, total}."""
+    target = Path(folder)
+    target.mkdir(parents=True, exist_ok=True)
+    return asyncio.run(_backup_media(udid, target, progress))
+
+
 __all__ = [
-    "DeviceError", "NotPaired", "DeviceGone", "InstallFailed",
-    "list_devices", "scan_apps", "install_ipa", "PyMobileDevice3Exception",
+    "DeviceError", "NotPaired", "DeviceGone", "InstallFailed", "BackupFailed",
+    "list_devices", "scan_apps", "install_ipa", "backup_full", "backup_media", "PyMobileDevice3Exception",
 ]

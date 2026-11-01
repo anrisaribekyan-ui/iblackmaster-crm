@@ -582,3 +582,30 @@ def test_station_location_binding(client, auth_headers, db):
     make_employee(db, name="Мастер", email="m2@x.test", permissions=["appInstallAccess"])
     master = login(client, "m2@x.test")
     assert client.patch(f"/api/app-install/stations/{station_id}", json={"location_id": location.id}, headers=master).status_code == 403
+
+
+def test_backup_job_full_and_media(client, auth_headers, db):
+    station_id, agent = make_station(client, auth_headers)
+    beat(client, agent, devices=(DONOR, LOCKED))
+    url = "/api/app-install/jobs"
+
+    no_mode = client.post(url, json={"station_id": station_id, "kind": "backup", "target_udid": DONOR["udid"]}, headers=auth_headers)
+    assert no_mode.status_code == 400
+    locked = client.post(url, json={"station_id": station_id, "kind": "backup", "backup_mode": "full", "target_udid": LOCKED["udid"]},
+                         headers=auth_headers)
+    assert locked.status_code == 400
+
+    r = client.post(url, json={"station_id": station_id, "kind": "backup", "backup_mode": "media", "backup_folder": ' "E:\\Клиенты\\Иванов" ',
+                               "target_udid": DONOR["udid"]}, headers=auth_headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["backup_mode"] == "media" and r.json()["backup_folder"] == "E:\\Клиенты\\Иванов"
+    dup = client.post(url, json={"station_id": station_id, "kind": "backup", "backup_mode": "full", "target_udid": DONOR["udid"]},
+                      headers=auth_headers)
+    assert dup.status_code == 400  # у телефона уже идёт копирование
+
+    job = next_job(client, agent)
+    assert job["kind"] == "backup" and job["mode"] == "media" and job["folder"] == "E:\\Клиенты\\Иванов"
+    report(client, agent, job["id"], progress=30, message="Копирую фото…")
+    report(client, agent, job["id"], state="done", message="Готово: 1200 файлов")
+    done = client.get(url, headers=auth_headers).json()[0]
+    assert done["state"] == "done" and done["progress"] == 100

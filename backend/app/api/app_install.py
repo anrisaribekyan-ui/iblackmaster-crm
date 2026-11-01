@@ -37,7 +37,7 @@ router = APIRouter(prefix="/app-install", tags=["Установка прилож
 
 ONLINE_SECONDS = 45  # помощник шлёт пульс раз в ~10 с
 # Задача без вестей от станции дольше этого — станция её потеряла (перезапуск, сменили код, выключили)
-STALE_MINUTES = {JobKind.INSTALL: 30, JobKind.ARCHIVE: 30}  # скачивание большого приложения идёт молча
+STALE_MINUTES = {JobKind.INSTALL: 30, JobKind.ARCHIVE: 30, JobKind.BACKUP: 90}  # скачивание большого приложения идёт молча
 STALE_DEFAULT_MINUTES = 10
 CODE_WAIT_MINUTES = 15  # помощник помнит пароль Apple ID до ввода кода не дольше этого
 CODE_RE = re.compile(r"^\d{6}$")
@@ -134,6 +134,8 @@ class JobOut(BaseModel):
     error_code: str | None
     email: str | None
     code_sent: bool  # код 2FA введён и ждёт, пока станция его заберёт
+    backup_mode: str | None = None
+    backup_folder: str | None = None
     created_at: datetime
     finished_at: datetime | None
     created_by_name: str | None
@@ -141,9 +143,11 @@ class JobOut(BaseModel):
 
 class JobIn(BaseModel):
     station_id: int
-    kind: Literal["scan", "purchases", "login", "install", "archive"]
+    kind: Literal["scan", "purchases", "login", "install", "archive", "backup"]
     app_id: int | None = None
     target_udid: str | None = Field(default=None, max_length=64)
+    backup_mode: Literal["full", "media"] | None = None  # full — вся копия iPhone, media — только фото и видео
+    backup_folder: str | None = Field(default=None, max_length=300)  # папка или флешка на компьютере станции
     order_id: int | None = None
     email: str | None = Field(default=None, max_length=200)
     password: str | None = Field(default=None, max_length=200)
@@ -191,6 +195,8 @@ def _job_out(db, job: AppInstallJob) -> JobOut:
         error_code=job.error_code,
         email=(job.payload or {}).get("email"),
         code_sent=job.state == JobState.NEED_CODE and job.secret is not None,
+        backup_mode=(job.payload or {}).get("mode"),
+        backup_folder=(job.payload or {}).get("folder"),
         created_at=job.created_at,
         finished_at=job.finished_at,
         created_by_name=author.name if author else None,
@@ -549,7 +555,7 @@ def create_job(data: JobIn, db: DbSession, me: CurrentEmployee):
     devices = {d["udid"]: d for d in (station.devices or [])}
     job = AppInstallJob(station_id=station.id, kind=data.kind, created_by_id=me.id, payload={})
 
-    if data.kind in (JobKind.SCAN, JobKind.INSTALL):
+    if data.kind in (JobKind.SCAN, JobKind.INSTALL, JobKind.BACKUP):
         device = devices.get(data.target_udid or "")
         if device is None:
             raise BusinessError("Этот телефон сейчас не подключён к станции")
@@ -571,6 +577,12 @@ def create_job(data: JobIn, db: DbSession, me: CurrentEmployee):
         job.order_id = data.order_id if data.kind == JobKind.INSTALL else None
         if data.kind == JobKind.ARCHIVE and _ipa_exists(app_item):
             raise BusinessError(f"«{app_item.name}» уже в архиве CRM")
+
+    if data.kind == JobKind.BACKUP:
+        if data.backup_mode not in ("full", "media"):
+            raise BusinessError("Выберите, что копировать: всю копию или только фото и видео")
+        folder = (data.backup_folder or "").strip().strip('"')
+        job.payload = {"mode": data.backup_mode, "folder": folder or None}
 
     if data.kind == JobKind.LOGIN:
         email = (data.email or "").strip()
@@ -683,6 +695,8 @@ class AgentJob(BaseModel):
     app_id: int | None = None
     ipa_in_crm: bool = False  # файл есть в архиве CRM — качать у Apple не нужно
     ipa_size: int | None = None
+    mode: str | None = None  # backup: full | media
+    folder: str | None = None  # backup: куда класть копию
 
 
 class AppReport(BaseModel):
@@ -774,6 +788,8 @@ def agent_next(db: DbSession, station: AgentStation):
         app_id=app_item.id if app_item else None,
         ipa_in_crm=bool(app_item and _ipa_exists(app_item)),
         ipa_size=app_item.ipa_size if app_item else None,
+        mode=(job.payload or {}).get("mode"),
+        folder=(job.payload or {}).get("folder"),
     )
 
 

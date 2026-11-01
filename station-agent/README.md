@@ -2,7 +2,7 @@
 
 Программа на компьютере в точке, к которому по USB подключают айфоны. Держит связь с CRM
 (раздел «Приложения»), читает приложения с донора, загружает покупки Apple ID, входит в Apple ID
-и ставит приложения на телефоны. Всем управляют кнопками в CRM.
+ставит приложения на телефоны и копирует данные айфонов (вся копия или только фото и видео) в папку или на флешку компьютера. Всем управляют кнопками в CRM.
 
 ## Установка
 
@@ -17,7 +17,7 @@
 - `station/agent.py` — пульс (подключённые телефоны) и выполнение задач из CRM.
 - `station/device.py` — айфоны через pymobiledevice3 (список, скан, установка).
 - `station/ipatool.py` — Apple ID через [ipatool](https://github.com/majd/ipatool): вход, покупки, скачивание IPA с кэшем.
-- `station/cli.py` — команды: `connect`, `run`, `status`, `autostart`, а для ручной проверки `devices`, `scan`, `purchases`, `download`, `install`, `transfer`.
+- `station/cli.py` — команды: `connect`, `run`, `status`, `autostart`, а для ручной проверки `devices`, `scan`, `purchases`, `download`, `install`, `transfer`, `backup <UDID> <папка> [--media]`.
 - API в CRM: `backend/app/api/app_install.py` (заголовок `X-Station-Token`).
 
 Настройки и журнал: `%APPDATA%\iBlackMaster Station` (Windows), `~/Library/Application Support/iBlackMaster Station` (Mac).

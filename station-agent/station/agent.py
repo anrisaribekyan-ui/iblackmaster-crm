@@ -262,6 +262,8 @@ class Agent:
                 self._install(job)
             elif kind == "archive":
                 self._archive_job(job)
+            elif kind == "backup":
+                self._backup(job)
             else:
                 self.report(job_id, state="failed", message=f"Неизвестная задача: {kind}")
         except AuthRequired as exc:
@@ -499,6 +501,52 @@ class Agent:
         device.install_ipa(job["target_udid"], path, progress=on_progress)
         self.report(job_id, state="done",
                     message=f"«{name}» установлено (файл из {source}). На телефоне в App Store должен быть вход в тот же Apple ID.")
+
+    def _backup(self, job: dict) -> None:
+        """Копия телефона на компьютер станции: вся (как в Finder) или только фото и видео."""
+        job_id, udid = job["id"], job["target_udid"]
+        mode = job.get("mode") or "full"
+        base = Path(job["folder"]) if job.get("folder") else config.data_dir() / "backups"
+        stamp = time.strftime("%Y-%m-%d_%H-%M")
+        folder = base / (f"фото_видео_{stamp}" if mode == "media" else f"копия_{stamp}")
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise device.BackupFailed(f"Не удалось создать папку {folder}: {exc}") from exc
+        free_gb = shutil.disk_usage(folder).free / 1_073_741_824
+        what = "фото и видео" if mode == "media" else "полную копию"
+        if self.report(job_id, progress=1, message=f"Копирую {what} в {folder}. Свободно {free_gb:.0f} ГБ. Не отключайте и не блокируйте телефон."):
+            return
+
+        last = {"sent": 0.0, "value": 1}
+        stop = threading.Event()
+
+        def on_progress(percent: int) -> None:
+            now = time.monotonic()
+            if percent > last["value"] and now - last["sent"] > 2:
+                last.update(sent=now, value=percent)
+                self.report(job_id, progress=min(percent, 99), message=f"Копирую {what}… {percent}%")
+
+        def keepalive() -> None:
+            # Телефон иногда долго готовит копию молча — подаём в CRM знак, что задача жива
+            while not stop.wait(60):
+                self.report(job_id, message=f"Копирую {what}… {last['value']}%")
+
+        threading.Thread(target=keepalive, daemon=True).start()
+        try:
+            if mode == "media":
+                stats = device.backup_media(udid, folder, progress=on_progress)
+                gb = stats["bytes"] / 1_073_741_824
+                note = (f"Фото и видео скопированы: {stats['files']} файлов, {gb:.1f} ГБ. Папка: {folder}. "
+                        "Если на телефоне включено «Оптимизировать хранилище», часть оригиналов лежит только в iCloud.")
+            else:
+                device.backup_full(udid, folder, progress=on_progress)
+                size = sum(f.stat().st_size for f in folder.rglob("*") if f.is_file()) / 1_073_741_824
+                note = (f"Полная копия готова: {size:.1f} ГБ. Папка: {folder}. "
+                        "Открыть её можно в iTunes/Finder (копия лежит в формате резервных копий iPhone).")
+        finally:
+            stop.set()
+        self.report(job_id, state="done", message=note)
 
     # ------------------------------------------------------------- главный цикл
 

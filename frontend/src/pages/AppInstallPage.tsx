@@ -51,7 +51,7 @@ type Job = {
   id: number
   station_id: number
   station_name: string
-  kind: 'scan' | 'purchases' | 'login' | 'install' | 'archive'
+  kind: 'scan' | 'purchases' | 'login' | 'install' | 'archive' | 'backup'
   app: IosApp | null
   target_name: string | null
   state: 'queued' | 'running' | 'need_code' | 'done' | 'failed' | 'cancelled'
@@ -60,6 +60,8 @@ type Job = {
   error_code: string | null
   email: string | null
   code_sent: boolean
+  backup_mode: 'full' | 'media' | null
+  backup_folder: string | null
   created_at: string
   created_by_name: string | null
 }
@@ -98,6 +100,8 @@ function jobTitle(job: Job) {
       return `Вход в Apple ID ${job.email ?? ''}`
     case 'archive':
       return `${job.app?.name ?? 'Приложение'} → в архив CRM`
+    case 'backup':
+      return `Копия «${job.target_name ?? 'телефон'}»: ${job.backup_mode === 'media' ? 'фото и видео' : 'вся копия'}`
     default:
       return `${job.app?.name ?? 'Приложение'} → ${job.target_name ?? 'телефон'}`
   }
@@ -116,6 +120,56 @@ function shortMessage(text: string) {
 
 function errorText(e: unknown, fallback: string) {
   return e instanceof ApiError ? e.message : fallback
+}
+
+// ------------------------------------------------------------------ копия данных телефона
+
+const BACKUP_FOLDER_KEY = 'apps.backupFolder'
+
+function BackupModal({ device, onClose, onStart }: {
+  device: Device
+  onClose: () => void
+  onStart: (mode: 'full' | 'media', folder: string) => Promise<void>
+}) {
+  const [mode, setMode] = useState<'full' | 'media'>('media')
+  const [folder, setFolder] = useState(() => {
+    try { return localStorage.getItem(BACKUP_FOLDER_KEY) ?? '' } catch { return '' }
+  })
+  const [busy, setBusy] = useState(false)
+  const submit = async () => {
+    setBusy(true)
+    try { localStorage.setItem(BACKUP_FOLDER_KEY, folder.trim()) } catch { /* без сохранения */ }
+    await onStart(mode, folder.trim())
+    setBusy(false)
+    onClose()
+  }
+  const option = (value: 'full' | 'media', title: string, hint: string) => (
+    <label className={`flex cursor-pointer gap-3 rounded-lg border p-3 ${mode === value ? 'border-accent bg-accent/10' : 'border-line'}`}>
+      <input type="radio" name="backup-mode" checked={mode === value} onChange={() => setMode(value)} className="mt-1" />
+      <span><b className="block">{title}</b><small className="text-muted">{hint}</small></span>
+    </label>
+  )
+  return (
+    <Modal title={`Скопировать «${deviceTitle(device)}»`} onClose={onClose}>
+      <div className="grid gap-4">
+        <div className="grid gap-2">
+          {option('media', 'Только фото и видео', 'Папка DCIM целиком, как есть. Быстро, подходит для клиента, который просит «сохрани снимки».')}
+          {option('full', 'Вся копия телефона', 'Как резервная копия в Finder/iTunes: контакты, сообщения, настройки, данные приложений. Долго и занимает столько, сколько занято на телефоне.')}
+        </div>
+        <label className="grid gap-1 text-sm">
+          Куда сохранить на компьютере станции
+          <input className={inputClass} value={folder} onChange={(e) => setFolder(e.target.value)}
+            placeholder="Пусто — папка «backups» помощника. Или флешка, например E:\Клиенты" />
+          <small className="text-muted">Внутри создастся папка с датой. Путь указывается на том компьютере, где работает помощник; флешка должна быть вставлена в него.</small>
+        </label>
+        <p className="text-sm text-muted">Разблокируйте телефон и держите его подключённым, пока идёт копирование. Если на нём включено «Оптимизировать хранилище фото», оригиналы могут лежать только в iCloud.</p>
+        <div className="flex gap-2">
+          <button className={primary} disabled={busy} onClick={() => void submit()}>{busy ? 'Запускаю…' : 'Начать копирование'}</button>
+          <button className={button} onClick={onClose}>Отмена</button>
+        </div>
+      </div>
+    </Modal>
+  )
 }
 
 // ------------------------------------------------------------------ вход в Apple ID
@@ -397,6 +451,7 @@ export default function AppInstallPage() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [apps, setApps] = useState<IosApp[]>([])
   const [query, setQuery] = useState('')
+  const [backupDevice, setBackupDevice] = useState<Device | null>(null)
   const [libraryOpen, setLibraryOpen] = useState(false) // длинный список приложений не раскрываем сам
   const [historyOpen, setHistoryOpen] = useState(false)
   const [appLimit, setAppLimit] = useState(40)
@@ -701,6 +756,10 @@ export default function AppInstallPage() {
                               `Читаю приложения с «${deviceTitle(d)}»`)}>
                               Это донор: прочитать приложения
                             </button>
+                            <button className={button} onClick={() => setBackupDevice(d)}
+                              title="Копия фото и видео или всего телефона на компьютер станции">
+                              Скопировать данные
+                            </button>
                             <button className={d.udid === targetUdid ? primary : button} aria-pressed={d.udid === targetUdid}
                               onClick={() => setTargetUdid(d.udid)}>
                               {d.udid === targetUdid ? 'Ставим сюда' : 'Ставить сюда'}
@@ -886,6 +945,11 @@ export default function AppInstallPage() {
       {importOpen && (
         <ImportModal onClose={() => setImportOpen(false)}
           onDone={(text) => { setNotice(text); void loadApps(query, storeFilter).catch(() => undefined) }} />
+      )}
+      {backupDevice && (
+        <BackupModal device={backupDevice} onClose={() => setBackupDevice(null)}
+          onStart={(mode, folder) => startJob({ kind: 'backup', target_udid: backupDevice.udid, backup_mode: mode, backup_folder: folder || null },
+            `Копирую ${mode === 'media' ? 'фото и видео' : 'весь телефон'} «${deviceTitle(backupDevice)}»`)} />
       )}
       {modal === 'login' && station && <LoginModal station={station} onClose={() => setModal(null)} onQueued={() => void loadJobs()} />}
       {reissue && <StationWizard reissue={reissue} onClose={() => setReissue(null)} onChanged={() => void refresh()} />}
