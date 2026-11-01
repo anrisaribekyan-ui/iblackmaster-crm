@@ -13,6 +13,7 @@ import ForgottenBanner from '../components/ForgottenBanner'
 import TimeChart from '../components/charts/TimeChart'
 import { compact, count, dayShort, rub } from '../components/charts/format'
 import StatusBadge from '../components/StatusBadge'
+import MonthCompare from '../components/MonthCompare'
 import Skeleton from '../components/Skeleton'
 
 type Dashboard = {
@@ -25,10 +26,10 @@ type Dashboard = {
   previous: { created: number; closed: number | null; income: string | null; revenue: string | null }
 }
 type Location = { id: number; name: string }
-type Period = 'today' | 'yesterday' | 'week' | 'month' | 'custom'
+type Period = 'today' | 'yesterday' | 'week' | 'month' | 'prevmonth' | 'custom'
 
-const PERIOD_LABELS: Record<Period, string> = { today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Месяц', custom: 'Период' }
-const PERIOD_NAMES: Record<Period, string> = { today: 'сегодня', yesterday: 'вчера', week: '7 дней', month: 'месяц', custom: 'период' }
+const PERIOD_LABELS: Record<Period, string> = { today: 'Сегодня', yesterday: 'Вчера', week: '7 дней', month: 'Этот месяц', prevmonth: 'Прошлый месяц', custom: 'Период' }
+const PERIOD_NAMES: Record<Period, string> = { today: 'сегодня', yesterday: 'вчера', week: '7 дней', month: 'месяц', prevmonth: 'прошлый месяц', custom: 'период' }
 
 const MOSCOW_OFFSET_MS = 3 * 60 * 60 * 1000
 
@@ -48,6 +49,7 @@ function periodRange(period: Period, customFrom: string, customTo: string): { fr
   if (period === 'yesterday') return { from: moscowMidnightUtc(y, m, d - 1), to: moscowMidnightUtc(y, m, d) }
   if (period === 'week') return { from: moscowMidnightUtc(y, m, d - 6), to: moscowMidnightUtc(y, m, d + 1) }
   if (period === 'month') return { from: moscowMidnightUtc(y, m, 1), to: moscowMidnightUtc(y, m, d + 1) }
+  if (period === 'prevmonth') return { from: moscowMidnightUtc(y, m - 1, 1), to: moscowMidnightUtc(y, m, 1) }
   if (!customFrom || !customTo) return null
   const [fy, fm, fd] = customFrom.split('-').map(Number)
   const [ty, tm, td] = customTo.split('-').map(Number)
@@ -155,6 +157,7 @@ export default function DashboardPage() {
       {error && <p role="alert" className="mb-4 text-danger">{error}</p>}
 
       <QuickActions canCreate={can('createOrderAccess')} />
+      {can('reportAccess') && hasProfit && <MonthCompare locationId={locationId} />}
       <ForgottenBanner locationId={locationId} />
       <MyEarnings />
 
@@ -300,6 +303,7 @@ function revenueNorm(trend: Dashboard['trend'], period: Period, customFrom: stri
   let days = 1
   if (period === 'week') days = 7
   else if (period === 'month') days = moscowNow().d
+  else if (period === 'prevmonth') { const n = moscowNow(); days = new Date(Date.UTC(n.y, n.m - 1, 0)).getUTCDate() }
   else if (period === 'custom') {
     if (!customFrom || !customTo) return null
     days = Math.round((Date.parse(customTo) - Date.parse(customFrom)) / 86_400_000) + 1

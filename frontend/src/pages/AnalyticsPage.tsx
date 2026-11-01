@@ -8,10 +8,11 @@ import ChartCard from '../components/charts/ChartCard'
 import TimeChart from '../components/charts/TimeChart'
 import { compact, count, dayLong, fillDays, rub } from '../components/charts/format'
 import ProfitReport from '../components/ProfitReport'
+import MonthCompare from '../components/MonthCompare'
 import Skeleton from '../components/Skeleton'
 
 type TabKey = 'profit' | 'orders' | 'works' | 'sales' | 'cashflow' | 'stock'
-type Period = 'today' | 'yesterday' | 'week' | 'month' | 'quarter' | 'year' | 'custom'
+type Period = 'today' | 'yesterday' | 'week' | 'month' | 'prevmonth' | 'quarter' | 'year' | 'custom'
 type Location = { id: number; name: string }
 type Row = Record<string, unknown>
 type Column = { field: string; label: string; kind: 'text' | 'money' | 'number' }
@@ -53,6 +54,9 @@ function periodRange(period: Period, customFrom: string, customTo: string): { fr
   if (period === 'month') {
     return { from: moscowMidnightUtc(today.y, today.m, 1), to: moscowMidnightUtc(today.y, today.m, today.d + 1) }
   }
+  if (period === 'prevmonth') {
+    return { from: moscowMidnightUtc(today.y, today.m - 1, 1), to: moscowMidnightUtc(today.y, today.m, 1) }
+  }
   if (period === 'quarter') {
     // Текущий месяц и два предыдущих целиком
     return { from: moscowMidnightUtc(today.y, today.m - 2, 1), to: moscowMidnightUtc(today.y, today.m, today.d + 1) }
@@ -70,7 +74,8 @@ const PERIODS: [Period, string][] = [
   ['today', 'Сегодня'],
   ['yesterday', 'Вчера'],
   ['week', '7 дней'],
-  ['month', 'Месяц'],
+  ['month', 'Этот месяц'],
+  ['prevmonth', 'Прошлый месяц'],
   ['quarter', '3 мес.'],
   ['year', 'Год'],
   ['custom', 'Период'],
@@ -239,6 +244,10 @@ export default function AnalyticsPage() {
       from = addDays(today.y, today.m, today.d, -6)
     } else if (period === 'month') {
       from = { y: today.y, m: today.m, d: 1 }
+    } else if (period === 'prevmonth') {
+      const start = new Date(Date.UTC(today.y, today.m - 2, 1))
+      from = { y: start.getUTCFullYear(), m: start.getUTCMonth() + 1, d: 1 }
+      to = addDays(today.y, today.m, 1, -1)
     } else if (period === 'quarter') {
       const start = new Date(Date.UTC(today.y, today.m - 3, 1))
       from = { y: start.getUTCFullYear(), m: start.getUTCMonth() + 1, d: 1 }
@@ -320,6 +329,8 @@ export default function AnalyticsPage() {
           </label>
         )}
       </div>
+
+      {tab === 'profit' && <MonthCompare locationId={locationId} />}
 
       {tab === 'profit' ? (
         <ProfitReport range={periodRange(period, customFrom, customTo)} locationId={locationId} filenameBase={filename.replace(/\.csv$/, '')} />
