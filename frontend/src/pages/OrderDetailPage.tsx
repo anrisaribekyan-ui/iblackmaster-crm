@@ -646,12 +646,13 @@ export default function OrderDetailPage() {
               </select>
             )}
             {!isDeleted && (
-              <>
-                <Link className="rounded-lg px-3 py-1.5 text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-                  to={`/orders/new?repeat=${detail.order.id}`} title="Новый заказ с теми же клиентом и устройством">Повторить заказ</Link>
-                <Link className="rounded-lg px-3 py-1.5 text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-                  to={`/orders/new?client=${detail.counteragent.id}`} title="Новый заказ для этого клиента, устройство вводится заново">Принять ещё от клиента</Link>
-              </>
+              <details className="relative">
+                <summary className="cursor-pointer list-none rounded-lg px-3 py-1.5 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white">Новый заказ</summary>
+                <div className="pop absolute right-0 z-20 mt-1 flex w-64 flex-col rounded-lg border border-line bg-surface p-1 text-ink shadow-lg">
+                  <Link className="rounded-md px-3 py-2 hover:bg-canvas" to={`/orders/new?repeat=${detail.order.id}`}>Повторить заказ<small className="block text-muted">Тот же клиент и устройство</small></Link>
+                  <Link className="rounded-md px-3 py-2 hover:bg-canvas" to={`/orders/new?client=${detail.counteragent.id}`}>Принять ещё от клиента<small className="block text-muted">Устройство вводится заново</small></Link>
+                </div>
+              </details>
             )}
             {!isDeleted && can('deleteOrderAccess') && (
               <button className="rounded-lg px-3 py-1.5 text-sm text-white/60 transition-colors hover:bg-white/10 hover:text-[#ff8a72]" onClick={() => setDeleting(true)}>Удалить</button>
