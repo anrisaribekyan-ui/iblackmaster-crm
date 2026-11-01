@@ -348,12 +348,15 @@ export default function OrderDetailPage() {
     return commentText
   }
 
-  const openPayment = (mode: PaymentMode, forClosure = false) => {
+  const [prepayMode, setPrepayMode] = useState(false)
+
+  const openPayment = (mode: PaymentMode, forClosure = false, prepay = false) => {
+    setPrepayMode(prepay)
     const available = cashRegisters.filter((register) => register.accepts_cash || register.accepts_bank)
     const defaultRegister = available.find((register) => register.accepts_cash) ?? available[0]
     setPaymentMode(mode)
     setCloseAfterPay(forClosure)
-    setPaymentAmount(mode === 'payment' ? String(Math.max(0, Math.round(Number(detail?.debt ?? 0)))) : '')
+    setPaymentAmount(mode === 'payment' && !prepay ? String(Math.max(0, Math.round(Number(detail?.debt ?? 0)))) : '')
     setPaymentRegisterId(defaultRegister ? String(defaultRegister.id) : '')
     setPaymentMethod(defaultRegister?.accepts_cash ? 'cash' : 'bank')
     setPaymentError('')
@@ -369,6 +372,7 @@ export default function OrderDetailPage() {
     const commentText = askStatusComment(status)
     if (commentText === null) return
     if (Number(detail.debt) > 0) {
+      setPrepayMode(false)
       setPaymentAmount(String(Math.round(Number(detail.debt))))
       setPaymentMode('payment')
       setCloseAfterPay(true)
@@ -394,6 +398,7 @@ export default function OrderDetailPage() {
       amount: String(form.get('amount') ?? ''),
       is_bank: isBank,
       note: String(form.get('note') ?? '').trim() || null,
+      is_prepayment: prepayMode,
     }
     const mode = paymentMode
     const shouldClose = closeAfterPay
@@ -981,7 +986,10 @@ export default function OrderDetailPage() {
             <header className="mb-3 flex items-center justify-between"><h2 className="font-semibold">Оплаты</h2><strong className="num">{formatMoney(detail.order.paid)}</strong></header>
             <p className="mb-3 text-sm text-muted">Долг: <strong className="text-ink num">{formatMoney(detail.debt)}</strong></p>
             <div className="flex flex-wrap gap-2">
-              {can('operationCashRegisterAccess') && !detail.order.is_deleted && <button className="rounded-md bg-accent px-3 py-2 text-sm text-accent-ink" onClick={() => openPayment('payment')}>Принять оплату</button>}
+              {can('operationCashRegisterAccess') && !detail.order.is_deleted && <>
+                <button className="rounded-md bg-accent px-3 py-2 text-sm text-accent-ink" onClick={() => openPayment('payment')}>Принять оплату</button>
+                {detail.status.group !== 'closed' && <button className="rounded-md border border-line px-3 py-2 text-sm" onClick={() => openPayment('payment', false, true)}>Внести предоплату</button>}
+              </>}
               {can('returnOrderProductAccess') && !detail.order.is_deleted && <button className="rounded-md border border-line px-3 py-2 text-sm" onClick={() => openPayment('refund')}>Возврат</button>}
             </div>
             {detail.transactions.length > 0 && (
@@ -1069,7 +1077,7 @@ export default function OrderDetailPage() {
         />
       )}
       {paymentMode && (
-        <Modal title={paymentMode === 'payment' ? closeAfterPay ? 'Оплата для выдачи' : 'Принять оплату' : 'Возврат'} onClose={() => { setPaymentMode(null); setCloseAfterPay(false) }}>
+        <Modal title={paymentMode === 'payment' ? closeAfterPay ? 'Оплата для выдачи' : prepayMode ? 'Предоплата' : 'Принять оплату' : 'Возврат'} onClose={() => { setPaymentMode(null); setCloseAfterPay(false) }}>
           <form onSubmit={(event) => void submitPayment(event)} className="grid gap-3">
             {activeRegisters.length === 0 ? (
               <p className="text-muted">Нет доступных касс для операции.</p>

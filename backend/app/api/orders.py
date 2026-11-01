@@ -156,6 +156,7 @@ class OrderPayment(BaseModel):
     amount: Decimal = Field(gt=Decimal("0"))
     is_bank: bool = False
     note: str | None = None
+    is_prepayment: bool = False  # оплата до выдачи: в заказе ставится отметка «Предоплата»
 
 
 class OrderCreateOut(BaseModel):
@@ -921,6 +922,8 @@ def pay_order(order_id: int, data: OrderPayment, db: DbSession, me: CurrentEmplo
         is_bank=data.is_bank,
         note=data.note,
     )
+    if data.is_prepayment:
+        order.has_prepayment = True
     db.commit()
     return {"id": transaction.id, "amount": transaction.amount, "debt": order.debt}
 

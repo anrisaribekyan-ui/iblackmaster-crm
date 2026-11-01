@@ -839,3 +839,18 @@ def test_order_transfer_to_location_and_verdict(client, auth_headers, db, owner)
     db.refresh(order)
     assert order.location_id == locations[1].id and order.verdict == "Заменили экран"
     assert client.put(f"/api/orders/{order.id}", json={"location_id": 999999}, headers=auth_headers).status_code == 404
+
+
+
+def test_prepayment_flag_set_on_existing_order(client, auth_headers, db, owner):
+    order = create_payment_test_order(db, owner, "PAY-PREPAY")
+    register = db.scalars(
+        select(CashRegister).where(CashRegister.location_id == order.location_id, CashRegister.is_active.is_(True))
+    ).first()
+    assert not order.has_prepayment
+    r = client.post(f"/api/orders/{order.id}/payments",
+                    json={"cash_register_id": register.id, "amount": "200.00", "is_bank": False, "is_prepayment": True},
+                    headers=auth_headers)
+    assert r.status_code == 200, r.text
+    db.refresh(order)
+    assert order.has_prepayment is True and order.paid == Decimal("200.00")
