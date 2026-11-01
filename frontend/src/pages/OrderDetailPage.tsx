@@ -640,6 +640,14 @@ export default function OrderDetailPage() {
                 {locations.map((location) => <option key={location.id} value={location.id} className="text-ink">{location.name.replace(/^iBlackMaster \((.*)\)$/, '$1')}</option>)}
               </select>
             )}
+            {!isDeleted && (
+              <>
+                <Link className="rounded-lg px-3 py-1.5 text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                  to={`/orders/new?repeat=${detail.order.id}`} title="Новый заказ с теми же клиентом и устройством">Повторить заказ</Link>
+                <Link className="rounded-lg px-3 py-1.5 text-sm text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                  to={`/orders/new?client=${detail.counteragent.id}`} title="Новый заказ для этого клиента, устройство вводится заново">Принять ещё от клиента</Link>
+              </>
+            )}
             {!isDeleted && can('deleteOrderAccess') && (
               <button className="rounded-lg px-3 py-1.5 text-sm text-white/60 transition-colors hover:bg-white/10 hover:text-[#ff8a72]" onClick={() => setDeleting(true)}>Удалить</button>
             )}

@@ -7,7 +7,7 @@ import { ChecklistInput, SignaturePad, useChecklistItems, type ChecklistValues }
 import QuickOrderPicker, { type QuickOrder } from '../components/QuickOrderPicker'
 import PartOrderModal, { DOSKA_BOARDS, INTAKE_MARK, linkPartsToOrder, partQuery, type AddedPart } from '../components/PartOrder'
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { localInputToIso } from '../format'
 import { useAuth } from '../auth'
@@ -32,6 +32,7 @@ type DeviceSuggestion = { id: number; brand_id: number; brand: string; model: st
 type Employee = { id: number; short_name: string }
 type FormValues = Record<string, unknown>
 type Choice = { id: number; name: string }
+type CashRegisterOption = { id: number; location_id: number | null; name: string; accepts_cash: boolean; accepts_bank: boolean }
 
 const inputClass = 'w-full rounded-md border border-line bg-surface px-3 py-2'
 const groupTitles: Record<string, string> = {
@@ -134,6 +135,56 @@ export default function OrderCreatePage() {
   const [error, setError] = useState('')
   const [partOpen, setPartOpen] = useState(false)
   const [parts, setParts] = useState<AddedPart[]>([])
+  const [searchParams] = useSearchParams()
+  const [registers, setRegisters] = useState<CashRegisterOption[]>([])
+  const [prepayAmount, setPrepayAmount] = useState('')
+  const [prepayRegister, setPrepayRegister] = useState('')
+  const [prepayBank, setPrepayBank] = useState(false)
+  const [createdId, setCreatedId] = useState<number | null>(null)
+  const [prefillNote, setPrefillNote] = useState('')
+  const prefilled = useRef(false)
+
+  useEffect(() => {
+    api.get<CashRegisterOption[]>('/cash-registers').then(setRegisters).catch(() => setRegisters([]))
+  }, [])
+
+  // «Повторить заказ» и «Принять ещё от клиента»: клиент (и для повтора — аппарат) подставляются из карточки заказа
+  useEffect(() => {
+    const repeatId = searchParams.get('repeat')
+    const clientId = searchParams.get('client')
+    if (loading || prefilled.current || (!repeatId && !clientId)) return
+    prefilled.current = true
+    const run = async () => {
+      try {
+        if (repeatId) {
+          const d = await api.get<{ counteragent: Counteragent; order: Record<string, unknown> }>(`/orders/${repeatId}`)
+          const o = d.order
+          const list = (v: unknown) => (Array.isArray(v) ? (v as string[]) : [])
+          setCounteragentId(d.counteragent.id)
+          setCounteragentFound(d.counteragent.name)
+          if (o.order_type_id) setOrderTypeId(String(o.order_type_id))
+          setValues((current) => ({
+            ...current,
+            name: d.counteragent.name,
+            phones: d.counteragent.phones ?? '',
+            deviceType: o.device_type ?? current.deviceType,
+            brand: o.brand ?? '', model: o.model ?? '', sn: o.serial ?? '', color: o.color ?? '',
+            problem: list(o.problems), completeSet: list(o.complete_set),
+          }))
+          setPrefillNote(`Повтор заказа ${String(o.number ?? '')}: клиент и устройство подставлены, проверьте проблему и комплектацию.`)
+        } else if (clientId) {
+          const c = await api.get<Counteragent>(`/counteragents/${clientId}`)
+          setCounteragentId(c.id)
+          setCounteragentFound(c.name)
+          setValues((current) => ({ ...current, name: c.name, phones: c.phones ?? '' }))
+          setPrefillNote(`Новый заказ для клиента ${c.name}.`)
+        }
+      } catch {
+        setPrefillNote('Не удалось подставить данные клиента — заполните форму вручную.')
+      }
+    }
+    void run()
+  }, [loading, searchParams])
 
   useEffect(() => {
     let active = true
@@ -278,6 +329,15 @@ export default function OrderCreatePage() {
       setError(`Заполните поле «${missingRequired.label}»`)
       return
     }
+    const prepayOn = Boolean(values.prepayment)
+    if (prepayOn && !(Number(prepayAmount.replace(',', '.')) > 0)) {
+      setError('Вы отметили предоплату — укажите её сумму или снимите галочку')
+      return
+    }
+    if (prepayOn && !prepayRegister) {
+      setError('Выберите кассу, в которую приняли предоплату')
+      return
+    }
     setSaving(true)
     setError('')
     try {
@@ -328,6 +388,20 @@ export default function OrderCreatePage() {
       // Запчасти уже лежат в «Что купить» — дописываем к ним номер заказа
       if (parts.length) await linkPartsToOrder(parts, created.number, me?.short_name ?? 'CRM')
       dirty.current = false
+      if (prepayOn) {
+        try {
+          await api.post(`/orders/${created.id}/payments`, {
+            cash_register_id: Number(prepayRegister),
+            amount: prepayAmount.replace(',', '.'),
+            is_bank: prepayBank,
+            note: 'Предоплата при приёме',
+          })
+        } catch (e) {
+          setCreatedId(created.id)
+          setError(`Заказ ${created.number} создан, но предоплату записать не удалось: ${e instanceof ApiError ? e.message : 'ошибка'}. Откройте заказ и примите оплату вручную.`)
+          return
+        }
+      }
       navigate(`/orders/${created.id}`)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Не удалось создать заказ')
@@ -359,7 +433,8 @@ export default function OrderCreatePage() {
   return (
     <section className="max-w-6xl">
       <h1 className="mb-4 text-xl font-semibold">Новый заказ</h1>
-      {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {prefillNote && <p role="status" className="mb-3 rounded-lg bg-accent/10 p-3 text-sm">{prefillNote}</p>}
+      {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}{createdId && <> <Link className="underline" to={`/orders/${createdId}`}>Открыть заказ</Link></>}</p>}
       {orderTypes.length === 0 ? (
         <p className="rounded-lg border border-line bg-surface p-5 text-muted">Нет активных типов заказов. Добавьте тип в настройках перед созданием заказа.</p>
       ) : (
@@ -499,6 +574,28 @@ export default function OrderCreatePage() {
                 </section>
               ))}
             </div>
+          )}
+          {Boolean(values.prepayment) && (
+            <section className="grid gap-3 rounded-xl border border-accent bg-surface p-4 sm:grid-cols-3">
+              <h2 className="font-semibold sm:col-span-3">Предоплата</h2>
+              <label className="grid gap-1 text-sm text-muted">Сумма, ₽
+                <input className={inputClass} inputMode="decimal" value={prepayAmount} onChange={(e) => setPrepayAmount(e.target.value)} placeholder="Например, 1000" />
+              </label>
+              <label className="grid gap-1 text-sm text-muted">Куда приняли
+                <select className={inputClass} value={prepayRegister} onChange={(e) => setPrepayRegister(e.target.value)}>
+                  <option value="">— Выберите кассу —</option>
+                  {registers.filter((r) => (r.accepts_cash || r.accepts_bank) && (r.location_id == null || String(r.location_id) === locationId))
+                    .map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </label>
+              <label className="grid gap-1 text-sm text-muted">Способ
+                <select className={inputClass} value={prepayBank ? 'bank' : 'cash'} onChange={(e) => setPrepayBank(e.target.value === 'bank')}>
+                  <option value="cash">Наличные</option>
+                  <option value="bank">Карта / перевод</option>
+                </select>
+              </label>
+              <p className="text-xs text-muted sm:col-span-3">Сумма запишется в заказ как оплата, появится в кассе и в квитанции. Недостающее клиент доплатит при выдаче.</p>
+            </section>
           )}
           {!fieldsLoading && fields.length > 0 && checklistItems.length > 0 && (
             <section className="rounded-xl border border-line bg-surface p-4">
