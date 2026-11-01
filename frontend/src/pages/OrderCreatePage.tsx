@@ -685,6 +685,8 @@ function MultiValueInput({
           value={draft}
           placeholder={placeholder}
           onChange={(event) => setDraft(event.target.value)}
+          // Набрали и ушли дальше (или нажали «Создать») без Enter — текст всё равно должен попасть в заказ
+          onBlur={() => add(draft)}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ',') {
               event.preventDefault()
@@ -693,10 +695,10 @@ function MultiValueInput({
           }}
           autoComplete="off"
         />
-        <button type="button" className="rounded-md border border-line px-2" onClick={() => add(draft)}>+</button>
+        <button type="button" className="rounded-md border border-line px-2" aria-label="Добавить" onMouseDown={(e) => e.preventDefault()} onClick={() => add(draft)}>+</button>
         {draft && matching.length > 0 && (
           <ul className="absolute left-0 top-full z-10 mt-1 max-h-40 w-full overflow-auto rounded-md border border-line bg-surface shadow-lg">
-            {matching.map((item) => <li key={item}><button type="button" className="w-full px-3 py-2 text-left hover:bg-canvas" onClick={() => add(item)}>{item}</button></li>)}
+            {matching.map((item) => <li key={item}><button type="button" className="w-full px-3 py-2 text-left hover:bg-canvas" onMouseDown={(e) => e.preventDefault()} onClick={() => add(item)}>{item}</button></li>)}
           </ul>
         )}
       </div>
