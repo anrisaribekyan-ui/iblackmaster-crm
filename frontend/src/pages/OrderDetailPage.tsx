@@ -1264,7 +1264,9 @@ function OrderInfoEditor({
       if (field.data_type === 'multiple' && typeof value === 'string') value = value.split(',').map((item) => item.trim()).filter(Boolean)
       if (['master_id', 'manager_id', 'how_know_id'].includes(key)) value = value ? Number(value) : null
       if (field.data_type === 'dateTime') value = localInputToIso(value as string | null)
-      if (key.startsWith('custom_') || !(key in aliasMap) && !['brand', 'model', 'color', 'appearance'].includes(field.key)) {
+      // Проверяем ключ поля формы (problem, completeSet…), а не имя колонки заказа (problems, complete_set…):
+      // иначе проблема, комплектация, серийный номер и т. д. уходили в custom_fields и в заказе не менялись
+      if (field.key.startsWith('custom_') || !(field.key in aliasMap) && !['brand', 'model', 'color', 'appearance'].includes(field.key)) {
         customFields[field.key] = value
       } else {
         payload[key] = value
