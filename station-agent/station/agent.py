@@ -264,6 +264,8 @@ class Agent:
                 self._archive_job(job)
             elif kind == "backup":
                 self._backup(job)
+            elif kind == "report":
+                self._report(job)
             else:
                 self.report(job_id, state="failed", message=f"Неизвестная задача: {kind}")
         except AuthRequired as exc:
@@ -501,6 +503,16 @@ class Agent:
         device.install_ipa(job["target_udid"], path, progress=on_progress)
         self.report(job_id, state="done",
                     message=f"«{name}» установлено (файл из {source}). На телефоне в App Store должен быть вход в тот же Apple ID.")
+
+    def _report(self, job: dict) -> None:
+        """Отчёт о телефоне: модель, серийники, память, батарея."""
+        from . import report as device_report
+
+        job_id, udid = job["id"], job["target_udid"]
+        if self.report(job_id, progress=10, message="Читаю данные телефона…"):
+            return
+        data = device_report.collect_report(udid)
+        self.report(job_id, state="done", report=data, message="Отчёт готов")
 
     def _backup(self, job: dict) -> None:
         """Копия телефона на компьютер станции: вся (как в Finder) или только фото и видео."""

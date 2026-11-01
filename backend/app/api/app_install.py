@@ -136,6 +136,7 @@ class JobOut(BaseModel):
     code_sent: bool  # код 2FA введён и ждёт, пока станция его заберёт
     backup_mode: str | None = None
     backup_folder: str | None = None
+    report: dict | None = None
     created_at: datetime
     finished_at: datetime | None
     created_by_name: str | None
@@ -143,7 +144,7 @@ class JobOut(BaseModel):
 
 class JobIn(BaseModel):
     station_id: int
-    kind: Literal["scan", "purchases", "login", "install", "archive", "backup"]
+    kind: Literal["scan", "purchases", "login", "install", "archive", "backup", "report"]
     app_id: int | None = None
     target_udid: str | None = Field(default=None, max_length=64)
     backup_mode: Literal["full", "media"] | None = None  # full — вся копия iPhone, media — только фото и видео
@@ -197,6 +198,7 @@ def _job_out(db, job: AppInstallJob) -> JobOut:
         code_sent=job.state == JobState.NEED_CODE and job.secret is not None,
         backup_mode=(job.payload or {}).get("mode"),
         backup_folder=(job.payload or {}).get("folder"),
+        report=(job.payload or {}).get("report"),
         created_at=job.created_at,
         finished_at=job.finished_at,
         created_by_name=author.name if author else None,
@@ -555,7 +557,7 @@ def create_job(data: JobIn, db: DbSession, me: CurrentEmployee):
     devices = {d["udid"]: d for d in (station.devices or [])}
     job = AppInstallJob(station_id=station.id, kind=data.kind, created_by_id=me.id, payload={})
 
-    if data.kind in (JobKind.SCAN, JobKind.INSTALL, JobKind.BACKUP):
+    if data.kind in (JobKind.SCAN, JobKind.INSTALL, JobKind.BACKUP, JobKind.REPORT):
         device = devices.get(data.target_udid or "")
         if device is None:
             raise BusinessError("Этот телефон сейчас не подключён к станции")
@@ -577,6 +579,9 @@ def create_job(data: JobIn, db: DbSession, me: CurrentEmployee):
         job.order_id = data.order_id if data.kind == JobKind.INSTALL else None
         if data.kind == JobKind.ARCHIVE and _ipa_exists(app_item):
             raise BusinessError(f"«{app_item.name}» уже в архиве CRM")
+
+    if data.kind == JobKind.REPORT:
+        job.order_id = data.order_id
 
     if data.kind == JobKind.BACKUP:
         if data.backup_mode not in ("full", "media"):
@@ -714,6 +719,7 @@ class ReportIn(BaseModel):
     error_code: str | None = Field(default=None, max_length=30)
     apps: list[AppReport] | None = Field(default=None, max_length=2000)
     apple_id: str | None = Field(default=None, max_length=200)
+    report: dict | None = None  # report: собранный отчёт о телефоне
 
 
 @router.get("/agent/archive")
@@ -828,6 +834,8 @@ def agent_report(job_id: int, data: ReportIn, db: DbSession, station: AgentStati
         job.message = re.sub(r"https?://([^/\s\"']+)[^\s\"']*", r"[\1]", data.message)[:2000]
     if data.error_code is not None:
         job.error_code = data.error_code
+    if data.report is not None and job.kind == JobKind.REPORT and len(json.dumps(data.report)) < 20000:
+        job.payload = {**(job.payload or {}), "report": data.report}
     if data.apps:
         _upsert_apps(db, data.apps, "scan" if job.kind == JobKind.SCAN else "purchases")
     if data.state is not None:

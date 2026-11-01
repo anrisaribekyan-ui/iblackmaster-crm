@@ -6,6 +6,7 @@ import OtpInput from '../components/OtpInput'
 import Skeleton from '../components/Skeleton'
 import { AgentFilesPanel, StationWizard } from '../components/StationSetup'
 import { formatDateTime, inputClass } from './shared'
+import { escapeHtml, openPrint } from '../print'
 
 /**
  * Установка iOS-приложений через станцию: компьютер в точке с помощником, к которому
@@ -51,7 +52,7 @@ type Job = {
   id: number
   station_id: number
   station_name: string
-  kind: 'scan' | 'purchases' | 'login' | 'install' | 'archive' | 'backup'
+  kind: 'scan' | 'purchases' | 'login' | 'install' | 'archive' | 'backup' | 'report'
   app: IosApp | null
   target_name: string | null
   state: 'queued' | 'running' | 'need_code' | 'done' | 'failed' | 'cancelled'
@@ -62,6 +63,7 @@ type Job = {
   code_sent: boolean
   backup_mode: 'full' | 'media' | null
   backup_folder: string | null
+  report: PhoneReport | null
   created_at: string
   created_by_name: string | null
 }
@@ -100,6 +102,8 @@ function jobTitle(job: Job) {
       return `Вход в Apple ID ${job.email ?? ''}`
     case 'archive':
       return `${job.app?.name ?? 'Приложение'} → в архив CRM`
+    case 'report':
+      return `Отчёт о «${job.target_name ?? 'телефоне'}»`
     case 'backup':
       return `Копия «${job.target_name ?? 'телефон'}»: ${job.backup_mode === 'media' ? 'фото и видео' : 'вся копия'}`
     default:
@@ -123,6 +127,35 @@ function errorText(e: unknown, fallback: string) {
 }
 
 // ------------------------------------------------------------------ копия данных телефона
+
+type PhoneReport = {
+  model_name: string | null; name: string | null; ios_version: string | null; serial: string | null
+  imei: string | null; imei2: string | null; model_number: string | null; activation_state: string | null
+  storage_total_gb: number | null; storage_free_gb: number | null; warnings: string[]
+  extra: Record<string, string>
+  battery: { health_percent: number | null; cycle_count: number | null; design_mah: number | null; current_max_mah: number | null; charge_percent: number | null; temperature_c: number | null }
+}
+
+function ReportModal({ report, onClose }: { report: PhoneReport; onClose: () => void }) {
+  const b = report.battery
+  const rows: [string, string][] = [
+    ['Устройство', report.model_name ?? '—'], ['Версия iOS', report.ios_version ?? '—'], ['Серийный номер', report.serial ?? '—'],
+    ['IMEI', report.imei ?? '—'], ['Номер модели', report.model_number ?? '—'], ['Активация', report.activation_state ?? '—'],
+    ['Память', report.storage_total_gb != null ? `${report.storage_total_gb} ГБ, свободно ${report.storage_free_gb ?? '—'} ГБ` : '—'],
+    ['Состояние батареи', b.health_percent != null ? `${b.health_percent} %` : '—'], ['Циклов зарядки', b.cycle_count != null ? String(b.cycle_count) : '—'],
+    ['Ёмкость батареи', b.design_mah ? `${b.current_max_mah ?? '—'} из ${b.design_mah} мАч` : '—'],
+    ...Object.entries(report.extra ?? {}).map(([k, v]): [string, string] => [k, v]),
+  ]
+  const print = () => openPrint('Отчёт о телефоне', `<h1>Отчёт о телефоне</h1><table>${rows.map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(v)}</td></tr>`).join('')}</table>`
+    + (report.warnings.length ? `<h2>Рекомендации</h2>${report.warnings.map((w) => `<p>• ${escapeHtml(w)}</p>`).join('')}` : '<p class="muted">Замечаний нет.</p>'))
+  return (
+    <Modal title="Отчёт о телефоне" onClose={onClose}>
+      <table className="w-full text-sm"><tbody>{rows.map(([k, v]) => <tr key={k} className="border-t border-line first:border-0"><td className="py-1.5 text-muted">{k}</td><td className="py-1.5 text-right">{v}</td></tr>)}</tbody></table>
+      {report.warnings.map((w) => <p key={w} className="mt-2 rounded-lg bg-warning/10 p-2 text-sm">{w}</p>)}
+      <div className="mt-4 flex justify-end gap-2"><button className="rounded-md border border-line px-3 py-2" onClick={print}>Распечатать</button><button className="rounded-md bg-ink px-3 py-2 text-white" onClick={onClose}>Закрыть</button></div>
+    </Modal>
+  )
+}
 
 const BACKUP_FOLDER_KEY = 'apps.backupFolder'
 
@@ -340,6 +373,7 @@ function LoginModal({ station, onClose, onQueued }: { station: Station; onClose:
 
 function JobRow({ job, onChanged }: { job: Job; onChanged: () => void }) {
   const [code, setCode] = useState('')
+  const [showReport, setShowReport] = useState(false)
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
   const waitingCode = job.state === 'need_code' && !job.code_sent
@@ -363,6 +397,7 @@ function JobRow({ job, onChanged }: { job: Job; onChanged: () => void }) {
 
   return (
     <li className="grid min-w-0 gap-2 rounded-xl border border-line bg-surface p-3">
+      {showReport && job.report && <ReportModal report={job.report} onClose={() => setShowReport(false)} />}
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span className="font-medium">{jobTitle(job)}</span>
         <span className={`text-sm ${STATE_CLASS[job.state]}`}>{STATE_TITLE[job.state]}</span>
@@ -388,6 +423,9 @@ function JobRow({ job, onChanged }: { job: Job; onChanged: () => void }) {
       )}
       {error && <p role="alert" className="text-sm text-danger">{error}</p>}
       <div className="flex flex-wrap gap-2 empty:hidden">
+        {job.kind === 'report' && job.state === 'done' && job.report && (
+          <button className={button} onClick={() => setShowReport(true)}>Открыть отчёт</button>
+        )}
         {(job.state === 'queued' || job.state === 'need_code' || (job.state === 'running' && (job.kind !== 'install' || job.progress < 40))) && (
           <button className={button} onClick={() => void act('cancel')}>Отменить</button>
         )}
@@ -755,6 +793,10 @@ export default function AppInstallPage() {
                             <button className={button} onClick={() => void startJob({ kind: 'scan', target_udid: d.udid },
                               `Читаю приложения с «${deviceTitle(d)}»`)}>
                               Это донор: прочитать приложения
+                            </button>
+                            <button className={button} onClick={() => void startJob({ kind: 'report', target_udid: d.udid },
+                              `Снимаю отчёт «${deviceTitle(d)}»`)} title="Модель, серийные номера, память, состояние батареи">
+                              Отчёт о телефоне
                             </button>
                             <button className={button} onClick={() => setBackupDevice(d)}
                               title="Копия фото и видео или всего телефона на компьютер станции">

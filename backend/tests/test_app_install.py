@@ -609,3 +609,19 @@ def test_backup_job_full_and_media(client, auth_headers, db):
     report(client, agent, job["id"], state="done", message="Готово: 1200 файлов")
     done = client.get(url, headers=auth_headers).json()[0]
     assert done["state"] == "done" and done["progress"] == 100
+
+
+def test_phone_report_job_stores_report(client, auth_headers, db):
+    station_id, agent = make_station(client, auth_headers)
+    beat(client, agent, devices=(DONOR, LOCKED))
+    url = "/api/app-install/jobs"
+    locked = client.post(url, json={"station_id": station_id, "kind": "report", "target_udid": LOCKED["udid"]}, headers=auth_headers)
+    assert locked.status_code == 400
+    r = client.post(url, json={"station_id": station_id, "kind": "report", "target_udid": DONOR["udid"]}, headers=auth_headers)
+    assert r.status_code == 200, r.text
+    job = next_job(client, agent)
+    assert job["kind"] == "report"
+    data = {"model_name": "iPhone 13", "serial": "ABC123", "battery": {"health_percent": 78, "cycle_count": 640}, "warnings": ["Батарея изношена (78 %) — рекомендуем замену"]}
+    report(client, agent, job["id"], state="done", report=data, message="Отчёт готов")
+    done = client.get(url, headers=auth_headers).json()[0]
+    assert done["state"] == "done" and done["report"]["battery"]["health_percent"] == 78

@@ -74,7 +74,9 @@ class JobKind:
     ARCHIVE = "archive"  # заранее скачать у Apple и положить в архив CRM (телефон не нужен)
     BACKUP = "backup"  # копия данных телефона на компьютер станции: полная или только фото и видео
 
-    ALL = (SCAN, PURCHASES, LOGIN, INSTALL, ARCHIVE, BACKUP)
+    REPORT = "report"  # отчёт о телефоне: модель, серийники, память, состояние батареи
+
+    ALL = (SCAN, PURCHASES, LOGIN, INSTALL, ARCHIVE, BACKUP, REPORT)
 
 
 class JobState:

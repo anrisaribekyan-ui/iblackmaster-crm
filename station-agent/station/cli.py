@@ -164,6 +164,14 @@ def backup(udid: str, folder: str, media: bool = typer.Option(False, "--media", 
         console.print(f"Готово: {device.backup_full(udid, folder, progress=lambda p: console.print(f'{p}%'))}")
 
 
+@app.command()
+def report(udid: str) -> None:
+    """Отчёт о телефоне (модель, серийники, память, батарея): report <UDID>."""
+    from . import report as device_report
+
+    console.print(device_report.format_report_text(device_report.collect_report(udid)))
+
+
 def entry() -> None:
     # Сборка без окна (Windows): stdout нет — пишем вывод в файл, иначе rich упадёт
     if sys.stdout is None or sys.stderr is None:
