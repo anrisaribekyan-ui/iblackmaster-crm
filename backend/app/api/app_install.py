@@ -117,6 +117,7 @@ class AppOut(BaseModel):
     retired_note: str | None = None
     retired_at: datetime | None = None
     retired_by_name: str | None = None
+    in_standard_set: bool = False
 
 
 class JobOut(BaseModel):
@@ -481,6 +482,56 @@ def restore_app(app_id: int, db: DbSession):
     item.retired_at, item.retired_by = None, None
     db.commit()
     return item
+
+
+class StandardIn(BaseModel):
+    value: bool
+
+
+@router.post("/apps/{app_id}/standard", response_model=AppOut, dependencies=use_access)
+def set_standard(app_id: int, data: StandardIn, db: DbSession):
+    """Отметить приложение как входящее в стандартный набор для нового телефона."""
+    item = db.get(IosApp, app_id)
+    if item is None:
+        raise NotFound("Приложение")
+    item.in_standard_set = data.value
+    db.commit()
+    return item
+
+
+class StandardSetIn(BaseModel):
+    station_id: int
+    target_udid: str
+
+
+@router.post("/jobs/standard-set", dependencies=use_access)
+def install_standard_set(data: StandardSetIn, db: DbSession, me: CurrentEmployee):
+    """Поставить на телефон все приложения стандартного набора (по одной задаче на приложение)."""
+    station = _get_station(db, data.station_id)
+    _expire_stale(db)
+    if not _is_online(station):
+        raise BusinessError("Станция не на связи: проверьте, что компьютер включён и помощник запущен")
+    device = {d["udid"]: d for d in (station.devices or [])}.get(data.target_udid)
+    if device is None:
+        raise BusinessError("Этот телефон сейчас не подключён к станции")
+    if not device.get("paired"):
+        raise BusinessError("Телефон не доверяет компьютеру: разблокируйте его и нажмите «Доверять»")
+    apps = db.scalars(select(IosApp).where(IosApp.in_standard_set.is_(True), IosApp.is_active.is_(True),
+                                           IosApp.retired_reason.is_(None)).order_by(IosApp.name)).all()
+    if not apps:
+        raise BusinessError("Стандартный набор пуст: отметьте приложения кнопкой «В набор»")
+    busy = set(db.scalars(select(AppInstallJob.app_id).where(
+        AppInstallJob.station_id == station.id, AppInstallJob.kind == JobKind.INSTALL,
+        AppInstallJob.target_udid == data.target_udid, AppInstallJob.state.in_(JobState.OPEN))))
+    created = 0
+    for item in apps:
+        if item.id in busy:
+            continue
+        db.add(AppInstallJob(station_id=station.id, kind=JobKind.INSTALL, app_id=item.id, target_udid=data.target_udid,
+                             target_name=device.get("name") or device.get("product_type"), created_by_id=me.id, payload={}))
+        created += 1
+    db.commit()
+    return {"created": created, "total": len(apps)}
 
 
 @router.delete("/apps/{app_id}", status_code=204, dependencies=use_access)

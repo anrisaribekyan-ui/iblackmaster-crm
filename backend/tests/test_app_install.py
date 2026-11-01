@@ -625,3 +625,20 @@ def test_phone_report_job_stores_report(client, auth_headers, db):
     report(client, agent, job["id"], state="done", report=data, message="Отчёт готов")
     done = client.get(url, headers=auth_headers).json()[0]
     assert done["state"] == "done" and done["report"]["battery"]["health_percent"] == 78
+
+
+def test_standard_set_installs_marked_apps(client, auth_headers, db):
+    station_id, agent = make_station(client, auth_headers)
+    beat(client, agent, devices=(DONOR,))
+    empty = client.post("/api/app-install/jobs/standard-set", json={"station_id": station_id, "target_udid": DONOR["udid"]}, headers=auth_headers)
+    assert empty.status_code == 400
+    from app.models.app_install import IosApp
+    one = IosApp(adam_id=111, bundle_id="a.b", name="Альфа", source="import", in_standard_set=False)
+    two = IosApp(adam_id=222, bundle_id="c.d", name="Бета", source="import")
+    db.add_all([one, two]); db.commit()
+    r = client.post(f"/api/app-install/apps/{one.id}/standard", json={"value": True}, headers=auth_headers)
+    assert r.status_code == 200 and r.json()["in_standard_set"] is True
+    run = client.post("/api/app-install/jobs/standard-set", json={"station_id": station_id, "target_udid": DONOR["udid"]}, headers=auth_headers)
+    assert run.json() == {"created": 1, "total": 1}
+    again = client.post("/api/app-install/jobs/standard-set", json={"station_id": station_id, "target_udid": DONOR["udid"]}, headers=auth_headers)
+    assert again.json()["created"] == 0

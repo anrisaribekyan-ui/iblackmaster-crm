@@ -45,6 +45,7 @@ type IosApp = {
   retired_note: string | null
   retired_at: string | null
   retired_by_name: string | null
+  in_standard_set: boolean
 }
 type StoreFilter = 'all' | 'removed' | 'archived' | 'retired'
 type AppStats = { all: number; removed: number; archived: number; unchecked: number; retired: number }
@@ -590,6 +591,28 @@ export default function AppInstallPage() {
     }
   }
 
+  const toggleStandard = async (app: IosApp) => {
+    try {
+      const updated = await api.post<IosApp>(`/app-install/apps/${app.id}/standard`, { value: !app.in_standard_set })
+      setApps((list) => list.map((x) => (x.id === app.id ? { ...x, in_standard_set: updated.in_standard_set } : x)))
+    } catch (e) {
+      setError(errorText(e, 'Не удалось изменить набор'))
+    }
+  }
+
+  const installSet = async (d: Device) => {
+    if (!station) return
+    setNotice('')
+    setError('')
+    try {
+      const r = await api.post<{ created: number; total: number }>('/app-install/jobs/standard-set', { station_id: station.id, target_udid: d.udid })
+      setNotice(r.created ? `Ставлю набор на «${deviceTitle(d)}»: ${r.created} из ${r.total}` : 'Все приложения набора уже ставятся на этот телефон')
+      await loadJobs()
+    } catch (e) {
+      setError(errorText(e, 'Не удалось поставить набор'))
+    }
+  }
+
   const uploadIpa = async (file: File) => {
     setUploading(true)
     setError('')
@@ -794,6 +817,10 @@ export default function AppInstallPage() {
                               `Читаю приложения с «${deviceTitle(d)}»`)}>
                               Это донор: прочитать приложения
                             </button>
+                            <button className={button} title="Поставить все приложения, отмеченные «В набор»"
+                              onClick={() => void installSet(d)}>
+                              Поставить набор
+                            </button>
                             <button className={button} onClick={() => void startJob({ kind: 'report', target_udid: d.udid },
                               `Снимаю отчёт «${deviceTitle(d)}»`)} title="Модель, серийные номера, память, состояние батареи">
                               Отчёт о телефоне
@@ -952,6 +979,11 @@ export default function AppInstallPage() {
                           title={!targetUdid ? 'Сначала выберите телефон: «Ставить сюда»' : undefined}
                           onClick={() => void startJob({ kind: 'install', app_id: a.id, target_udid: targetUdid }, `Ставлю «${a.name}»`)}>
                           {busyApp(a.id) ? 'Ставится…' : 'Установить'}
+                        </button>
+                        <button className={`${button} px-2 ${a.in_standard_set ? 'border-accent' : ''}`} aria-pressed={a.in_standard_set}
+                          title="Входит ли в стандартный набор для нового телефона"
+                          onClick={() => void toggleStandard(a)}>
+                          {a.in_standard_set ? '★ В наборе' : '☆ В набор'}
                         </button>
                         <button className={`${button} px-2`} aria-label={`Убрать «${a.name}»`} title="Убрать из списка"
                           onClick={() => setRetiring(a)}>

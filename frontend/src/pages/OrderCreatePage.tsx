@@ -1,4 +1,5 @@
 import { getCurrentLocation } from '../currentLocation'
+import PhoneReader from '../components/PhoneReader'
 import { ClientCard, useIntakeHints, WarrantyAlert } from '../components/IntakeHints'
 import PriceHints from '../components/PriceHints'
 import { DevicePasswordInput } from '../components/PatternLock'
@@ -376,6 +377,12 @@ export default function OrderCreatePage() {
               </select>
             </label>
           </div>
+          <PhoneReader onRead={(phone) => setValues((current) => ({
+            ...current,
+            brand: current.brand || (phone.product_type?.startsWith('iPhone') || phone.product_type?.startsWith('iPad') ? 'Apple' : current.brand),
+            model: current.model || phone.model_name || current.model,
+            sn: current.sn || phone.serial || current.sn,
+          }))} />
           {!fieldsLoading && fields.length > 0 && (
             <div className="rounded-xl border border-line bg-surface p-4">
               <QuickOrderPicker

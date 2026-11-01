@@ -44,6 +44,7 @@ class IosApp(Base, TimestampMixin):
     version_id: Mapped[int | None] = mapped_column(BigInteger)  # softwareVersionExternalIdentifier
     source: Mapped[str] = mapped_column(String(10), default="scan")  # scan | purchases | upload | import
     is_active: Mapped[bool] = mapped_column(default=True)
+    in_standard_set: Mapped[bool] = mapped_column(default=False)  # ставится набором на новый телефон
     # Архив CRM: сам файл IPA лежит в uploads/ipa/<id>.ipa. Ставится без донора и без Apple,
     # но запустится только на телефоне, где в App Store вход в тот же Apple ID (ipa_apple_id).
     ipa_size: Mapped[int | None] = mapped_column(BigInteger)
