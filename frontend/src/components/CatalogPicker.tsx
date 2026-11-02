@@ -24,7 +24,7 @@ export default function CatalogPicker({
     }
     setError('')
     try {
-      const found = await api.get<CatalogItem[]>(`/nomenclature/search?q=${encodeURIComponent(q)}&location_id=${locationId}`)
+      const found = await api.get<CatalogItem[]>(`/nomenclature/search?q=${encodeURIComponent(q)}&location_id=${locationId}${onlyProducts ? '&is_work=false' : ''}`)
       setResults(onlyProducts ? found.filter((i) => !i.is_work) : found)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Не удалось выполнить поиск')

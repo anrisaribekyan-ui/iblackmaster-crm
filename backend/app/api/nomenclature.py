@@ -239,14 +239,7 @@ def list_nomenclature(
         query = query.where(Nomenclature.group_id == group_id)
     if q and q.strip():
         # Фильтруем и считаем в базе, а не тащим весь справочник в Python.
-        term = q.strip()
-        query = query.where(
-            or_(
-                Nomenclature.name.icontains(term, autoescape=True),
-                Nomenclature.article.icontains(term, autoescape=True),
-                cast(Nomenclature.code, String).icontains(term, autoescape=True),
-            )
-        )
+        query = query.where(*search_conditions(q))
     total = db.scalar(query.with_only_columns(func.count(Nomenclature.id)).order_by(None)) or 0
     page_items = db.scalars(query.offset((page - 1) * 50).limit(50)).all()
     return NomenclaturePage(
@@ -309,21 +302,28 @@ def delete_nomenclature(item_id: int, db: DbSession, me: CurrentEmployee):
     return Response(status_code=204)
 
 
+def search_conditions(q: str | None) -> list:
+    """Поиск по словам: каждое слово запроса должно встретиться в названии, артикуле или коде (в любом порядке)."""
+    words = [w for w in (q or "").replace("ё", "е").replace("Ё", "Е").split() if w]
+    return [
+        or_(
+            func.replace(func.lower(Nomenclature.name), "ё", "е").contains(word.lower(), autoescape=True),
+            Nomenclature.article.icontains(word, autoescape=True),
+            cast(Nomenclature.code, String).icontains(word, autoescape=True),
+        )
+        for word in words
+    ]
+
+
 @router.get("/nomenclature/search", response_model=list[NomenclatureOut])
-def search_nomenclature(db: DbSession, me: CurrentEmployee, q: str = "", location_id: int | None = None):
+def search_nomenclature(db: DbSession, me: CurrentEmployee, q: str = "", location_id: int | None = None, is_work: bool | None = None):
     if location_id is not None:
         check_location(me, location_id)
     query = select(Nomenclature).where(Nomenclature.is_deleted.is_(False)).order_by(Nomenclature.code)
-    term = q.strip()
-    if term:
-        query = query.where(
-            or_(
-                Nomenclature.name.icontains(term, autoescape=True),
-                Nomenclature.article.icontains(term, autoescape=True),
-                cast(Nomenclature.code, String).icontains(term, autoescape=True),
-            )
-        )
-    items = db.scalars(query.limit(20)).all()
+    query = query.where(*search_conditions(q))
+    if is_work is not None:
+        query = query.where(Nomenclature.is_work.is_(is_work))
+    items = db.scalars(query.limit(30)).all()
     return serialize_items(db, items, location_id, has_permission(me, "purchasePriceAccess"))
 
 

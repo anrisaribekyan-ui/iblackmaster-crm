@@ -193,3 +193,14 @@ def test_import_archive_nomenclature_is_idempotent(client, auth_headers, db):
     assert again == {"created": 0, "skipped": 3, "groups_created": 0}
     assert len(db.scalars(select(Nomenclature).where(Nomenclature.code.in_([9901, 9902, 9903]))).all()) == 3
     assert len(db.scalars(select(NomenclatureGroup).where(NomenclatureGroup.name == "Подгруппа")).all()) == 1
+
+
+def test_search_by_words_in_any_order_and_only_products(client, auth_headers):
+    for name, work in (("Дисплей для iPhone 12 Pro оригинал", False), ("Замена дисплея iPhone 12 Pro", True)):
+        assert client.post("/api/nomenclature", json={"name": name, "is_work": work}, headers=auth_headers).status_code == 200
+    found = client.get("/api/nomenclature/search", params={"q": "iphone диспл 12"}, headers=auth_headers).json()
+    assert len(found) == 2
+    products = client.get("/api/nomenclature/search", params={"q": "pro iphone", "is_work": "false"}, headers=auth_headers).json()
+    assert [i["name"] for i in products] == ["Дисплей для iPhone 12 Pro оригинал"]
+    listing = client.get("/api/nomenclature", params={"q": "12 диспл"}, headers=auth_headers).json()
+    assert listing["total"] == 2
