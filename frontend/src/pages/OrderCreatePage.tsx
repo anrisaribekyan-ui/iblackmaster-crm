@@ -656,6 +656,7 @@ function DynamicField({
   counteragentFound: string
   onNewCounteragent: () => void
 }) {
+  const [suggestOpen, setSuggestOpen] = useState(false)
   const label = <span>{field.label}{field.is_required && <span className="ml-1 text-danger">*</span>}</span>
   let control: ReactNode
   if (field.data_type === 'multiple' && field.key !== 'phones') {
@@ -676,13 +677,16 @@ function DynamicField({
           className={inputClass}
           value={String(value ?? '')}
           required={field.is_required}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => { onChange(event.target.value); setSuggestOpen(true) }}
+          onFocus={() => setSuggestOpen(true)}
+          onBlur={() => setSuggestOpen(false)}
+          onKeyDown={(event) => { if (event.key === 'Escape') setSuggestOpen(false) }}
           autoComplete="off"
         />
-        {deviceSuggestions.length > 0 && (
+        {suggestOpen && deviceSuggestions.length > 0 && (
           <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-line bg-surface shadow-lg">
             {deviceSuggestions.map((device) => (
-              <li key={device.id}><button type="button" className="w-full px-3 py-2 text-left hover:bg-canvas" onClick={() => onChooseDevice(device)}>{device.name}</button></li>
+              <li key={device.id}><button type="button" className="w-full px-3 py-2 text-left hover:bg-canvas" onMouseDown={(e) => e.preventDefault()} onClick={() => { onChooseDevice(device); setSuggestOpen(false) }}>{device.name}</button></li>
             ))}
           </ul>
         )}

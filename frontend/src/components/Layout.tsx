@@ -182,6 +182,8 @@ export default function Layout() {
         <Suspense fallback={<Skeleton className="py-6" />}>
           <Outlet />
         </Suspense>
+        {/* Запас внизу страницы: плавающая кнопка «Идея для Анри» не должна закрывать последние кнопки формы */}
+        <div className="h-24" aria-hidden />
       </main>
       <ShiftPrompt />
       <IdeaButton />

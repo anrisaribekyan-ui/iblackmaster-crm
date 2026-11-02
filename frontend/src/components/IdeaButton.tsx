@@ -41,10 +41,11 @@ export default function IdeaButton() {
         type="button"
         onClick={() => setOpen(true)}
         title="Что неудобно или чего не хватает? Напишите — Анри увидит"
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] right-3 z-30 flex items-center gap-2 rounded-full bg-ink px-4 py-2.5 text-sm font-medium text-white shadow-lg hover:opacity-90 md:bottom-5 md:right-5"
+        aria-label="Идея для Анри"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] right-3 z-30 flex items-center gap-2 rounded-full bg-ink p-3 md:px-4 md:py-2.5 text-sm font-medium text-white shadow-lg hover:opacity-90 md:bottom-5 md:right-5"
       >
         <Icon name="idea" className="h-[18px] w-[18px]" />
-        Идея для Анри
+        <span className="hidden md:inline">Идея для Анри</span>
       </button>
       {open && (
         <Modal title="Идея для Анри" onClose={close}>
