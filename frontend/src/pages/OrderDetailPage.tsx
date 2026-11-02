@@ -1033,6 +1033,7 @@ export default function OrderDetailPage() {
             orderId={detail.order.id}
             hasPhone={/(^|,)\s*79\d{9}/.test(detail.counteragent.phones ?? '')}
             disabled={isDeleted}
+            partArrived={/запчасть в наличии/i.test(detail.status?.name ?? '')}
             onSent={() => void loadDetail()}
           />
           <section className="rounded-xl border border-line bg-surface p-4">

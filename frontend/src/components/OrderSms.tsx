@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../api/client'
 import Modal from './Modal'
-import { formatDateTime, smsParts, smsStateClass, type Sms } from './sms'
+import { formatDateTime, PART_ARRIVED_SMS, smsParts, smsStateClass, type Sms } from './sms'
 
 const quick = [
+  PART_ARRIVED_SMS,
   'Здравствуйте, {имя}! Ваш {устройство} готов, к оплате {долг} руб. {адрес}, {часы}',
   'Здравствуйте, {имя}! Заказ {номер}: нужна ваша консультация, перезвоните, пожалуйста: {телефон_точки}',
   'Здравствуйте, {имя}! Статус ремонта {номер}: {ссылка}',
 ]
 
 /** SMS по заказу: что ушло клиенту и кнопка «Написать клиенту». */
-export default function OrderSms({ orderId, hasPhone, disabled, onSent }: { orderId: number; hasPhone: boolean; disabled: boolean; onSent: () => void }) {
+export default function OrderSms({ orderId, hasPhone, disabled, partArrived = false, onSent }: { orderId: number; hasPhone: boolean; disabled: boolean; partArrived?: boolean; onSent: () => void }) {
   const [items, setItems] = useState<Sms[]>([])
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
@@ -52,14 +53,26 @@ export default function OrderSms({ orderId, hasPhone, disabled, onSent }: { orde
     <section className="rounded-xl border border-line bg-surface p-4">
       <header className="mb-3 flex items-center justify-between gap-2">
         <h2 className="font-semibold">SMS клиенту</h2>
-        <button
-          className="rounded-md border border-line px-3 py-1.5 text-sm hover:border-accent disabled:opacity-50"
-          disabled={disabled || !hasPhone}
-          title={hasPhone ? '' : 'У клиента нет мобильного номера'}
-          onClick={() => setOpen(true)}
-        >
-          Написать клиенту
-        </button>
+        <div className="flex flex-wrap justify-end gap-2">
+          {partArrived && (
+            <button
+              className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink disabled:opacity-50"
+              disabled={disabled || !hasPhone}
+              title={hasPhone ? 'Откроется готовый текст: запчасть пришла, можно приезжать' : 'У клиента нет мобильного номера'}
+              onClick={() => { setText(PART_ARRIVED_SMS); setOpen(true) }}
+            >
+              Запчасть пришла: написать
+            </button>
+          )}
+          <button
+            className="rounded-md border border-line px-3 py-1.5 text-sm hover:border-accent disabled:opacity-50"
+            disabled={disabled || !hasPhone}
+            title={hasPhone ? '' : 'У клиента нет мобильного номера'}
+            onClick={() => setOpen(true)}
+          >
+            Написать клиенту
+          </button>
+        </div>
       </header>
       {items.length === 0 ? (
         <p className="text-sm text-muted">{hasPhone ? 'Сообщений по заказу ещё не было.' : 'У клиента нет мобильного номера.'}</p>
@@ -90,10 +103,10 @@ export default function OrderSms({ orderId, hasPhone, disabled, onSent }: { orde
         <Modal title="SMS клиенту" onClose={() => setOpen(false)}>
           <div className="grid gap-3">
             <div className="flex flex-col gap-1">
-              {quick.map((q) => (
+              {quick.map((q, i) => (
                 <button key={q} type="button" onClick={() => setText(q)}
                   className="rounded-md border border-line px-2 py-1 text-left text-sm text-muted hover:border-accent hover:text-ink">
-                  {q}
+                  {i === 0 && <b className="mr-1 text-ink">Запчасть пришла:</b>}{q}
                 </button>
               ))}
             </div>
