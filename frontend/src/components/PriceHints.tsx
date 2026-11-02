@@ -9,6 +9,8 @@ const timesWord = (n: number) => (n % 10 === 1 && n % 100 !== 11 ? 'раз' : [2
 /** «Цена за 3 секунды» (ТЗ этап 3, E2): частые ремонты этой модели и сколько они обычно стоили у нас. */
 export default function PriceHints({ brand, model, onPick }: { brand: string; model: string; onPick: (price: string) => void }) {
   const [hints, setHints] = useState<Hint[]>([])
+  const [open, setOpen] = useState(false)
+  const [hiddenFor, setHiddenFor] = useState('')
   useEffect(() => {
     if (model.trim().length < 2) {
       setHints([])
@@ -23,18 +25,27 @@ export default function PriceHints({ brand, model, onPick }: { brand: string; mo
     return () => { active = false; window.clearTimeout(timer) }
   }, [brand, model])
 
-  if (hints.length === 0) return null
+  const title = [brand, model].filter(Boolean).join(' ')
+  if (hints.length === 0 || hiddenFor === title) return null
   return (
-    <div className="rounded-xl border border-line bg-canvas p-3">
-      <p className="mb-2 text-sm font-semibold">Обычно на {[brand, model].filter(Boolean).join(' ')}</p>
-      <ul className="divide-y divide-line">
+    <div className="col-span-full rounded-xl border border-line bg-canvas" onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false) }}>
+      <div className="flex items-center gap-1 pr-1">
+        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm">
+          <span className="min-w-0 flex-1 truncate"><span className="font-semibold">Цены на {title}</span> <span className="text-muted">· {hints.length}</span></span>
+          <span aria-hidden className="text-muted">{open ? '▴' : '▾'}</span>
+        </button>
+        <button type="button" onClick={() => setHiddenFor(title)} aria-label="Скрыть подсказки цен" className="rounded-md px-2 py-1 text-lg leading-none text-muted hover:text-ink">×</button>
+      </div>
+      {open && (
+      <div className="border-t border-line p-3 pt-1">
+      <ul className="max-h-64 divide-y divide-line overflow-y-auto">
         {hints.map((h) => {
           const range = h.from === h.to ? `${rub(h.typical)} ₽` : `${rub(h.from)}–${rub(h.to)} ₽`
           return (
             <li key={h.work}>
               <button
                 type="button"
-                onClick={() => onPick(h.from === h.to ? String(h.typical) : `${h.from}-${h.to}`)}
+                onClick={() => { onPick(h.from === h.to ? String(h.typical) : `${h.from}-${h.to}`); setOpen(false) }}
                 className="flex w-full items-baseline gap-3 py-2 text-left text-sm hover:text-accent"
                 title="Подставить в «Ориентировочную цену»"
               >
@@ -49,6 +60,8 @@ export default function PriceHints({ brand, model, onPick }: { brand: string; mo
         })}
       </ul>
       <p className="mt-1 text-xs text-muted">Итог заказа с этой работой по выданным заказам. Нажмите — цена встанет в «Ориентировочную цену».</p>
+      </div>
+      )}
     </div>
   )
 }
