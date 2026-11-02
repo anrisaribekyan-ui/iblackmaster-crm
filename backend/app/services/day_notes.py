@@ -259,7 +259,17 @@ def match_orders(db: Session, title: str, allowed_locations: set[int], location_
 
 def order_by_number(db: Session, number: str, allowed_locations: set[int]) -> dict | None:
     """Точное совпадение по номеру: заказ может быть в любом статусе (в том числе выданный)."""
-    order = db.scalars(select(Order).where(Order.number == number, Order.is_deleted.is_(False))).first()
+    digits = re.sub(r"\D", "", number)
+    # В базе номер может быть с латинской или русской «А», с пробелом или с приставкой точки (ЛН-…): ищем по цифрам
+    variants = {number, f"A{digits}", f"А{digits}", digits, f"ЛН-{digits}"}
+    found = db.scalars(select(Order).where(Order.number.in_(variants), Order.is_deleted.is_(False)).order_by(Order.id)).all()
+    if not found and digits:
+        found = db.scalars(select(Order).where(Order.number.like(f"%{digits}"), Order.is_deleted.is_(False))).all()
+        found = [o for o in found if re.sub(r"\D", "", o.number) == digits]
+    if allowed_locations:
+        found = [o for o in found if o.location_id in allowed_locations]
+    exact = [o for o in found if o.number == number]
+    order = exact[0] if exact else (found[0] if len(found) == 1 else None)
     if order is None or (allowed_locations and order.location_id not in allowed_locations):
         return None
     status = db.get(OrderStatus, order.status_id)

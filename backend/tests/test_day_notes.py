@@ -135,3 +135,10 @@ def test_unknown_order_number_has_no_candidates(client, auth_headers):
     note_id = client.post("/api/day-notes", json={"text": "А99999 500 нал замена стекла"}, headers=auth_headers).json()["id"]
     item = client.post(f"/api/day-notes/{note_id}/analyze", headers=auth_headers).json()["items"][0]
     assert item["kind"] == "order_work" and item["candidates"] == []
+
+
+def test_order_lookup_ignores_script_of_a(client, auth_headers, db, owner):
+    order = make_order(db, owner, "А15991", "Apple", "iPhone 14 Pro Max", price=0)  # русская А в номере
+    note_id = client.post("/api/day-notes", json={"text": "A15991 13600 безнал замена дисплея"}, headers=auth_headers).json()["id"]
+    item = client.post(f"/api/day-notes/{note_id}/analyze", headers=auth_headers).json()["items"][0]
+    assert [c["order_id"] for c in item["candidates"]] == [order.id]
