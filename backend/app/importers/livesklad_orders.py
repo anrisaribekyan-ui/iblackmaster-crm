@@ -47,7 +47,7 @@ from app.models import (
     StatusGroup,
 )
 from app.security import hash_password
-from app.utils.phone import normalize_phone
+from app.utils.phone import normalize_phone, split_phones
 
 MSK = ZoneInfo("Europe/Moscow")
 POSITION_RE = re.compile(r"^\s*([\d.,]+)\s*x\s*(.+?)\s*\(([\d\s.,]+)\s*руб\.?\)\s*;?\s*$")
@@ -257,12 +257,14 @@ class Importer:
         return found
 
     def client(self, row: dict) -> Counteragent:
-        phone = normalize_phone(str(row.get("Телефон") or ""))
+        phones = split_phones(str(row.get("Телефон") or ""))
+        phone = ",".join(phones) or None
         name = text(row.get("Имя")) or "Без имени"
-        if phone and phone in self.clients_by_phone:
-            self.stats["клиент найден по телефону"] += 1
-            return self.clients_by_phone[phone]
-        if not phone and name.casefold() in self.clients_by_name:
+        for one in phones:
+            if one in self.clients_by_phone:
+                self.stats["клиент найден по телефону"] += 1
+                return self.clients_by_phone[one]
+        if not phones and name.casefold() in self.clients_by_name:
             return self.clients_by_name[name.casefold()]
         ca_type = self.ca_types.get((text(row.get("Тип контрагента")) or "").casefold())
         client = Counteragent(
@@ -278,8 +280,9 @@ class Importer:
         )
         self.db.add(client)
         self.db.flush()
-        if phone:
-            self.clients_by_phone[phone] = client
+        if phones:
+            for one in phones:
+                self.clients_by_phone.setdefault(one, client)
         else:
             self.clients_by_name[name.casefold()] = client
         self.stats["клиентов создано"] += 1

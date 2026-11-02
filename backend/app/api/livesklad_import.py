@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
 
-from app.api.deps import CurrentEmployee, require
+from app.api.deps import CurrentEmployee, DbSession, require
 from app.errors import BusinessError, NotFound
 
 router = APIRouter(prefix="/admin/livesklad-import", tags=["Перенос из LiveSklad"])
@@ -74,3 +74,11 @@ def import_status(job_id: str, me: CurrentEmployee):
     if not job_id.isalnum() or not path.exists():
         raise NotFound("Перенос")
     return json.loads(path.read_text())
+
+
+@router.post("/merge-duplicates", dependencies=[Depends(require("settingAccess"))])
+def merge_duplicate_clients(db: DbSession, commit: bool = False):
+    """Склеивает клиентов, задвоенных переносом (склеенные в одну строку телефоны). Без commit — только подсчёт."""
+    from app.services.client_merge import merge_duplicates
+
+    return merge_duplicates(db, commit)
