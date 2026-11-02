@@ -50,6 +50,8 @@ class Employee(Base, TimestampMixin):
     telegram_chat_id: Mapped[str | None] = mapped_column(String(50))
     # Когда последний раз меняли пароль: входы, выданные раньше, перестают действовать
     password_changed_at: Mapped[datetime | None]
+    # Какие подсказки и экскурсии сотрудник уже видел (хранится на сервере: не повторяются на другом устройстве)
+    seen_tips: Mapped[list[str]] = mapped_column(JSON, default=list)
 
     role: Mapped[Role] = relationship()
     locations: Mapped[list["Location"]] = relationship(secondary=employee_location)  # noqa: F821

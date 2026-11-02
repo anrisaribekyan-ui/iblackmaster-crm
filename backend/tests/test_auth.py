@@ -14,3 +14,11 @@ def test_employee_changes_own_password(client, auth_headers, owner):
 def test_mail_test_endpoint_accepts_custom_address(client, auth_headers):
     bad = client.post("/api/settings/mail/test", json={"to": "не адрес"}, headers=auth_headers)
     assert bad.status_code == 400  # без SMTP — «почта не подключена», с неверным адресом — тоже 400
+
+
+def test_tips_seen_and_reset(client, auth_headers):
+    assert client.get("/api/auth/me", headers=auth_headers).json()["seen_tips"] == []
+    assert client.post("/api/auth/tips/seen", json={"id": "page:orders"}, headers=auth_headers).json() == ["page:orders"]
+    assert client.post("/api/auth/tips/seen", json={"id": "page:orders"}, headers=auth_headers).json() == ["page:orders"]
+    assert client.get("/api/auth/me", headers=auth_headers).json()["seen_tips"] == ["page:orders"]
+    assert client.post("/api/auth/tips/reset", headers=auth_headers).json() == []

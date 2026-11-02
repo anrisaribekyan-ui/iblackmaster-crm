@@ -10,6 +10,9 @@ import Skeleton from './Skeleton'
 import LocationSwitcher from './LocationSwitcher'
 import ShiftPrompt from './ShiftPrompt'
 import IdeaButton from './IdeaButton'
+import PageTip from './PageTip'
+import Tour from './Tour'
+import { ALL_TIPS_OFF, TOUR_ID, tipFor } from '../tips'
 
 /** Меню как в LiveSklad. permission — право, без которого пункт скрыт (пусто — виден всем). */
 export const MENU: { to: string; label: string; icon: string; permission?: string }[] = [
@@ -31,14 +34,24 @@ export const MENU: { to: string; label: string; icon: string; permission?: strin
 ]
 
 export default function Layout() {
-  const { me, logout, can } = useAuth()
+  const { me, logout, can, resetTips } = useAuth()
   const [passwordOpen, setPasswordOpen] = useState(false)
+  const [tourOpen, setTourOpen] = useState(false)
+  const [forcedTip, setForcedTip] = useState<string | null>(null)
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const location = useLocation()
   // На телефоне меню закрывается после перехода
   useEffect(() => setMenuOpen(false), [location.pathname])
+  // Подсказки: экскурсия при первом входе, карточка «Что здесь» при первом заходе на страницу, «?» открывает снова
+  const seen = me?.seen_tips ?? []
+  const tipsOff = seen.includes(ALL_TIPS_OFF)
+  const tip = tipFor(location.pathname)
+  const tipAllowed = !!tip && (!tip.permission || can(tip.permission))
+  const showTour = !!me && (tourOpen || (!tipsOff && !seen.includes(TOUR_ID)))
+  const showTip = !showTour && tipAllowed && tip && (forcedTip === tip.id || (!tipsOff && !seen.includes(tip.id)))
+  useEffect(() => setForcedTip(null), [location.pathname])
   const searchRef = useRef<HTMLInputElement>(null)
   const mainRef = useRef<HTMLElement>(null)
   const navigationType = useNavigationType()
@@ -143,6 +156,9 @@ export default function Layout() {
           ))}
         </nav>
         <InstallApp />
+        <button type="button" onClick={() => { void resetTips().then(() => setTourOpen(true)) }} className="mx-3 mb-1 rounded-md px-3 py-1.5 text-left text-sm text-rail-muted hover:bg-rail-hover hover:text-white" title="Показать экскурсию и подсказки по страницам заново">
+          Экскурсия по CRM
+        </button>
         <ThemeSwitch />
         <div className="m-3 flex items-center gap-3 rounded-lg bg-rail-hover px-3 py-2.5">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#3a3f47] text-sm font-medium text-white" aria-hidden>
@@ -159,6 +175,7 @@ export default function Layout() {
         </div>
       </aside>
       {passwordOpen && <ChangePasswordModal onClose={() => setPasswordOpen(false)} />}
+      {showTour && <Tour onClose={() => setTourOpen(false)} />}
       {/* На телефоне прокручивается вся страница (прячется адресная строка, работает «потянуть — обновить»),
           на компьютере — только рабочая область справа от меню */}
       <main ref={mainRef} className="relative min-w-0 flex-1 px-3 pb-24 sm:px-8 md:overflow-auto md:py-6 md:pb-6">
@@ -178,7 +195,17 @@ export default function Layout() {
             />
             <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-line px-1.5 text-xs text-muted md:block peer-focus:md:hidden" title="Нажмите / чтобы искать">/</kbd>
           </form>
+          <button
+            type="button"
+            onClick={() => (tipAllowed && tip ? setForcedTip(tip.id) : setTourOpen(true))}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-surface font-semibold text-muted hover:text-ink"
+            title="Что на этой странице"
+            aria-label="Подсказка по этой странице"
+          >
+            ?
+          </button>
         </header>
+        {showTip && tip && <PageTip tip={tip} onClose={() => setForcedTip(null)} onTour={() => setTourOpen(true)} />}
         <Suspense fallback={<Skeleton className="py-6" />}>
           <Outlet />
         </Suspense>

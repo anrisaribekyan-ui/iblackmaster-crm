@@ -41,6 +41,7 @@ class MeOut(BaseModel):
     permissions: list[str]
     scopes: dict[str, str]
     location_ids: list[int]
+    seen_tips: list[str] = []
 
 
 @router.post("/login", response_model=LoginOut)
@@ -66,7 +67,30 @@ def me(employee: CurrentEmployee):
         permissions=ALL_PERMISSION_CODES if employee.is_owner else (employee.role.permissions or []),
         scopes=FULL_SCOPES if employee.is_owner else (employee.role.scopes or {}),
         location_ids=[loc.id for loc in employee.locations],
+        seen_tips=list(employee.seen_tips or []),
     )
+
+
+class TipIn(BaseModel):
+    id: str
+
+
+@router.post("/tips/seen", response_model=list[str])
+def mark_tip_seen(data: TipIn, employee: CurrentEmployee, db: DbSession):
+    tip = data.id.strip()[:60]
+    seen = list(employee.seen_tips or [])
+    if tip and tip not in seen:
+        employee.seen_tips = [*seen, tip]
+        db.commit()
+    return list(employee.seen_tips or [])
+
+
+@router.post("/tips/reset", response_model=list[str])
+def reset_tips(employee: CurrentEmployee, db: DbSession):
+    """«Показать экскурсию заново»."""
+    employee.seen_tips = []
+    db.commit()
+    return []
 
 
 # --- Забыли пароль: код на почту ----------------------------------------------------------

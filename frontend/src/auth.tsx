@@ -12,6 +12,8 @@ export type Me = {
   permissions: string[]
   scopes: Record<string, string>
   location_ids: number[]
+  /** Подсказки и экскурсии, которые сотрудник уже видел */
+  seen_tips: string[]
 }
 
 type AuthState = {
@@ -25,6 +27,10 @@ type AuthState = {
   logout: () => void
   /** Есть ли у текущего сотрудника право (код из backend/app/permissions.py) */
   can: (permission: string) => boolean
+  /** Отметить подсказку показанной (хранится на сервере) */
+  markTip: (id: string) => void
+  /** «Показать экскурсию заново» */
+  resetTips: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -91,7 +97,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const can = (permission: string) => !!me && (me.is_owner || me.permissions.includes(permission))
 
-  return <AuthContext.Provider value={{ me, loading, offline, retry, login, loginWithToken, logout, can }}>{children}</AuthContext.Provider>
+  const markTip = (id: string) => {
+    setMe((current) => (current && !current.seen_tips.includes(id) ? { ...current, seen_tips: [...current.seen_tips, id] } : current))
+    void api.post('/auth/tips/seen', { id }).catch(() => undefined)
+  }
+
+  const resetTips = async () => {
+    await api.post('/auth/tips/reset', {})
+    setMe((current) => (current ? { ...current, seen_tips: [] } : current))
+  }
+
+  return <AuthContext.Provider value={{ me, loading, offline, retry, login, loginWithToken, logout, can, markTip, resetTips }}>{children}</AuthContext.Provider>
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
