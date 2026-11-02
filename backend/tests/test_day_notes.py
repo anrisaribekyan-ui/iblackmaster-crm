@@ -116,3 +116,22 @@ def test_work_for_retail_client_is_a_sale_of_work():
 def test_cost_is_extracted():
     items = service.rules_extract("заменил акб айфон 8 за 3000 себес 1200 нал / поменял дисп за 2000 без себеса")
     assert [(i["amount"], i["cost"]) for i in items] == [(3000, 1200), (2000, 0)]
+
+
+def test_order_number_in_note_becomes_work_for_that_order(client, auth_headers, db, owner):
+    order = make_order(db, owner, "A15991", "Apple", "iPhone 14 Pro Max", price=0)
+    text = "A15991 13600 безнал замена дисплея iPhone 14 pro max soft oled DD себес 3700   заказ уже есть\nСтекло 1500 ремакс 14 про (себес 160) безнал"
+    note_id = client.post("/api/day-notes", json={"text": text}, headers=auth_headers).json()["id"]
+    work, glass = client.post(f"/api/day-notes/{note_id}/analyze", headers=auth_headers).json()["items"]
+    assert work["kind"] == "order_work" and work["order_number"] == "A15991"
+    assert work["amount"] == 13600 and work["method"] == "bank" and work["cost"] == 3700
+    assert work["title"] == "Замена дисплея iPhone 14 pro max soft oled DD"
+    assert [c["order_id"] for c in work["candidates"]] == [order.id]
+    assert work["candidates"][0]["positions"] == []
+    assert glass["kind"] == "sale" and glass["amount"] == 1500
+
+
+def test_unknown_order_number_has_no_candidates(client, auth_headers):
+    note_id = client.post("/api/day-notes", json={"text": "А99999 500 нал замена стекла"}, headers=auth_headers).json()["id"]
+    item = client.post(f"/api/day-notes/{note_id}/analyze", headers=auth_headers).json()["items"][0]
+    assert item["kind"] == "order_work" and item["candidates"] == []

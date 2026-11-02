@@ -16,7 +16,9 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import Counteragent, Nomenclature, Order, OrderStatus, StatusGroup
 
-KINDS = {"sale", "give_order", "payment", "other"}
+KINDS = {"sale", "give_order", "payment", "order_work", "other"}
+ORDER_NO = re.compile(r"(?<![A-Za-zА-Яа-я0-9])[AaАа][\s-]?(\d{4,6})(?!\d)")
+ORDER_PHRASE = re.compile(r"заказ\s+(?:уже\s+)?есть|уже\s+есть|заказ\s+№?", re.I)
 BANK_WORDS = re.compile(r"безнал|без нал|карт[аойуе]|картой|перевод|эквайр|терминал|сбп|qr|кьюар", re.I)
 CASH_WORDS = re.compile(r"наличк|наличны|\bнал\b|кэш|cash", re.I)
 GIVE_WORDS = re.compile(r"выдал|выдан|выдача|отдал|забрал|закрыл", re.I)
@@ -46,6 +48,23 @@ def _tokens(text: str) -> list[str]:
             token = token.translate(LOOKALIKE)
         result.append(token)
     return result
+
+
+def order_number(text: str) -> str | None:
+    """«А15991» (русская или латинская А) → «A15991»."""
+    match = ORDER_NO.search(text or "")
+    return f"A{match.group(1)}" if match else None
+
+
+def work_name(text: str) -> str:
+    """Название работы из строки заметки: без номера заказа, суммы, способа оплаты и себестоимости."""
+    value = ORDER_NO.sub(" ", text or "")
+    value = ORDER_PHRASE.sub(" ", value)
+    value = COST.sub(" ", NO_COST.sub(" ", NO_WARRANTY.sub(" ", value)))
+    value = BANK_WORDS.sub(" ", CASH_WORDS.sub(" ", value))
+    value = re.sub(r"(?<![\w.])\d{3,6}(?:\s*(?:руб\w*|р|₽)(?![а-яa-z]))?(?![\w])", " ", value, count=1)
+    value = re.sub(r"\s+", " ", value).strip(" \t.,-")
+    return (value[:1].upper() + value[1:]) if value else "Работа"
 
 
 def _prefix_match(word: str, pool: set[str]) -> bool:
@@ -238,6 +257,28 @@ def match_orders(db: Session, title: str, allowed_locations: set[int], location_
     ]
 
 
+def order_by_number(db: Session, number: str, allowed_locations: set[int]) -> dict | None:
+    """Точное совпадение по номеру: заказ может быть в любом статусе (в том числе выданный)."""
+    order = db.scalars(select(Order).where(Order.number == number, Order.is_deleted.is_(False))).first()
+    if order is None or (allowed_locations and order.location_id not in allowed_locations):
+        return None
+    status = db.get(OrderStatus, order.status_id)
+    client = db.get(Counteragent, order.counteragent_id)
+    return {
+        "order_id": order.id,
+        "location_id": order.location_id,
+        "number": order.number,
+        "label": " ".join(x for x in (order.brand, order.model) if x) or "Аппарат",
+        "client": client.name if client else "",
+        "debt": int(order.debt),
+        "total": int(order.total_price),
+        "paid": int(order.paid),
+        "status": status.name if status else "",
+        "ready": bool(status and status.group == StatusGroup.FINISH),
+        "positions": [{"name": p.name or "", "price": int(p.price or 0), "is_work": bool(p.is_work)} for p in order.positions],
+    }
+
+
 def match_products(db: Session, title: str, limit: int = 3) -> list[dict]:
     query = _tokens(title)
     if not query:
@@ -265,6 +306,22 @@ def analyze(
     items = []
     for row in extracted:
         item = {**row, "status": "new", "ref": None, "candidates": [], "products": []}
+        number = order_number(row.get("text") or "")
+        if number:
+            found = order_by_number(db, number, allowed_locations)
+            if row["kind"] in ("give_order", "payment"):
+                item["candidates"] = [found] if found else []
+            else:
+                item["kind"] = "order_work"
+                item["order_number"] = number
+                item["candidates"] = [found] if found else []
+                item["title"] = work_name(row.get("text") or "")
+                if item.get("cost") is None:
+                    cost_match = COST.search(row.get("text") or "")
+                    item["cost"] = int(cost_match.group(1)) if cost_match else (0 if NO_COST.search(row.get("text") or "") else None)
+                item["no_cost"] = item.get("no_cost") or bool(NO_COST.search(row.get("text") or ""))
+            items.append(item)
+            continue
         if row["kind"] in ("give_order", "payment"):
             item["candidates"] = match_orders(db, row.get("title") or "", allowed_locations, location_id)
         elif row["kind"] == "sale":

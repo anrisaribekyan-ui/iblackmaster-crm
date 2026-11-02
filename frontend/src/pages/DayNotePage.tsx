@@ -2,10 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, ApiError } from '../api/client'
 import { inputClass, money, useLocationsAndRegisters, type CashRegisterRef } from './shared'
 
-type Candidate = { order_id: number; location_id: number; number: string; label: string; client: string; debt: number; status: string; ready: boolean }
+type Candidate = {
+  order_id: number; location_id: number; number: string; label: string; client: string; debt: number; status: string; ready: boolean
+  total?: number; paid?: number; positions?: { name: string; price: number; is_work: boolean }[]
+}
 type Product = { nomenclature_id: number; name: string; is_work: boolean }
 type Item = {
-  kind: 'sale' | 'give_order' | 'payment' | 'other'
+  kind: 'sale' | 'give_order' | 'payment' | 'order_work' | 'other'
+  order_number?: string
   text: string
   title: string
   amount: number | null
@@ -27,6 +31,7 @@ const KIND_TITLE: Record<Item['kind'], string> = {
   sale: 'Продажа',  // для работы название берём ниже
   give_order: 'Выдача ремонта',
   payment: 'Оплата по ремонту',
+  order_work: 'Работа в заказ',
   other: 'Не распознано',
 }
 
@@ -205,6 +210,8 @@ function ItemCard({ noteId, index, item, locations, registers, fallbackLocationI
   const [cost, setCost] = useState<string>(item.cost != null ? String(item.cost) : '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [workAdded, setWorkAdded] = useState(false) // позиция уже добавлена, оплата не прошла: при повторе не задваиваем
+  const [payNow, setPayNow] = useState(item.method !== null)
 
   const candidate = useMemo(() => item.candidates.find((c) => String(c.order_id) === orderId), [item.candidates, orderId])
   const done = item.status !== 'new'
@@ -241,6 +248,36 @@ function ItemCard({ noteId, index, item, locations, registers, fallbackLocationI
       await mark('applied', `order:${candidate.number}`)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Не удалось внести')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const applyOrderWork = async () => {
+    if (!candidate) return
+    setBusy(true)
+    setError('')
+    try {
+      const sum = Number(amount)
+      if (!(sum > 0)) throw new ApiError(400, 'business_error', 'Укажите цену работы')
+      if (!name.trim()) throw new ApiError(400, 'business_error', 'Укажите название работы')
+      const register = payNow ? pickRegister(registers, candidate.location_id, bank) : undefined
+      if (payNow && !register) throw new ApiError(400, 'business_error', bank ? 'Нет кассы для безналичной оплаты' : 'Нет кассы для наличных')
+      if (!workAdded) {
+        await api.post(`/orders/${candidate.order_id}/positions`, {
+          name: name.trim(), is_work: true, quantity: '1', price: String(sum),
+          purchase_price: cost.trim() === '' ? '0' : String(Number(cost)),
+          ...(item.guarantee_days != null ? { guarantee_days: item.guarantee_days } : {}),
+        })
+        setWorkAdded(true)
+      }
+      if (payNow && register) {
+        await api.post(`/orders/${candidate.order_id}/payments`, { cash_register_id: register.id, amount: String(sum), is_bank: bank, note: 'Из заметки «что сегодня было»' })
+      }
+      await mark('applied', `order:${candidate.number}`)
+    } catch (e) {
+      const message = e instanceof ApiError ? e.message : 'Не удалось внести работу'
+      setError(workAdded ? `Работа уже добавлена в заказ. ${message}. Нажмите ещё раз, чтобы повторить только оплату.` : message)
     } finally {
       setBusy(false)
     }
@@ -291,7 +328,7 @@ function ItemCard({ noteId, index, item, locations, registers, fallbackLocationI
   return (
     <article className={`rounded-xl border border-line bg-surface p-4 ${done ? 'opacity-60' : ''}`}>
       <div className="mb-1 flex flex-wrap items-baseline gap-2">
-        <b>{item.kind === 'sale' && item.is_work ? 'Работа (розница)' : KIND_TITLE[item.kind]}</b>{item.no_cost && <span className="text-sm text-muted">без себестоимости</span>}
+        <b>{item.kind === 'sale' && item.is_work ? 'Работа (розница)' : item.kind === 'order_work' ? `Работа в заказ ${item.order_number ?? ''}` : KIND_TITLE[item.kind]}</b>{item.no_cost && <span className="text-sm text-muted">без себестоимости</span>}
         {item.person && <span className="text-sm text-muted">{item.person}</span>}
         {item.status === 'applied' && <span className="rounded bg-green-100 px-2 text-sm text-green-800">внесено{item.ref ? ` · ${item.ref.replace(/^\w+:/, '')}` : ''}</span>}
         {item.status === 'skipped' && <span className="rounded bg-black/5 px-2 text-sm text-muted">пропущено</span>}
@@ -321,6 +358,45 @@ function ItemCard({ noteId, index, item, locations, registers, fallbackLocationI
               hint={candidate.debt > 0 ? `Долг по заказу: ${money(candidate.debt)}` : 'Заказ уже оплачен — сумму можно не вносить'} />
           )}
           <Actions busy={busy} canApply={Boolean(candidate)} applyLabel={item.kind === 'give_order' ? 'Внести оплату и выдать' : 'Внести оплату'} onApply={applyOrder} onSkip={skip} />
+        </div>
+      )}
+
+      {!done && item.kind === 'order_work' && (
+        <div className="flex flex-col gap-3">
+          {!candidate ? (
+            <p className="text-amber-700">Заказ {item.order_number} не найден (или он на другой точке). Проверьте номер в заметке и разберите её заново, либо внесите работу вручную из карточки заказа.</p>
+          ) : (
+            <div className="rounded-lg bg-canvas p-3 text-sm">
+              <div><b>{candidate.number}</b> · {candidate.label} · {candidate.client} · {candidate.status}</div>
+              <div className="text-muted">В заказе сейчас: {candidate.positions && candidate.positions.length > 0 ? candidate.positions.map((p) => `${p.name} ${money(p.price)}`).join('; ') : 'работ нет'}. Оплачено {money(candidate.paid ?? 0)} из {money(candidate.total ?? 0)}.</div>
+              {candidate.positions?.some((p) => p.is_work && Number(amount) > 0 && p.price === Number(amount)) && (
+                <div className="mt-1 text-amber-700">Работа на эту сумму в заказе уже есть. Проверьте, чтобы не внести её дважды.</div>
+              )}
+            </div>
+          )}
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-muted">Какая работа</span>
+            <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-muted">Цена работы, ₽</span>
+            <input className={`${inputClass} w-36`} inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-muted">Себестоимость, ₽ {item.no_cost ? '(в заметке: без себестоимости)' : '(можно оставить пустой)'}</span>
+            <input className={`${inputClass} w-36`} inputMode="numeric" value={cost} placeholder={item.no_cost ? '0' : ''} onChange={(e) => setCost(e.target.value.replace(/\D/g, ''))} />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={payNow} onChange={(e) => setPayNow(e.target.checked)} />
+            Клиент оплатил эту сумму: внести оплату в кассу
+          </label>
+          {payNow && (
+            <div className="flex overflow-hidden self-start rounded-md border border-line" role="group" aria-label="Способ оплаты">
+              <button type="button" aria-pressed={!bank} className={`px-4 py-2 ${!bank ? 'bg-accent text-accent-ink' : ''}`} onClick={() => setBank(false)}>Нал</button>
+              <button type="button" aria-pressed={bank} className={`px-4 py-2 ${bank ? 'bg-accent text-accent-ink' : ''}`} onClick={() => setBank(true)}>Безнал</button>
+            </div>
+          )}
+          <Actions busy={busy} canApply={Boolean(candidate)} applyLabel="Внести работу в заказ" onApply={applyOrderWork} onSkip={skip} />
         </div>
       )}
 
