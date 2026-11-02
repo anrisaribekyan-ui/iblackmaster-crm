@@ -8,6 +8,7 @@ export default function MailStatus() {
   const [status, setStatus] = useState<Status | null>(null)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
+  const [to, setTo] = useState('')
 
   useEffect(() => {
     api.get<Status>('/settings/mail').then(setStatus).catch(() => setStatus(null))
@@ -19,7 +20,7 @@ export default function MailStatus() {
     setBusy(true)
     setMessage(null)
     try {
-      const r = await api.post<{ sent_to: string }>('/settings/mail/test', {})
+      const r = await api.post<{ sent_to: string }>('/settings/mail/test', { to: to.trim() || null })
       setMessage({ ok: true, text: `Письмо ушло на ${r.sent_to} — проверьте ящик и «Спам»` })
     } catch (e) {
       setMessage({ ok: false, text: e instanceof ApiError ? e.message : 'Не удалось отправить' })
@@ -40,9 +41,13 @@ export default function MailStatus() {
         </span>
       </div>
       {status.configured ? (
-        <button disabled={busy} className="mt-3 rounded-md border border-line px-3 py-2 text-sm disabled:opacity-60" onClick={() => void test()}>
-          {busy ? 'Отправляем…' : 'Прислать проверочное письмо себе'}
-        </button>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <input type="email" aria-label="Куда отправить проверочное письмо" placeholder="Пусто — на вашу почту, или адрес сотрудника"
+            className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2 text-sm sm:max-w-sm" value={to} onChange={(e) => setTo(e.target.value)} />
+          <button disabled={busy} className="rounded-md border border-line px-3 py-2 text-sm disabled:opacity-60" onClick={() => void test()}>
+            {busy ? 'Отправляем…' : 'Прислать проверочное письмо'}
+          </button>
+        </div>
       ) : (
         <p className="mt-3 text-sm">
           Заведите отдельный ящик, например crm@ваш-домен в Яндекс 360, создайте в нём «пароль приложения» и впишите на сервере в файл <code className="rounded bg-canvas px-1">.env</code>:

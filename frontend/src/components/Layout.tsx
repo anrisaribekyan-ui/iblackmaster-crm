@@ -2,6 +2,7 @@ import { Suspense, useEffect, useRef, useState, type FormEvent } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import { api } from '../api/client'
 import { useAuth } from '../auth'
+import ChangePasswordModal from './ChangePasswordModal'
 import Icon from './icons'
 import InstallApp from './InstallApp'
 import ThemeSwitch from './ThemeSwitch'
@@ -31,6 +32,7 @@ export const MENU: { to: string; label: string; icon: string; permission?: strin
 
 export default function Layout() {
   const { me, logout, can } = useAuth()
+  const [passwordOpen, setPasswordOpen] = useState(false)
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -146,16 +148,17 @@ export default function Layout() {
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#3a3f47] text-sm font-medium text-white" aria-hidden>
             {(me?.short_name ?? '?').slice(0, 1)}
           </span>
-          <div className="min-w-0 flex-1 text-sm leading-tight">
+          <button type="button" onClick={() => setPasswordOpen(true)} className="min-w-0 flex-1 rounded-md text-left text-sm leading-tight hover:bg-rail" title="Сменить пароль">
             <div className="truncate font-medium text-white">{me?.short_name}</div>
-            <div className="truncate text-xs text-rail-muted">{me?.role_name}</div>
-          </div>
+            <div className="truncate text-xs text-rail-muted">{me?.role_name} · сменить пароль</div>
+          </button>
           <button onClick={logout} className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-rail-muted hover:bg-rail hover:text-white" title="Выйти из CRM на этом устройстве">
             <Icon name="logout" className="h-[18px] w-[18px]" />
             <span className="md:sr-only">Выйти</span>
           </button>
         </div>
       </aside>
+      {passwordOpen && <ChangePasswordModal onClose={() => setPasswordOpen(false)} />}
       {/* На телефоне прокручивается вся страница (прячется адресная строка, работает «потянуть — обновить»),
           на компьютере — только рабочая область справа от меню */}
       <main ref={mainRef} className="relative min-w-0 flex-1 px-3 pb-24 sm:px-8 md:overflow-auto md:py-6 md:pb-6">

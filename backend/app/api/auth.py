@@ -1,3 +1,4 @@
+import logging
 import secrets
 from datetime import timedelta
 from urllib.parse import quote
@@ -13,6 +14,8 @@ from app.db import utcnow
 from app.models import EmailCode, Employee
 from app.security import create_access_token, hash_password, verify_password
 from app.services import mail
+
+log = logging.getLogger("auth")
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -99,6 +102,25 @@ def _find(db: DbSession, email: str) -> Employee | None:
     return db.scalars(select(Employee).where(func.lower(Employee.email) == email.strip().lower())).first()
 
 
+class ChangePasswordIn(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=200)
+
+
+@router.post("/change-password", response_model=LoginOut)
+def change_password(data: ChangePasswordIn, db: DbSession, me: CurrentEmployee):
+    """Сотрудник сам меняет свой пароль: нужен текущий. Прежние входы гаснут, этому устройству выдаём новый."""
+    if not verify_password(data.current_password, me.password_hash):
+        raise BusinessError("Текущий пароль указан неверно")
+    if data.new_password == data.current_password:
+        raise BusinessError("Новый пароль должен отличаться от текущего")
+    me.password_hash = hash_password(data.new_password)
+    me.password_changed_at = utcnow()
+    db.commit()
+    notify_password_changed(me, "вы сами, в профиле")
+    return LoginOut(access_token=create_access_token(me.id))
+
+
 @router.post("/forgot")
 def forgot_password(data: ForgotIn, db: DbSession):
     """Отправить код. Ответ одинаковый, есть такая почта или нет — чтобы по CRM нельзя было проверять адреса."""
@@ -106,6 +128,7 @@ def forgot_password(data: ForgotIn, db: DbSession):
         raise BusinessError("Почта для писем ещё не подключена — попросите владельца сменить вам пароль в настройках")
     employee = _find(db, data.email)
     if employee is None or not employee.is_active:
+        log.warning("Сброс пароля: сотрудник с адресом %s не найден или отключён, письмо не отправлено", data.email.strip().lower())
         return {"sent": True}
     now = utcnow()
     recent = db.scalars(
