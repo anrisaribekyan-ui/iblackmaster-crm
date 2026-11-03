@@ -499,7 +499,7 @@ export default function OrderCreatePage() {
                           style={{ '--form-cols': `repeat(${columnCount}, minmax(0, 1fr))` } as CSSProperties}
                         >
                           {columns.map(({ column, fields: columnFields }) => (
-                            <div key={column} className="grid content-start gap-3">
+                            <div key={column} className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-3">
                               {columnFields.map((field) => (
                                 <Fragment key={field.id}>
                                 <DynamicField
@@ -770,7 +770,7 @@ function MultiValueInput({
     setDraft('')
   }
   return (
-    <div>
+    <div className="min-w-0">
       {value.length > 0 && (
         <ul className="mb-1 flex flex-wrap gap-1">
           {value.map((item) => (
@@ -782,7 +782,7 @@ function MultiValueInput({
       )}
       <div className="relative flex gap-1">
         <input
-          className={inputClass}
+          className={`${inputClass} min-w-0 flex-1`}
           value={draft}
           placeholder={placeholder}
           onChange={(event) => setDraft(event.target.value)}
