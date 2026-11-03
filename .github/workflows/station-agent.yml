@@ -4,6 +4,7 @@ name: Помощник станции (установщики)
 # Скачать: вкладка Actions → последний запуск → Artifacts, или Releases при теге station-v*.
 on:
   push:
+    branches: [main]
     paths:
       - "station-agent/**"
       - ".github/workflows/station-agent.yml"
