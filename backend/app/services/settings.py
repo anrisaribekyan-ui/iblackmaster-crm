@@ -29,6 +29,14 @@ DEFAULTS: dict[str, dict] = {
         # доли от чистой прибыли после всех расходов: {"name": "Гор", "percent": 5, "location_id": 1 | null}
         "shares": [],
     },
+    # VPN iBM: панель Remnawave и тарифы
+    "vpn": {
+        "panel_url": "",
+        "panel_token": "",
+        "commission_percent": 30,  # % от цены закреплённому сотруднику за выдачу и каждое продление
+        "device_limit": 2,
+        "prices": {"1": 500, "3": 1400, "6": 2500, "12": 4000},
+    },
     # Чек-лист проверки аппарата при приёме и выдаче (ТЗ этап 3, E5)
     "checklist": {
         "items": [

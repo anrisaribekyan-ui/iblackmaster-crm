@@ -109,6 +109,8 @@ PERMISSIONS: dict[str, dict] = {
     "measureAccess": {"section": "Справочники", "title": "Единицы измерения", "parent": None},
     "appInstallAccess": {"section": "Установка приложений", "title": "Может ставить приложения на айфоны", "parent": None},
     "appInstallStationAccess": {"section": "Установка приложений", "title": "Может добавлять станции и входить в Apple ID", "parent": "appInstallAccess"},
+    "vpnAccess": {"section": "VPN", "title": "Может выдавать и продлевать VPN (с приёмом оплаты)", "parent": None},
+    "vpnFreeAccess": {"section": "VPN", "title": "Может выдавать VPN без оплаты и менять закреплённого сотрудника", "parent": "vpnAccess"},
     "supplierOrderAccess": {"section": "Закупки", "title": "Может оформлять заказы у поставщиков (Moba, Master Mobile, Liberti)", "parent": None},
 }
 

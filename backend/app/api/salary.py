@@ -47,6 +47,8 @@ KIND_TITLES = {
     AccrualKind.REVENUE: "Премия от оборота",
     AccrualKind.BONUS: "Бонус",
     AccrualKind.PENALTY: "Штраф",
+    AccrualKind.TIP: "Чаевые (50%)",
+    AccrualKind.VPN: "VPN: выдача и продления",
 }
 
 

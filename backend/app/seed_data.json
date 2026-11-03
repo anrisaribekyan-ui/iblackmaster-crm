@@ -1235,6 +1235,12 @@
    "affects_balance": false
   },
   {
+   "name": "Оплата VPN",
+   "is_income": true,
+   "type": "vpn",
+   "affects_balance": false
+  },
+  {
    "name": "Чаевые",
    "is_income": true,
    "type": "tip",

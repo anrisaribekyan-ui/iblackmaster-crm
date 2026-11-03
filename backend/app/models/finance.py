@@ -26,6 +26,7 @@ class CashItemType:
     SALARY = "salary"  # Выплата зарплаты (расход)
     COLLECTION = "collection"  # Инкассация (расход)
     BANK_PERCENT = "bankPercent"  # Комиссия банка (расход)
+    VPN = "vpn"  # Оплата VPN (приход)
     TIP = "tip"  # Чаевые (приход, не входит в выручку заказа/чека)
 
 

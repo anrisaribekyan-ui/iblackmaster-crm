@@ -34,6 +34,7 @@ from app.models.order import (
     QuickOrder,
     StatusGroup,
 )
+from app.models.vpn import VpnClient, VpnIssue
 from app.models.salary import AccrualKind, SalaryEvent, SalaryRule
 from app.models.staff import EmailCode, Employee, Role, employee_location
 from app.models.idea import Idea

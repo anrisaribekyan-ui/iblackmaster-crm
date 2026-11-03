@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 import app.models  # noqa: F401  — регистрирует все таблицы
 from app.api import (
     app_install,
+    vpn as vpn_api,
     livesklad_import,
     auth,
     mail_settings,
@@ -125,4 +126,5 @@ app.include_router(day_notes.router, prefix="/api")
 app.include_router(ideas.router, prefix="/api")
 app.include_router(transactions.router, prefix="/api")
 app.include_router(app_install.router, prefix="/api")
+app.include_router(vpn_api.router, prefix="/api")
 app.include_router(supplier_orders.router, prefix="/api")

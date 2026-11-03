@@ -24,6 +24,7 @@ class AccrualKind(str, enum.Enum):
     REVENUE = "revenue"  # Премия от оборота
     BONUS = "bonus"  # Бонус (вручную)
     PENALTY = "penalty"  # Штраф (вручную)
+    VPN = "vpn"  # Процент с выдачи/продления VPN закреплённому сотруднику
     TIP = "tip"  # Половина чаевых мастеру/продавцу
 
 

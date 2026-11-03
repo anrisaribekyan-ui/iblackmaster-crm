@@ -26,6 +26,7 @@ export const MENU: { to: string; label: string; icon: string; permission?: strin
   { to: '/tasks', icon: 'tasks', label: 'Задачи' },
   { to: '/zakupki', icon: 'cart', label: 'Закупки' },
   { to: '/apps', icon: 'phone', label: 'Приложения', permission: 'appInstallAccess' },
+  { to: '/vpn', icon: 'phone', label: 'VPN', permission: 'vpnAccess' },
   { to: '/transfer', icon: 'phone', label: 'Перенос данных' },
   { to: '/finance/cashes', icon: 'finance', label: 'Финансы' },
   { to: '/analytics', icon: 'analytics', label: 'Аналитика', permission: 'reportAccess' },
