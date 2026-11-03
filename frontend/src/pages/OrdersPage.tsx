@@ -7,13 +7,15 @@ import { api, ApiError } from '../api/client'
 import { formatPhone } from '../format'
 import { useAuth } from '../auth'
 import { downloadCsv } from '../csv'
+import Modal from '../components/Modal'
 import StatusBadge, { type SmsMark } from '../components/StatusBadge'
 
-type Tab = 'new' | 'inWork' | 'wait' | 'finish' | 'closed' | 'all'
+type Tab = 'new' | 'inWork' | 'wait' | 'finish' | 'closed' | 'all' | 'open'
+type CustomTab = { id: string; name: string; statusIds: number[] }
 type OrderRow = {
   id: number
   number: string
-  status: { id: number; group: Exclude<Tab, 'all'>; name: string; color: string; sms?: SmsMark }
+  status: { id: number; group: Exclude<Tab, 'all' | 'open'>; name: string; color: string; sms?: SmsMark }
   deadline: string | null
   manager: string | null
   created_at: string
@@ -41,6 +43,7 @@ const tabs: { key: Tab; label: string }[] = [
   { key: 'wait', label: 'Отложенные' },
   { key: 'finish', label: 'Готовые' },
   { key: 'closed', label: 'Выданные' },
+  { key: 'open', label: 'Не выданные' },
   { key: 'all', label: 'Все' },
 ]
 const filterInput = 'rounded-md border border-line bg-surface px-2 py-1.5'
@@ -82,13 +85,28 @@ export default function OrdersPage() {
   const lastTab = (() => {
     try { return localStorage.getItem('orders:tab') ?? 'all' } catch { return 'all' }
   })()
+  const [customTabs, setCustomTabs] = useState<CustomTab[]>(() => {
+    try { return JSON.parse(localStorage.getItem('orders:customTabs') ?? '[]') as CustomTab[] } catch { return [] }
+  })
+  const [tabEditor, setTabEditor] = useState<CustomTab | null>(null)
+  const saveCustomTabs = (next: CustomTab[]) => {
+    setCustomTabs(next)
+    try { localStorage.setItem('orders:customTabs', JSON.stringify(next)) } catch { /* приватный режим */ }
+  }
   const queryString = useMemo(() => {
     const params = new URLSearchParams(searchParams)
     if (!params.has('tab')) params.set('tab', lastTab)
+    const custom = customTabs.find((t) => t.id === params.get('tab'))
+    if (custom) {
+      params.set('tab', 'all')
+      params.set('status_ids', custom.statusIds.join(','))
+    } else if (params.get('tab')?.startsWith('c_')) {
+      params.set('tab', 'all')
+    }
     if (!params.has('location_id') && currentLocation) params.set('location_id', currentLocation)
     return params.toString()
-  }, [searchParams, lastTab, currentLocation])
-  const currentTab = (searchParams.get('tab') ?? lastTab) as Tab
+  }, [searchParams, lastTab, currentLocation, customTabs])
+  const currentTab = (searchParams.get('tab') ?? lastTab) as string
   useEffect(() => {
     try { localStorage.setItem('orders:tab', currentTab) } catch { /* приватный режим */ }
   }, [currentTab])
@@ -259,9 +277,12 @@ export default function OrdersPage() {
       )}
       <nav aria-label="Группы заказов" className="mb-3 flex gap-1 overflow-x-auto rounded-xl border border-line bg-surface p-1">
         {tabs.map((tab) => {
+          const counts: Record<string, number> = data?.counts ?? {}
           const count = tab.key === 'all'
-            ? Object.values(data?.counts ?? {}).reduce((sum, value) => sum + value, 0)
-            : data?.counts[tab.key] ?? 0
+            ? Object.values(counts).reduce((sum, value) => sum + value, 0)
+            : tab.key === 'open'
+              ? Object.entries(counts).reduce((sum, [group, value]) => sum + (group === 'closed' ? 0 : value), 0)
+              : counts[tab.key] ?? 0
           return (
             <button
               key={tab.key}
@@ -272,7 +293,52 @@ export default function OrdersPage() {
             </button>
           )
         })}
+        {customTabs.map((tab) => (
+          <span key={tab.id} className={`group flex flex-1 items-center whitespace-nowrap rounded-lg transition-colors ${currentTab === tab.id ? 'bg-ink font-medium text-white shadow-sm' : 'text-muted hover:bg-canvas hover:text-ink'}`}>
+            <button className="flex-1 px-3 py-1.5" onClick={() => setParam('tab', tab.id)}>{tab.name}</button>
+            <button aria-label={`Изменить вкладку ${tab.name}`} title="Изменить" className="pr-2 text-xs opacity-60 hover:opacity-100" onClick={() => setTabEditor(tab)}>✎</button>
+          </span>
+        ))}
+        <button aria-label="Добавить свою вкладку" title="Своя вкладка: выберите нужные статусы" className="rounded-lg px-3 py-1.5 text-accent hover:bg-canvas" onClick={() => setTabEditor({ id: `c_${Date.now()}`, name: '', statusIds: [] })}>＋</button>
       </nav>
+      {tabEditor && (
+        <Modal title={customTabs.some((t) => t.id === tabEditor.id) ? 'Своя вкладка' : 'Новая вкладка'} onClose={() => setTabEditor(null)}>
+          <div className="grid gap-3">
+            <label className="grid gap-1 text-sm text-muted">Название
+              <input className={filterInput} autoFocus maxLength={20} value={tabEditor.name} onChange={(e) => setTabEditor({ ...tabEditor, name: e.target.value })} placeholder="Например: Жду запчасть" />
+            </label>
+            <div className="max-h-72 overflow-auto rounded-md border border-line p-2">
+              {statusGroups.map((group) => (
+                <div key={group.group} className="mb-2">
+                  <p className="text-xs font-medium text-muted">{group.title}</p>
+                  {group.statuses.map((status) => (
+                    <label key={status.id} className="flex items-center gap-2 py-1 text-sm">
+                      <input type="checkbox" checked={tabEditor.statusIds.includes(status.id)}
+                        onChange={(e) => setTabEditor({ ...tabEditor, statusIds: e.target.checked ? [...tabEditor.statusIds, status.id] : tabEditor.statusIds.filter((i) => i !== status.id) })} />
+                      {status.name}
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between gap-2">
+              {customTabs.some((t) => t.id === tabEditor.id)
+                ? <button className="text-danger" onClick={() => { saveCustomTabs(customTabs.filter((t) => t.id !== tabEditor.id)); if (currentTab === tabEditor.id) setParam('tab', 'open'); setTabEditor(null) }}>Удалить вкладку</button>
+                : <span />}
+              <button
+                disabled={!tabEditor.name.trim() || tabEditor.statusIds.length === 0}
+                className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-50"
+                onClick={() => {
+                  const item = { ...tabEditor, name: tabEditor.name.trim() }
+                  saveCustomTabs(customTabs.some((t) => t.id === item.id) ? customTabs.map((t) => (t.id === item.id ? item : t)) : [...customTabs, item])
+                  setParam('tab', item.id)
+                  setTabEditor(null)
+                }}
+              >Сохранить</button>
+            </div>
+          </div>
+        </Modal>
+      )}
       {error && <p role="alert" className="mb-3 rounded-md border border-danger p-3 text-danger">{error}</p>}
       {loading && data === null ? (
         <p className="py-6 text-muted">Загрузка заказов…</p>

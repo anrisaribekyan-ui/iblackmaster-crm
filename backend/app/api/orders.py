@@ -394,8 +394,9 @@ def list_orders(
     db: DbSession,
     me: CurrentEmployee,
     location_id: int | None = None,
-    tab: Literal["new", "inWork", "wait", "finish", "closed", "all"] = "all",
+    tab: Literal["new", "inWork", "wait", "finish", "closed", "all", "open"] = "all",
     status_id: int | None = None,
+    status_ids: str | None = None,
     order_type_id: int | None = None,
     master_id: int | None = None,
     manager_id: int | None = None,
@@ -477,8 +478,14 @@ def list_orders(
     for group, amount in db.execute(count_query):
         counts[StatusGroup(group).value] = amount
 
-    if tab != "all":
+    if tab == "open":
+        query = query.where(OrderStatus.group != StatusGroup.CLOSED)
+    elif tab != "all":
         query = query.where(OrderStatus.group == StatusGroup(tab))
+    if status_ids:
+        ids = [int(i) for i in status_ids.split(",") if i.strip().isdigit()]
+        if ids:
+            query = query.where(Order.status_id.in_(ids))
     total = db.scalar(query.with_only_columns(func.count(Order.id)).order_by(None)) or 0
     rows = db.execute(query.order_by(Order.created_at.desc(), Order.id.desc()).offset((page - 1) * 50).limit(50)).all()
     manager_ids = {order.manager_id for order, _, _ in rows if order.manager_id}
