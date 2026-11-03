@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import PhoneInput from '../../components/PhoneInput'
 import { api, ApiError, setToken } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
@@ -333,7 +334,7 @@ function EmployeeForm({
         <label className="grid gap-1 text-sm text-muted">Отчество<input className={inputClass} name="patronymic" defaultValue={employee?.patronymic ?? ''} /></label>
         <label className="grid gap-1 text-sm text-muted">Короткое имя<input className={inputClass} name="short_name" required defaultValue={employee?.short_name ?? ''} /></label>
         <label className="grid gap-1 text-sm text-muted">Email<input className={inputClass} name="email" type="email" required defaultValue={employee?.email ?? ''} /></label>
-        <label className="grid gap-1 text-sm text-muted">Телефоны<input className={inputClass} name="phones" defaultValue={employee?.phones ?? ''} /></label>
+        <label className="grid gap-1 text-sm text-muted">Телефоны<PhoneInput className="bg-surface" name="phones" defaultValue={employee?.phones ?? ''} /></label>
         <label className="grid gap-1 text-sm text-muted">ИНН<input className={inputClass} name="inn" defaultValue={employee?.inn ?? ''} /></label>
         <label className="grid gap-1 text-sm text-muted">Должность<input className={inputClass} name="position" defaultValue={employee?.position ?? ''} /></label>
         <label className="grid gap-1 text-sm text-muted">День рождения<input className={inputClass} name="birthday" type="date" defaultValue={employee?.birthday ?? ''} /></label>

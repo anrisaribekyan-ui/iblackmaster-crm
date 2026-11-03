@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import PhoneInput from '../../components/PhoneInput'
 import { useRowLink } from '../../components/rowLink'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../api/client'
@@ -259,7 +260,7 @@ export default function CounteragentsPage() {
               <select className={inputClass} name="type_id" defaultValue={editor?.type_id ?? ''}><option value="">Не выбран</option>{types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}</select>
             </label>
             <label className="grid gap-1 text-sm text-muted">Телефоны
-              <input className={inputClass} name="phones" placeholder="+7 (___) ___-__-__" defaultValue={editor?.phones ?? ''} />
+              <PhoneInput className="bg-surface" name="phones" defaultValue={editor?.phones ?? ''} />
             </label>
             <label className="grid gap-1 text-sm text-muted">Email<input className={inputClass} name="email" type="email" defaultValue={editor?.email ?? ''} /></label>
             <label className="grid gap-1 text-sm text-muted">Адрес<input className={inputClass} name="address" defaultValue={editor?.address ?? ''} /></label>

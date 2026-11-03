@@ -1,4 +1,5 @@
 import { getCurrentLocation } from '../currentLocation'
+import PhoneInput from '../components/PhoneInput'
 import PhoneReader from '../components/PhoneReader'
 import { ClientCard, useIntakeHints, WarrantyAlert } from '../components/IntakeHints'
 import PriceHints from '../components/PriceHints'
@@ -720,7 +721,9 @@ function DynamicField({
           : field.data_type === 'number' || field.data_type === 'money'
             ? 'number'
             : 'text'
-    control = (
+    control = field.key === 'phones' ? (
+      <PhoneInput className="bg-surface" value={String(value ?? '')} required={field.is_required} onChange={(v) => onChange(v)} />
+    ) : (
       <input
         className={inputClass}
         type={inputType}

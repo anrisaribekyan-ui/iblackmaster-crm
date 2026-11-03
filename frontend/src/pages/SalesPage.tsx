@@ -585,6 +585,26 @@ function SaleModal({ sale, registers, canReturn, onClose, onReturned }: {
     return reg ? `${reg.id}:${reg.accepts_cash ? 'cash' : 'bank'}` : ''
   })
   const [error, setError] = useState('')
+  const [tipping, setTipping] = useState(false)
+  const [tipAmount, setTipAmount] = useState('')
+  const [tipDone, setTipDone] = useState('')
+
+  const submitTip = async () => {
+    if (!(Number(tipAmount) > 0)) {
+      setError('Укажите сумму чаевых')
+      return
+    }
+    const [id, kind] = target.split(':')
+    try {
+      await api.post(`/sales/${sale.id}/tips`, { cash_register_id: Number(id), is_bank: kind === 'bank', amount: tipAmount })
+      setTipDone(`Чаевые ${tipAmount} ₽ приняты: половина — продавцу в зарплату`)
+      setTipping(false)
+      setTipAmount('')
+      setError('')
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Не удалось принять чаевые')
+    }
+  }
 
   const submit = async () => {
     const items = Object.entries(amounts).filter(([, q]) => Number(q) > 0).map(([id, q]) => ({ sale_position_id: Number(id), quantity: q }))
@@ -651,7 +671,28 @@ function SaleModal({ sale, registers, canReturn, onClose, onReturned }: {
         </tbody>
       </table>
       <p className="mb-4 text-right">Итого {money(sale.total_price)} · оплачено {money(sale.paid)}</p>
-      {returning ? (
+      {tipDone && <p className="mb-3 text-sm text-success">{tipDone}</p>}
+      {tipping ? (
+        <div className="grid gap-2">
+          <label className="grid gap-1 text-xs text-muted">Сумма чаевых, ₽
+            <input className={`${inputClass} num`} type="number" min="1" inputMode="numeric" autoFocus value={tipAmount} onChange={(e) => setTipAmount(e.target.value)} />
+          </label>
+          <label className="grid gap-1 text-xs text-muted">Куда положить
+            <select className={inputClass} value={target} onChange={(e) => setTarget(e.target.value)}>
+              {registers.flatMap((r) => [
+                ...(r.accepts_cash ? [<option key={`${r.id}c`} value={`${r.id}:cash`}>{r.name} — нал</option>] : []),
+                ...(r.accepts_bank ? [<option key={`${r.id}b`} value={`${r.id}:bank`}>{r.name} — безнал</option>] : []),
+              ])}
+            </select>
+          </label>
+          <p className="text-xs text-muted">Чаевые не входят в сумму чека и прибыль. 50% — продавцу в зарплату, 50% остаётся в кассе.</p>
+          {error && <p className="text-sm text-danger">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <button className="rounded-md border border-line px-3 py-2" onClick={() => setTipping(false)}>Отмена</button>
+            <button className="rounded-md bg-accent px-3 py-2 text-accent-ink" onClick={() => void submitTip()}>Принять чаевые</button>
+          </div>
+        </div>
+      ) : returning ? (
         <div className="grid gap-2">
           <label className="grid gap-1 text-xs text-muted">Вернуть деньги из кассы
             <select className={inputClass} value={target} onChange={(e) => setTarget(e.target.value)}>
@@ -670,7 +711,10 @@ function SaleModal({ sale, registers, canReturn, onClose, onReturned }: {
       ) : (
         <div className="flex items-center justify-between gap-2">
           {canReturn && <button className="text-danger" onClick={() => setReturning(true)}>Возврат по чеку</button>}
-          <button className="rounded-md border border-line bg-surface px-3 py-2" onClick={printReceipt}>Печать чек</button>
+          <div className="ml-auto flex gap-2">
+            <button className="rounded-md border border-line bg-surface px-3 py-2" onClick={() => { setTipping(true); setTipDone('') }}>Чаевые</button>
+            <button className="rounded-md border border-line bg-surface px-3 py-2" onClick={printReceipt}>Печать чек</button>
+          </div>
         </div>
       )}
     </Modal>

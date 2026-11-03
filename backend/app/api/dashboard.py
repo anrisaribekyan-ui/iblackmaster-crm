@@ -277,6 +277,7 @@ def _income(
         Transaction.date < period_to,
         Transaction.is_income.is_(True),
         or_(Transaction.order_id.is_not(None), Transaction.sale_id.is_not(None)),
+        Transaction.cash_item_id.not_in(select(CashItem.id).where(CashItem.type == "tip")),
     )
     if allowed:
         query = query.where(or_(Transaction.location_id.is_(None), Transaction.location_id.in_(allowed)))

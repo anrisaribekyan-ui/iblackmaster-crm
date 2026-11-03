@@ -100,7 +100,7 @@ type OrderDetail = {
 }
 type OrderFieldValues = Record<string, unknown>
 type CatalogItem = { id: number; name: string; article?: string | null; prices?: { price: string }[]; is_work: boolean; guarantee_days?: number }
-type PaymentMode = 'payment' | 'refund'
+type PaymentMode = 'payment' | 'refund' | 'tip'
 type TaskRow = { id: number; title: string; text: string | null; assignee_name: string | null; deadline: string | null; is_done: boolean }
 type LocationInfo = { id: number; name: string; address: string | null; phones: string | null }
 
@@ -405,7 +405,7 @@ export default function OrderDetailPage() {
     setSaving(true)
     setPaymentError('')
     try {
-      const result = await api.post<{ debt: string }>(`/orders/${detail.order.id}/${mode === 'payment' ? 'payments' : 'refunds'}`, payload)
+      const result = await api.post<{ debt: string }>(`/orders/${detail.order.id}/${mode === 'payment' ? 'payments' : mode === 'tip' ? 'tips' : 'refunds'}`, payload)
       await loadDetail()
       if (shouldClose && mode === 'payment' && Number(result.debt) <= 0) {
         const status = getFirstClosedStatus()
@@ -1003,6 +1003,7 @@ export default function OrderDetailPage() {
             <div className="flex flex-wrap gap-2">
               {can('operationCashRegisterAccess') && !detail.order.is_deleted && <>
                 <button className="rounded-md bg-accent px-3 py-2 text-sm text-accent-ink" onClick={() => openPayment('payment')}>Принять оплату</button>
+                <button className="rounded-md border border-line px-3 py-2 text-sm" title="Половина — мастеру в зарплату, половина остаётся в кассе" onClick={() => openPayment('tip')}>Чаевые</button>
                 {detail.status.group !== 'closed' && <button className="rounded-md border border-line px-3 py-2 text-sm" onClick={() => openPayment('payment', false, true)}>Внести предоплату</button>}
               </>}
               {can('returnOrderProductAccess') && !detail.order.is_deleted && <button className="rounded-md border border-line px-3 py-2 text-sm" onClick={() => openPayment('refund')}>Возврат</button>}
@@ -1012,7 +1013,7 @@ export default function OrderDetailPage() {
                 {detail.transactions.map((transaction) => (
                   <li key={transaction.id} className={`py-2 text-sm ${transaction.cash_item_type === 'bankPercent' ? 'text-muted' : ''}`}>
                     <div className="flex justify-between gap-2">
-                      <span>{transaction.cash_item_type === 'bankPercent' ? 'Комиссия банка' : `${transaction.is_income ? 'Оплата' : 'Возврат'}, ${transaction.is_bank ? 'безнал' : 'наличные'}`}</span>
+                      <span>{transaction.cash_item_type === 'bankPercent' ? 'Комиссия банка' : `${transaction.cash_item_type === 'tip' ? 'Чаевые' : transaction.is_income ? 'Оплата' : 'Возврат'}, ${transaction.is_bank ? 'безнал' : 'наличные'}`}</span>
                       <strong className={`num ${transaction.is_income ? '' : 'text-danger'}`}>{transaction.is_income ? '' : '−'}{formatMoney(transaction.amount)}</strong>
                     </div>
                     <small className="text-muted">{formatDate(transaction.date)} · {transaction.cash_register_name}{transaction.note ? ` · ${transaction.note}` : ''}</small>
@@ -1078,7 +1079,7 @@ export default function OrderDetailPage() {
         <TaskForm employees={taskEmployees} orderId={Number(orderId)} onSave={createTask} onClose={() => setTaskCreating(false)} />
       )}
       {paymentMode && (
-        <Modal title={paymentMode === 'payment' ? closeAfterPay ? 'Оплата для выдачи' : prepayMode ? 'Предоплата' : 'Принять оплату' : 'Возврат'} onClose={() => { setPaymentMode(null); setCloseAfterPay(false) }}>
+        <Modal title={paymentMode === 'payment' ? closeAfterPay ? 'Оплата для выдачи' : prepayMode ? 'Предоплата' : 'Принять оплату' : paymentMode === 'tip' ? 'Чаевые' : 'Возврат'} onClose={() => { setPaymentMode(null); setCloseAfterPay(false) }}>
           <form onSubmit={(event) => void submitPayment(event)} className="grid gap-3">
             {activeRegisters.length === 0 ? (
               <p className="text-muted">Нет доступных касс для операции.</p>
@@ -1115,7 +1116,7 @@ export default function OrderDetailPage() {
             {paymentError && <p role="alert" className="text-sm text-danger">{paymentError}</p>}
             <div className="flex justify-end gap-2">
               <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => { setPaymentMode(null); setCloseAfterPay(false) }}>Отмена</button>
-              {activeRegisters.length > 0 && <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Обработка…' : paymentMode === 'payment' ? 'Оплатить' : 'Вернуть'}</button>}
+              {activeRegisters.length > 0 && <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Обработка…' : paymentMode === 'payment' ? 'Оплатить' : paymentMode === 'tip' ? 'Принять чаевые' : 'Вернуть'}</button>}
             </div>
           </form>
         </Modal>

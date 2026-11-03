@@ -24,6 +24,7 @@ class AccrualKind(str, enum.Enum):
     REVENUE = "revenue"  # Премия от оборота
     BONUS = "bonus"  # Бонус (вручную)
     PENALTY = "penalty"  # Штраф (вручную)
+    TIP = "tip"  # Половина чаевых мастеру/продавцу
 
 
 class SalaryRule(Base, TimestampMixin):

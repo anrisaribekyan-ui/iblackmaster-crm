@@ -928,6 +928,29 @@ def pay_order(order_id: int, data: OrderPayment, db: DbSession, me: CurrentEmplo
     return {"id": transaction.id, "amount": transaction.amount, "debt": order.debt}
 
 
+class TipIn(BaseModel):
+    cash_register_id: int
+    amount: Decimal = Field(gt=Decimal("0"))
+    is_bank: bool = False
+    employee_id: int | None = None
+
+
+@router.post(
+    "/{order_id}/tips",
+    dependencies=[Depends(require("operationCashRegisterAccess"))],
+)
+def tip_order(order_id: int, data: TipIn, db: DbSession, me: CurrentEmployee):
+    from app.services import tips
+
+    order = get_order_for_employee(db, order_id, me)
+    register = get_order_cash_register(db, me, data.cash_register_id)
+    tx = tips.add_tip(db, order=order, me=me, cash_register_id=register.id, amount=data.amount,
+                      is_bank=data.is_bank, employee_id=data.employee_id)
+    order_service.add_history(db, order, "payment", me, text=f"чаевые {tx.amount} руб", transaction_id=tx.id)
+    db.commit()
+    return {"id": tx.id, "amount": tx.amount}
+
+
 @router.post(
     "/{order_id}/refunds",
     dependencies=[Depends(require("returnOrderProductAccess"))],

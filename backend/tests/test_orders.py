@@ -854,3 +854,25 @@ def test_prepayment_flag_set_on_existing_order(client, auth_headers, db, owner):
     assert r.status_code == 200, r.text
     db.refresh(order)
     assert order.has_prepayment is True and order.paid == Decimal("200.00")
+
+
+def test_order_tip_split_and_not_in_paid(client, auth_headers, db, owner):
+    from app.models.salary import SalaryEvent
+
+    order = create_payment_test_order(db, owner, "TIP-1")
+    register = db.scalars(
+        select(CashRegister).where(CashRegister.location_id == order.location_id, CashRegister.is_active.is_(True))
+    ).first()
+    r = client.post(
+        f"/api/orders/{order.id}/tips",
+        json={"cash_register_id": register.id, "amount": "101", "employee_id": owner.id},
+        headers=auth_headers,
+    )
+    assert r.status_code == 200, r.text
+    assert db.get(Order, order.id).paid == Decimal("0")
+    ev = db.scalars(select(SalaryEvent).where(SalaryEvent.kind == "tip")).one()
+    assert ev.amount == Decimal("50") and ev.employee_id == owner.id
+    d = client.delete(f"/api/orders/{order.id}/payments/{r.json()['id']}", headers=auth_headers)
+    assert d.status_code == 204
+    assert db.get(Order, order.id).paid == Decimal("0")
+    assert db.scalars(select(SalaryEvent).where(SalaryEvent.kind == "tip")).first() is None

@@ -119,6 +119,30 @@ def create_sale(data: SaleCreate, db: DbSession, me: CurrentEmployee):
     }
 
 
+class SaleTipIn(BaseModel):
+    cash_register_id: int
+    amount: Decimal = Field(gt=Decimal("0"))
+    is_bank: bool = False
+    employee_id: int | None = None
+
+
+@router.post("/{sale_id}/tips", dependencies=[Depends(require("operationCashRegisterAccess"))])
+def tip_sale(sale_id: int, data: SaleTipIn, db: DbSession, me: CurrentEmployee):
+    from app.services import tips
+
+    sale = db.get(Sale, sale_id)
+    if sale is None or sale.is_deleted:
+        raise NotFound("Чек")
+    check_location(me, sale.location_id)
+    register = validate_cash_register(db, me, data.cash_register_id)
+    if register.location_id is not None and register.location_id != sale.location_id:
+        raise BusinessError("Касса должна быть глобальной или находиться в локации продажи")
+    tx = tips.add_tip(db, sale=sale, me=me, cash_register_id=register.id, amount=data.amount,
+                      is_bank=data.is_bank, employee_id=data.employee_id)
+    db.commit()
+    return {"id": tx.id, "amount": tx.amount}
+
+
 @router.post("/{sale_id}/returns", dependencies=[Depends(require("saleReturnAccess", "operationCashRegisterAccess"))])
 def return_sale(sale_id: int, data: SaleReturnIn, db: DbSession, me: CurrentEmployee):
     sale = db.get(Sale, sale_id)

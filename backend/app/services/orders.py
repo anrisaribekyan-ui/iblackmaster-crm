@@ -378,6 +378,13 @@ def refund(
 def delete_payment(db: Session, order: Order, tx: Transaction, employee: Employee) -> None:
     if tx.order_id != order.id:
         raise BusinessError("Транзакция не из этого заказа")
+    from app.services import tips
+
+    if tips.is_tip(tx):
+        money.delete_transaction(db, tx)
+        tips.remove_tip_events(db, tx)
+        add_history(db, order, "delete_cash", employee, text=f"чаевые {tx.amount} руб", transaction_id=tx.id)
+        return
     was_income = tx.is_income
     amount = tx.amount
     money.delete_transaction(db, tx)

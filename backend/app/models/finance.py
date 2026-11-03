@@ -26,6 +26,7 @@ class CashItemType:
     SALARY = "salary"  # Выплата зарплаты (расход)
     COLLECTION = "collection"  # Инкассация (расход)
     BANK_PERCENT = "bankPercent"  # Комиссия банка (расход)
+    TIP = "tip"  # Чаевые (приход, не входит в выручку заказа/чека)
 
 
 class CashItem(Base):
