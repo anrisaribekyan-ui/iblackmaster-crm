@@ -20,6 +20,7 @@ class SalePositionIn(BaseModel):
     is_work: bool = False
     quantity: Decimal = Field(gt=Decimal("0"))
     price: Decimal = Field(ge=Decimal("0"))
+    discount: Decimal = Field(default=Decimal("0"), ge=Decimal("0"))  # скидка на всю позицию, ₽
     guarantee_days: int | None = None
     serials: list[str] = Field(default_factory=list)
     # Быстрая продажа: товар, которого нет в справочнике или на складе. Себестоимость вводят руками,
@@ -80,6 +81,8 @@ def create_sale(data: SaleCreate, db: DbSession, me: CurrentEmployee):
         counteragent = db.get(Counteragent, data.counteragent_id)
         if counteragent is None or counteragent.is_deleted:
             raise NotFound("Покупатель")
+    if any(p.discount > 0 for p in data.positions) and not has_permission(me, "discountSaleAccess"):
+        raise Forbidden("Нет права: discountSaleAccess")
     if data.payments and not has_permission(me, "operationCashRegisterAccess"):
         raise Forbidden("Нет права: operationCashRegisterAccess")
     for payment in data.payments:
@@ -298,6 +301,7 @@ def get_sale(sale_id: int, db: DbSession, me: CurrentEmployee):
                 "is_work": p.is_work,
                 "quantity": p.quantity,
                 "price": p.price,
+                "discount": ((p.price - p.sold_price) * p.quantity).quantize(Decimal("1")),
                 "sold_price": p.sold_price,
                 "returned_quantity": p.returned_quantity,
             }

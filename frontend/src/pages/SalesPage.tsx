@@ -17,6 +17,7 @@ type Line = {
   isWork: boolean
   quantity: string
   price: string
+  discount?: string // скидка на всю строку, ₽
   cost: string // себестоимость единицы: для свободной позиции — вводят, для товара без остатка — из справочника
   stock: number | null // остаток на складе (для товара из справочника)
 }
@@ -145,7 +146,8 @@ export default function SalesPage() {
   useEffect(() => { void loadHistory() }, [loadHistory])
   useEffect(() => { void loadTop() }, [loadTop])
 
-  const gross = lines.reduce((sum, l) => sum + Number(l.quantity || 0) * Number(l.price || 0), 0)
+  const lineNet = (l: Line) => Math.max(0, Number(l.quantity || 0) * Number(l.price || 0) - Number(l.discount || 0))
+  const gross = lines.reduce((sum, l) => sum + lineNet(l), 0)
   const total = Math.max(0, Math.round(gross - Math.round((gross * discount) / 100) - Number(discountSum || 0)))
   const cost = lines.reduce((sum, l) => sum + Number(l.quantity || 0) * Number(l.cost || 0), 0)
   const paidSum = split ? payments.reduce((sum, p) => sum + Number(p.amount || 0), 0) : total
@@ -204,6 +206,7 @@ export default function SalesPage() {
             is_work: l.isWork,
             quantity: l.quantity,
             price: l.price || '0',
+            ...(Number(l.discount) > 0 ? { discount: l.discount } : {}),
             ...(l.nomenclatureId === null ? { purchase_price: l.cost || '0' } : {}),
             ...(short ? { no_stock: true, purchase_price: l.cost || '0' } : {}),
           }
@@ -338,8 +341,14 @@ export default function SalesPage() {
                         <input aria-label="Цена" className="h-9 w-24 rounded-md border border-line bg-surface px-2 text-right num disabled:opacity-60" inputMode="numeric" value={line.price}
                           disabled={line.nomenclatureId !== null && !can('discountSaleAccess') && !can('setPriceAccess')}
                           onChange={(e) => set({ price: e.target.value.replace(/[^\d]/g, '') })} />
-                        <span className="ml-auto whitespace-nowrap num font-medium">{money(Number(line.quantity || 0) * Number(line.price || 0))}</span>
+                        <span className="ml-auto whitespace-nowrap num font-medium">{money(lineNet(line))}</span>
                       </div>
+                      {can('discountSaleAccess') && (
+                        <label className="col-span-full flex items-center justify-end gap-2 text-xs text-muted">Скидка на позицию, ₽
+                          <input aria-label="Скидка на позицию" className="h-8 w-24 rounded-md border border-line bg-surface px-2 text-right num" inputMode="numeric" placeholder="0" value={line.discount ?? ''}
+                            onChange={(e) => set({ discount: e.target.value.replace(/[^\d]/g, '') })} />
+                        </label>
+                      )}
                     </li>
                   )
                 })}

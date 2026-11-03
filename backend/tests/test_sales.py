@@ -171,3 +171,40 @@ def test_sales_history_month_filter_and_paging(client, auth_headers, db):
     assert [x["number"] for x in octo["items"]] == ["M1"]
     assert client.get(f"/api/sales?location_id={location.id}", headers=auth_headers).json()["total"] == 3
     assert client.get(f"/api/sales?location_id={location.id}&month=bad", headers=auth_headers).status_code == 400
+
+
+def test_sale_per_position_discount(client, auth_headers, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    store = db.scalars(select(Store).where(Store.location_id == location.id)).first()
+    response = client.post(
+        "/api/sales",
+        json={
+            "location_id": location.id,
+            "store_id": store.id,
+            "positions": [
+                {"name": "Стекло", "quantity": "1", "price": "1500", "discount": "300"},
+                {"name": "Чехол", "quantity": "2", "price": "500", "purchase_price": "100"},
+            ],
+            "payments": [],
+            "counteragent_id": None,
+        },
+        headers=auth_headers,
+    )
+    # без оплаты и покупателя чек не создать — проверяем сумму через полную оплату
+    assert response.status_code == 400
+    register = db.scalars(select(CashRegister).where(CashRegister.location_id == location.id, CashRegister.is_active.is_(True))).first()
+    response = client.post(
+        "/api/sales",
+        json={
+            "location_id": location.id,
+            "store_id": store.id,
+            "positions": [
+                {"name": "Стекло", "quantity": "1", "price": "1500", "discount": "300"},
+                {"name": "Чехол", "quantity": "2", "price": "500", "purchase_price": "100"},
+            ],
+            "payments": [{"cash_register_id": register.id, "amount": "2200"}],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 200, response.text
+    assert Decimal(str(response.json()["total_price"])) == Decimal("2200")

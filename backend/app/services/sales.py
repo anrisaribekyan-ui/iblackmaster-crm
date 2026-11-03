@@ -59,6 +59,10 @@ def create_sale(
         is_work = nomenclature.is_work if nomenclature else bool(item.get("is_work"))
         manual_cost = item.get("purchase_price")
         unit_price = money.to_money(item["price"])
+        line_discount = money.to_money(item.get("discount") or 0)
+        if line_discount > unit_price * quantity:
+            raise BusinessError("Скидка на позицию больше её стоимости")
+        net_price = (unit_price - line_discount / quantity).quantize(CENT, rounding=ROUND_HALF_UP) if line_discount else unit_price
         purchase_price = Decimal("0")
         if nomenclature is not None and nomenclature.is_work:
             purchase_price = nomenclature.purchase_price
@@ -76,13 +80,13 @@ def create_sale(
             name=item.get("name") or nomenclature.name,
             quantity=quantity,
             price=unit_price,
-            sold_price=unit_price,
+            sold_price=net_price,
             purchase_price=purchase_price,
             guarantee_days=item.get("guarantee_days") if item.get("guarantee_days") is not None else (nomenclature.guarantee_days if nomenclature else 0),
             serials=item.get("serials", []),
         )
         sale.positions.append(position)
-        gross += (unit_price * quantity).quantize(CENT)
+        gross += (net_price * quantity).quantize(CENT)
         sale.total_purchase += (purchase_price * quantity).quantize(CENT)
 
     discount = (gross * discount_percent / 100).quantize(CENT, rounding=ROUND_HALF_UP) + discount_sum
@@ -90,7 +94,7 @@ def create_sale(
     if gross > 0 and total != gross:
         ratio = total / gross
         for position in sale.positions:
-            position.sold_price = (position.price * ratio).quantize(CENT, rounding=ROUND_HALF_UP)
+            position.sold_price = (position.sold_price * ratio).quantize(CENT, rounding=ROUND_HALF_UP)
     sale.total_price = sum((position.sold_price * position.quantity for position in sale.positions), Decimal("0")).quantize(CENT)
     sale.total_purchase = sale.total_purchase.quantize(CENT)
 
