@@ -134,6 +134,7 @@ type PhoneReport = {
   imei: string | null; imei2: string | null; model_number: string | null; activation_state: string | null
   storage_total_gb: number | null; storage_free_gb: number | null; warnings: string[]
   extra: Record<string, string>
+  apple_id?: string | null
   battery: { health_percent: number | null; cycle_count: number | null; design_mah: number | null; current_max_mah: number | null; charge_percent: number | null; temperature_c: number | null }
 }
 
@@ -141,7 +142,7 @@ function ReportModal({ report, onClose }: { report: PhoneReport; onClose: () => 
   const b = report.battery
   const rows: [string, string][] = [
     ['Устройство', report.model_name ?? '—'], ['Версия iOS', report.ios_version ?? '—'], ['Серийный номер', report.serial ?? '—'],
-    ['IMEI', report.imei ?? '—'], ['Номер модели', report.model_number ?? '—'], ['Активация', report.activation_state ?? '—'],
+    ['IMEI', report.imei ?? '—'], ['Номер модели', report.model_number ?? '—'], ['Активация', report.activation_state ?? '—'], ['Apple ID (по приложениям)', report.apple_id ?? '—'],
     ['Память', report.storage_total_gb != null ? `${report.storage_total_gb} ГБ, свободно ${report.storage_free_gb ?? '—'} ГБ` : '—'],
     ['Состояние батареи', b.health_percent != null ? `${b.health_percent} %` : '—'], ['Циклов зарядки', b.cycle_count != null ? String(b.cycle_count) : '—'],
     ['Ёмкость батареи', b.design_mah ? `${b.current_max_mah ?? '—'} из ${b.design_mah} мАч` : '—'],

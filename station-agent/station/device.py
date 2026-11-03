@@ -113,6 +113,33 @@ def _parse_itunes_metadata(raw: Any) -> tuple[Optional[int], Optional[int]]:
     return as_int(meta.get("itemId")), as_int(meta.get("softwareVersionExternalIdentifier"))
 
 
+def _parse_apple_id(raw: Any) -> Optional[str]:
+    """Почта Apple ID, которым куплено приложение (из iTunesMetadata)."""
+    if not raw:
+        return None
+    try:
+        meta = plistlib.loads(bytes(raw)) if isinstance(raw, (bytes, bytearray)) else raw
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(meta, dict):
+        return None
+    info = (meta.get("com.apple.iTunesStore.downloadInfo") or {}).get("accountInfo") or {}
+    for value in (meta.get("appleId"), info.get("AppleID") if isinstance(info, dict) else None):
+        if isinstance(value, str) and "@" in value:
+            return value.strip().lower()
+    return None
+
+
+def most_common_apple_id(items: list[Any]) -> Optional[str]:
+    """Apple ID телефона = тот, которым куплено больше всего приложений на нём."""
+    counts: dict[str, int] = {}
+    for raw in items:
+        found = _parse_apple_id(raw)
+        if found:
+            counts[found] = counts.get(found, 0) + 1
+    return max(counts, key=counts.get) if counts else None
+
+
 # ---------------- список устройств ----------------
 
 async def _list_devices() -> list[dict]:
@@ -181,6 +208,7 @@ async def _scan_apps(udid: str) -> list[dict]:
     finally:
         await lockdown.close()
 
+    _APPLE_IDS[udid] = most_common_apple_id([info.get("iTunesMetadata") for info in apps.values()])
     result = []
     for bundle_id, info in apps.items():
         adam_id, version_id = _parse_itunes_metadata(info.get("iTunesMetadata"))
@@ -194,6 +222,16 @@ async def _scan_apps(udid: str) -> list[dict]:
         })
     result.sort(key=lambda a: a["name"].lower())
     return result
+
+
+_APPLE_IDS: dict[str, Optional[str]] = {}
+
+
+def phone_apple_id(udid: str) -> Optional[str]:
+    """Apple ID телефона по последнему чтению приложений (читает заново, если ещё не читали)."""
+    if udid not in _APPLE_IDS:
+        asyncio.run(_scan_apps(udid))
+    return _APPLE_IDS.get(udid)
 
 
 def scan_apps(udid: str) -> list[dict]:

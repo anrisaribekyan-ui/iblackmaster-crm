@@ -179,6 +179,7 @@ def format_report_text(report: dict) -> str:
         f"IMEI 2: {_fmt(report.get('imei2'))}",
         f"Номер модели: {_fmt(report.get('model_number'))}",
         f"Активация: {_fmt(report.get('activation_state'))}",
+        f"Apple ID (по приложениям): {_fmt(report.get('apple_id'))}",
         f"Память: {memory}",
         "-" * 46, "АККУМУЛЯТОР",
         f"  Состояние (ёмкость): {_fmt(b.get('health_percent'), ' %')}",

@@ -299,7 +299,9 @@ class Agent:
         ]
         other = len(apps) - len(store)
         tail = f", ещё {other} не из App Store" if other else ""
-        self.report(job["id"], state="done", apps=store, message=f"Найдено приложений из App Store: {len(store)}{tail}")
+        owner = device.phone_apple_id(job["target_udid"])
+        who = f". Apple ID на телефоне: {owner}" if owner else ""
+        self.report(job["id"], state="done", apps=store, message=f"Найдено приложений из App Store: {len(store)}{tail}{who}")
 
     def _purchases(self, job: dict) -> None:
         self.report(job["id"], message="Загружаю покупки Apple ID…")
@@ -512,6 +514,10 @@ class Agent:
         if self.report(job_id, progress=10, message="Читаю данные телефона…"):
             return
         data = device_report.collect_report(udid)
+        try:
+            data["apple_id"] = device.phone_apple_id(udid)
+        except Exception:  # noqa: BLE001 — Apple ID по приложениям не должен ронять отчёт
+            data["apple_id"] = None
         self.report(job_id, state="done", report=data, message="Отчёт готов")
 
     def _backup(self, job: dict) -> None:
