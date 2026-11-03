@@ -507,6 +507,16 @@ export default function OrderDetailPage() {
     )
   }
 
+  const editPositionDiscount = async (position: Position, discount: string) => {
+    if (!detail) return
+    const qty = Number(position.quantity) || 1
+    const sold = Math.max(0, Math.round(Number(position.price) - Number(discount || 0) / qty))
+    await run(
+      () => api.put(`/orders/${detail.order.id}/positions/${position.id}`, { sold_price: String(sold) }),
+      'Не удалось применить скидку',
+    )
+  }
+
   const editPositionGuarantee = async (position: Position, days: string) => {
     if (!detail) return
     await run(
@@ -838,6 +848,7 @@ export default function OrderDetailPage() {
                       canViewMargin={can('marginPriceAccess')}
                       canViewCost={canSeeCost}
                       onSavePrice={(price) => void editPositionPrice(position, price)}
+                          onSaveDiscount={(d) => void editPositionDiscount(position, d)}
                       onSaveGuarantee={(days) => void editPositionGuarantee(position, days)}
                       onOpen={() => setOpenPositionId(position.id)}
                       onDelete={() => void removePosition(position)}
@@ -845,8 +856,8 @@ export default function OrderDetailPage() {
                   ))}
                 </ul>
                 <div className="mb-4 hidden overflow-x-auto md:block">
-                  <table className="w-full min-w-[740px] text-left text-sm">
-                    <thead className="bg-canvas text-muted"><tr>{['Позиция', 'Тип', 'Кол-во', 'Цена', ...(canSeeCost ? ['Себестоимость'] : []), 'Гарантия, дн.', 'Итого', ...(can('marginPriceAccess') ? ['Прибыль'] : []), ''].map((item) => <th key={item} className="px-2 py-2 font-medium">{item}</th>)}</tr></thead>
+                  <table className="w-full min-w-[820px] text-left text-sm">
+                    <thead className="bg-canvas text-muted"><tr>{['Позиция', 'Тип', 'Кол-во', 'Цена', 'Скидка, ₽', ...(canSeeCost ? ['Себестоимость'] : []), 'Гарантия, дн.', 'Итого', ...(can('marginPriceAccess') ? ['Прибыль'] : []), ''].map((item) => <th key={item} className="px-2 py-2 font-medium">{item}</th>)}</tr></thead>
                     <tbody>
                       {detail.positions.map((position) => (
                         <PositionRow
@@ -857,6 +868,7 @@ export default function OrderDetailPage() {
                           canViewCost={canSeeCost}
                           canEditCost={can('changeOrderPositionAccess') && can('orderPurchasePriceAccess') && !isClosed}
                           onSavePrice={(price) => void editPositionPrice(position, price)}
+                          onSaveDiscount={(d) => void editPositionDiscount(position, d)}
                           onSaveCost={(cost) => void editPositionCost(position, cost)}
                           onSaveGuarantee={(days) => void editPositionGuarantee(position, days)}
                           onOpen={() => setOpenPositionId(position.id)}
@@ -1136,6 +1148,7 @@ function PositionRow({
   canViewCost,
   canEditCost,
   onSavePrice,
+  onSaveDiscount,
   onSaveCost,
   onSaveGuarantee,
   onOpen,
@@ -1147,6 +1160,7 @@ function PositionRow({
   canViewCost: boolean
   canEditCost: boolean
   onSavePrice: (price: string) => void
+  onSaveDiscount: (discount: string) => void
   onSaveCost: (cost: string) => void
   onSaveGuarantee: (days: string) => void
   onOpen: () => void
@@ -1154,6 +1168,9 @@ function PositionRow({
 }) {
   const [price, setPrice] = useState(position.price)
   useEffect(() => setPrice(position.price), [position.price])
+  const discountNow = String(Math.max(0, Math.round((Number(position.price) - Number(position.sold_price)) * Number(position.quantity))))
+  const [discount, setDiscount] = useState(discountNow)
+  useEffect(() => setDiscount(discountNow), [discountNow])
   const [cost, setCost] = useState(position.purchase_price ?? '')
   useEffect(() => setCost(position.purchase_price ?? ''), [position.purchase_price])
   const [guarantee, setGuarantee] = useState(String(position.guarantee_days))
@@ -1164,6 +1181,7 @@ function PositionRow({
       <td className="px-2 py-2">{position.is_work ? 'Работа' : 'Материал'}</td>
       <td className="px-2 py-2 num">{Number(position.quantity).toLocaleString('ru-RU')}</td>
       <td className="px-2 py-2">{canEdit ? <input className={`${inputClass} w-28 text-right num`} type="number" min="0" step="1" value={price} onChange={(event) => setPrice(event.target.value)} onBlur={() => { if (price !== position.price) onSavePrice(price) }} /> : <span className="num">{formatMoney(position.sold_price)}</span>}</td>
+      <td className="px-2 py-2">{canEdit ? <input className={`${inputClass} w-24 text-right num`} type="number" min="0" step="1" value={discount} title="Скидка на всю позицию, ₽" onChange={(event) => setDiscount(event.target.value)} onBlur={() => { if (discount !== discountNow) onSaveDiscount(discount) }} /> : <span className="num">{discountNow === '0' ? '—' : formatMoney(discountNow)}</span>}</td>
       {canViewCost && (
         <td className="px-2 py-2">{canEditCost
           ? <input className={`${inputClass} w-28 text-right num`} type="number" min="0" step="1" value={cost} title="Себестоимость за единицу" onChange={(event) => setCost(event.target.value)} onBlur={() => { if (cost !== (position.purchase_price ?? '')) onSaveCost(cost) }} />
@@ -1177,12 +1195,13 @@ function PositionRow({
   )
 }
 
-function PositionCard({ position, canEdit, canViewMargin, canViewCost, onSavePrice, onSaveGuarantee, onOpen, onDelete }: {
+function PositionCard({ position, canEdit, canViewMargin, canViewCost, onSavePrice, onSaveDiscount, onSaveGuarantee, onOpen, onDelete }: {
   position: Position
   canEdit: boolean
   canViewMargin: boolean
   canViewCost: boolean
   onSavePrice: (price: string) => void
+  onSaveDiscount: (discount: string) => void
   onSaveGuarantee: (days: string) => void
   onOpen: () => void
   onDelete: () => void
@@ -1191,6 +1210,9 @@ function PositionCard({ position, canEdit, canViewMargin, canViewCost, onSavePri
   useEffect(() => setPrice(position.price), [position.price])
   const [guarantee, setGuarantee] = useState(String(position.guarantee_days))
   useEffect(() => setGuarantee(String(position.guarantee_days)), [position.guarantee_days])
+  const discountNow = String(Math.max(0, Math.round((Number(position.price) - Number(position.sold_price)) * Number(position.quantity))))
+  const [discount, setDiscount] = useState(discountNow)
+  useEffect(() => setDiscount(discountNow), [discountNow])
   const qtyNum = Number(position.quantity)
   return (
     <li className="py-3">
@@ -1208,9 +1230,12 @@ function PositionCard({ position, canEdit, canViewMargin, canViewCost, onSavePri
         {canEdit && <button className="-mr-1 grid h-8 w-8 place-items-center rounded-md text-lg text-muted hover:text-danger" onClick={onDelete} aria-label={`Удалить ${position.name}`}>×</button>}
       </div>
       {canEdit && (
-        <label className="mt-2 flex items-center gap-2 text-xs text-muted">Цена
+        <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">Цена
           <input className="h-9 w-28 rounded-md border border-line bg-surface px-2 text-right text-sm text-ink num" inputMode="numeric" value={price}
             onChange={(event) => setPrice(event.target.value.replace(/[^\d]/g, ''))} onBlur={() => { if (price !== position.price) onSavePrice(price) }} />
+          Скидка
+          <input className="h-9 w-20 rounded-md border border-line bg-surface px-2 text-right text-sm text-ink num" inputMode="numeric" value={discount}
+            onChange={(event) => setDiscount(event.target.value.replace(/[^\d]/g, ''))} onBlur={() => { if (discount !== discountNow) onSaveDiscount(discount) }} />
           Гарантия, дн.
           <input className="h-9 w-20 rounded-md border border-line bg-surface px-2 text-right text-sm text-ink num" inputMode="numeric" value={guarantee}
             onChange={(event) => setGuarantee(event.target.value.replace(/[^\d]/g, ''))} onBlur={() => { if (guarantee !== String(position.guarantee_days)) onSaveGuarantee(guarantee) }} />
