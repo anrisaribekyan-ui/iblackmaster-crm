@@ -178,7 +178,7 @@ export default function OrderDetailPage() {
   const [managers, setManagers] = useState<Employee[]>([])
   // Как в LiveSklad: заказ открывается на работах и материалах, информация — по вкладке
   const [tab, setTab] = useState<'info' | 'positions'>('positions')
-  const [editingInfo, setEditingInfo] = useState(false)
+  const [infoVersion, setInfoVersion] = useState(0)
   const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null)
   const [closeAfterPay, setCloseAfterPay] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
@@ -746,7 +746,6 @@ export default function OrderDetailPage() {
             <section className="rounded-xl border border-line bg-surface p-4">
               <header className="mb-4 flex items-center justify-between gap-3">
                 <h2 className="font-semibold">Информация о заказе</h2>
-                {can('changeOrderInfoAccess') && !isDeleted && <button className="text-sm text-accent" onClick={() => setEditingInfo(true)}>Изменить</button>}
               </header>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Info label="Клиент" value={detail.counteragent.name} />
@@ -764,7 +763,7 @@ export default function OrderDetailPage() {
                 </div>
                 <Info label="Тип заказа" value={detail.order_type.name} />
                 <Info label="Статус" value={detail.status.name} />
-                {fields.filter((field) => field.is_visible && field.key !== 'name' && field.key !== 'phones').map((field) => (
+                {!(can('changeOrderInfoAccess') && !isDeleted) && fields.filter((field) => field.is_visible && field.key !== 'name' && field.key !== 'phones').map((field) => (
                   field.key === 'password' && parsePattern(String(fieldValue(field, detail) ?? ''))
                     ? (
                       <div key={field.id}>
@@ -782,6 +781,21 @@ export default function OrderDetailPage() {
                       : <Info key={field.id} label={field.label} value={displayValue(field, detail, masters, managers, howKnows)} />
                 ))}
               </div>
+              {can('changeOrderInfoAccess') && !isDeleted && (
+                <OrderInfoEditor
+                  key={`${detail.order.id}:${infoVersion}`}
+                  detail={detail}
+                  fields={fields}
+                  masters={masters}
+                  managers={managers}
+                  saving={saving}
+                  onSave={async (payload) => {
+                    if (await run(() => api.put(`/orders/${detail.order.id}`, payload), 'Не удалось сохранить информацию')) {
+                      setInfoVersion((v) => v + 1)
+                    }
+                  }}
+                />
+              )}
             </section>
           ) : (
             <section className="rounded-xl border border-line bg-surface p-4">
@@ -1063,21 +1077,6 @@ export default function OrderDetailPage() {
       {taskCreating && (
         <TaskForm employees={taskEmployees} orderId={Number(orderId)} onSave={createTask} onClose={() => setTaskCreating(false)} />
       )}
-      {editingInfo && (
-        <OrderInfoEditor
-          detail={detail}
-          fields={fields}
-          masters={masters}
-          managers={managers}
-          saving={saving}
-          onClose={() => setEditingInfo(false)}
-          onSave={async (payload) => {
-            if (await run(() => api.put(`/orders/${detail.order.id}`, payload), 'Не удалось сохранить информацию')) {
-              setEditingInfo(false)
-            }
-          }}
-        />
-      )}
       {paymentMode && (
         <Modal title={paymentMode === 'payment' ? closeAfterPay ? 'Оплата для выдачи' : prepayMode ? 'Предоплата' : 'Принять оплату' : 'Возврат'} onClose={() => { setPaymentMode(null); setCloseAfterPay(false) }}>
           <form onSubmit={(event) => void submitPayment(event)} className="grid gap-3">
@@ -1253,7 +1252,6 @@ function OrderInfoEditor({
   masters,
   managers,
   saving,
-  onClose,
   onSave,
 }: {
   detail: OrderDetail
@@ -1261,15 +1259,15 @@ function OrderInfoEditor({
   masters: Employee[]
   managers: Employee[]
   saving: boolean
-  onClose: () => void
   onSave: (payload: Record<string, unknown>) => Promise<void>
 }) {
-  const [values, setValues] = useState<OrderFieldValues>(() =>
-    Object.fromEntries(fields.map((field) => {
-      const raw = fieldValue(field, detail)
-      return [field.key, field.data_type === 'dateTime' ? isoToLocalInput(raw as string | null) : raw]
-    })),
-  )
+  const initial = () => Object.fromEntries(fields.map((field) => {
+    const raw = fieldValue(field, detail)
+    return [field.key, field.data_type === 'dateTime' ? isoToLocalInput(raw as string | null) : raw]
+  })) as OrderFieldValues
+  const [saved] = useState<OrderFieldValues>(initial)
+  const [values, setValues] = useState<OrderFieldValues>(saved)
+  const dirty = JSON.stringify(values) !== JSON.stringify(saved)
   const [error, setError] = useState('')
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -1299,9 +1297,8 @@ function OrderInfoEditor({
     }
   }
   return (
-    <Modal title="Изменить информацию о заказе" onClose={onClose}>
-      <form onSubmit={(event) => void submit(event)} className="grid max-h-[75vh] gap-3 overflow-y-auto sm:grid-cols-2">
-        {fields.filter((field) => field.is_visible).map((field) => {
+      <form onSubmit={(event) => void submit(event)} className="mt-4 grid gap-3 sm:grid-cols-2">
+        {fields.filter((field) => field.is_visible && field.key !== 'name' && field.key !== 'phones').map((field) => {
           const value = values[field.key]
           const staticField = field.key === 'name' || field.key === 'phones'
           const selectOptions = field.key === 'master' ? masters : field.key === 'manager' ? managers : []
@@ -1341,12 +1338,15 @@ function OrderInfoEditor({
           )
         })}
         {error && <p role="alert" className="text-sm text-danger sm:col-span-2">{error}</p>}
-        <div className="flex justify-end gap-2 sm:col-span-2">
-          <button type="button" className="rounded-md border border-line px-3 py-2" onClick={onClose}>Отмена</button>
-          <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
-        </div>
+        {dirty && (
+          // Появляется, как только что-то поменяли: отдельной кнопки «Изменить» не нужно
+          <div className="sticky bottom-20 z-10 flex items-center justify-end gap-2 rounded-lg border border-accent/40 bg-surface p-2 shadow-lg sm:col-span-2 md:bottom-2">
+            <span className="mr-auto text-sm text-muted">Есть несохранённые изменения</span>
+            <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => { setValues(saved); setError('') }}>Отменить</button>
+            <button disabled={saving} className="rounded-md bg-accent px-4 py-2 font-medium text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
+          </div>
+        )}
       </form>
-    </Modal>
   )
 }
 
