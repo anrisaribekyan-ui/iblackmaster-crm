@@ -130,29 +130,38 @@ function receiptHalf(d: FormData, tag: string): string {
     .map((text, index) => `<p><b>${index + 1}.</b> ${e(text)}</p>`)
     .join('')
   const estimate = /^[\d\s\-–+.,]+$/.test(d.approximatePrice) ? `${d.approximatePrice} ₽` : d.approximatePrice
-  return `<div class="half">
+  return `<div class="half"><div class="fit">
     ${head(d, 'Квитанция о приёме', tag, [d.shop.name, d.shop.address, d.shop.phones].filter(Boolean).join(' · '))}
-    <div class="cols">
+    <div class="cols3">
       <section class="card"><h3>Заказчик</h3><dl class="kv"><dt>Имя</dt><dd>${val(d.customer.name)}</dd><dt>Телефон</dt><dd>${val(d.customer.phones)}</dd><dt>Мастер</dt><dd>${val(d.master)}</dd></dl></section>
+      <section class="card"><h3>Устройство</h3><dl class="kv"><dt>Модель</dt><dd>${val(d.device)}</dd><dt>SN / IMEI</dt><dd>${val(d.serial)}</dd><dt>Внешний вид</dt><dd>${val(d.look)}</dd></dl></section>
       <section class="card"><h3>Сроки и оплата</h3><dl class="kv"><dt>Готовность</dt><dd>${val(d.ready)}</dd><dt>Предоплата</dt><dd>${val(d.prepaid)}</dd><dt>Примечание</dt><dd>${val(d.note)}</dd></dl></section>
-      <section class="card wide"><h3>Устройство</h3><div class="kv2"><dl class="kv"><dt>Модель</dt><dd>${val(d.device)}</dd><dt>SN / IMEI</dt><dd>${val(d.serial)}</dd></dl><dl class="kv"><dt>Комплектация</dt><dd>${val(d.completeSet)}</dd><dt>Внешний вид</dt><dd>${val(d.look)}</dd></dl></div></section>
     </div>
     <div class="price">
-      <section class="card tint" style="flex:1.2"><h3>Причина обращения (со слов заказчика)</h3><div>${val(d.problems)}</div></section>
-      <section class="card" style="flex:1"><h3>Ориентировочная стоимость</h3><div class="big">${val(estimate)}</div></section>
+      <section class="card" style="flex:1.1"><h3>Комплектация</h3><div>${val(d.completeSet)}</div></section>
+      <section class="card tint" style="flex:1.4"><h3>Причина обращения (со слов заказчика)</h3><div>${val(d.problems)}</div></section>
+      <section class="card" style="flex:.8"><h3>Ориентир. стоимость</h3><div class="big">${val(estimate)}</div></section>
       ${d.trackQr ? `<section class="card qr"><div class="qr-img">${d.trackQr}</div><div class="qr-cap">Следите за ремонтом: наведите камеру</div></section>` : ''}
     </div>
     <div class="terms">${terms}</div>
     ${sign(`Исполнитель · ${e(d.manager || d.master)}`, `С условиями ознакомлен и согласен · ${e(d.customer.name)}`, d.signatureIn)}
-  </div>`
+  </div></div>`
 }
+
+/** Квитанция всегда помещается на листе: если текста много, каждая половина плавно уменьшается (не меньше 70 %). */
+const FIT_SCRIPT = `(function(){
+  var halves=[].slice.call(document.querySelectorAll('.receipt .half'));
+  halves.forEach(function(h){var f=h.querySelector('.fit');if(!f)return;var z=1;
+    while(f.scrollHeight*z>h.clientHeight-1&&z>0.7){z=Math.round((z-0.02)*100)/100;f.style.zoom=z;}});
+})();`
 
 export function receiptHtml(d: FormData): string {
   return `<section class="sheet receipt">
     ${receiptHalf(d, 'Экземпляр сервиса')}
     <div class="cut">✂ линия отреза</div>
     ${receiptHalf(d, 'Экземпляр клиента')}
-  </section>`
+  </section>
+  <script>${FIT_SCRIPT}</script>`
 }
 
 const MARK_TEXT = { ok: '✓ работает', fail: '✗ не работает', na: '— не проверить' } as const
@@ -369,7 +378,16 @@ export const FORMS_STYLE = `
   .cut { display: flex; align-items: center; gap: 8px; margin: 3mm 0; color: var(--ink-3); font-size: 8pt; }
   .cut::before, .cut::after { content: ""; flex: 1; border-top: 1px dashed var(--ink-3); }
   .sheet.receipt { padding: 9mm 14mm; }
-  .receipt .half { height: 134mm; display: flex; flex-direction: column; overflow: hidden; }
+  .receipt .half { height: 134mm; overflow: hidden; }
+  .receipt .fit { display: flex; flex-direction: column; min-height: 134mm; }
+  .receipt .head { align-items: center; }
+  .receipt .doc-title { text-align: right; white-space: nowrap; }
+  .receipt .doc-title h1 { display: inline; }
+  .receipt .doc-title .num { display: inline; margin-left: 8px; }
+  .receipt .brand-sub { max-width: 110mm; }
+  .receipt .card > div:not(.big):not(.qr-img):not(.qr-cap) { font-size: 8.8pt; font-weight: 500; line-height: 1.3; }
+  .cols3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px 8px; margin-top: 5px; }
+  .cols3 .kv { grid-template-columns: auto 1fr; }
   .receipt .head { padding-bottom: 6px; }
   .receipt .mark { width: 28px; height: 28px; font-size: 12px; border-radius: 7px; }
   .receipt .doc-title h1 { font-size: 14pt; }
