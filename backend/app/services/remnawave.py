@@ -63,7 +63,7 @@ class Remnawave:
             raise BusinessError("Панель VPN не вернула пользователя")
         return _parse(data)
 
-    def update_expire(self, user_id: int, expire_at: datetime) -> PanelUser:
+    def update_expire(self, username: str, user_id: int | None, expire_at: datetime) -> PanelUser:
         data = self._req("PATCH", "/api/users", json={"id": user_id, "expireAt": _iso(expire_at)})
         if not data:
             raise BusinessError("Пользователь не найден в панели VPN")
@@ -78,6 +78,82 @@ class Remnawave:
         return _parse(data) if data else None
 
 
-def get_panel(cfg: dict) -> Remnawave:
+class Marzban:
+    """Marzban: логин и пароль админа → токен; пользователи по username."""
+
+    def __init__(self, url: str, username: str, password: str, timeout: float = 20.0):
+        if not url or not username or not password:
+            raise BusinessError("VPN: не заполнены адрес, логин и пароль панели (раздел VPN → Настройки панели)")
+        self.url = url.rstrip("/")
+        self.http = httpx.Client(base_url=self.url, timeout=timeout)
+        self.credentials = {"username": username, "password": password}
+        self.token: str | None = None
+
+    def _login(self) -> None:
+        try:
+            r = self.http.post("/api/admin/token", data=self.credentials)
+        except httpx.HTTPError as e:
+            raise BusinessError(f"Панель VPN недоступна: {e}") from e
+        if r.status_code != 200:
+            raise BusinessError("Панель VPN не приняла логин и пароль")
+        self.token = r.json()["access_token"]
+
+    def _req(self, method: str, path: str, **kw):
+        if self.token is None:
+            self._login()
+        try:
+            r = self.http.request(method, path, headers={"Authorization": f"Bearer {self.token}"}, **kw)
+            if r.status_code == 401:
+                self._login()
+                r = self.http.request(method, path, headers={"Authorization": f"Bearer {self.token}"}, **kw)
+        except httpx.HTTPError as e:
+            raise BusinessError(f"Панель VPN недоступна: {e}") from e
+        if r.status_code == 404:
+            return None
+        if r.status_code >= 400:
+            raise BusinessError(f"Панель VPN ответила {r.status_code}: {r.text[:200]}")
+        return r.json() if r.content else {}
+
+    def _proxies(self) -> dict:
+        data = self._req("GET", "/api/inbounds") or {}
+        proxies: dict = {}
+        for protocol in data:
+            proxies[protocol] = {"flow": "xtls-rprx-vision"} if protocol == "vless" else {}
+        return proxies or {"vless": {}}
+
+    def _parse(self, data: dict) -> PanelUser:
+        link = data.get("subscription_url") or ""
+        if link.startswith("/"):
+            link = self.url + link
+        expire = data.get("expire")
+        return PanelUser(
+            id=0, username=data["username"], status=data.get("status", "active").upper(),
+            expire_at=datetime.fromtimestamp(expire, tz=timezone.utc) if expire else datetime.max.replace(tzinfo=timezone.utc),
+            subscription_url=link,
+        )
+
+    def create_user(self, *, username: str, expire_at: datetime, device_limit: int, description: str) -> PanelUser:
+        data = self._req("POST", "/api/user", json={
+            "username": username, "proxies": self._proxies(), "inbounds": {}, "expire": int(expire_at.timestamp()),
+            "data_limit": 0, "status": "active", "note": description,
+        })
+        if not data:
+            raise BusinessError("Панель VPN не вернула пользователя")
+        return self._parse(data)
+
+    def update_expire(self, username: str, user_id: int | None, expire_at: datetime) -> PanelUser:
+        data = self._req("PUT", f"/api/user/{username}", json={"expire": int(expire_at.timestamp()), "status": "active"})
+        if not data:
+            raise BusinessError("Пользователь не найден в панели VPN")
+        return self._parse(data)
+
+    def get_by_username(self, username: str) -> PanelUser | None:
+        data = self._req("GET", f"/api/user/{username}")
+        return self._parse(data) if data else None
+
+
+def get_panel(cfg: dict):
     """Точка подмены в тестах."""
-    return Remnawave(cfg.get("panel_url", ""), cfg.get("panel_token", ""))
+    if cfg.get("panel_type") == "remnawave":
+        return Remnawave(cfg.get("panel_url", ""), cfg.get("panel_token", ""))
+    return Marzban(cfg.get("panel_url", ""), cfg.get("panel_username", ""), cfg.get("panel_password", ""))

@@ -29,11 +29,14 @@ def get_config(db: DbSession, me: CurrentEmployee):
     cfg = settings_service.get(db, "vpn")
     return {
         "prices": cfg["prices"], "commission_percent": cfg["commission_percent"],
-        "can_free": has_permission(me, "vpnFreeAccess"), "configured": bool(cfg["panel_url"] and cfg["panel_token"]),
+        "can_free": has_permission(me, "vpnFreeAccess"), "configured": bool(cfg["panel_url"] and (cfg["panel_token"] if cfg["panel_type"] == "remnawave" else cfg["panel_username"] and cfg["panel_password"])),
     }
 
 
 class VpnSettingsIn(BaseModel):
+    panel_type: str | None = Field(default=None, pattern="^(marzban|remnawave)$")
+    panel_username: str | None = None
+    panel_password: str | None = None
     panel_url: str | None = None
     panel_token: str | None = None
     commission_percent: Decimal | None = Field(default=None, ge=0, le=100)
@@ -44,14 +47,15 @@ class VpnSettingsIn(BaseModel):
 @router.get("/settings", dependencies=[Depends(require("settingAccess"))])
 def get_settings(db: DbSession):
     cfg = settings_service.get(db, "vpn")
-    return {**cfg, "panel_token": "", "token_set": bool(cfg["panel_token"])}
+    return {**cfg, "panel_token": "", "panel_password": "", "token_set": bool(cfg["panel_token"]), "password_set": bool(cfg["panel_password"])}
 
 
 @router.put("/settings", dependencies=[Depends(require("settingAccess"))])
 def put_settings(data: VpnSettingsIn, db: DbSession):
     values = {k: (float(v) if isinstance(v, Decimal) else v) for k, v in data.model_dump(exclude_none=True).items()}
-    if not values.get("panel_token"):
-        values.pop("panel_token", None)  # пустое поле не затирает сохранённый токен
+    for secret in ("panel_token", "panel_password"):
+        if not values.get(secret):
+            values.pop(secret, None)  # пустое поле не затирает сохранённое значение
     settings_service.put(db, "vpn", values)
     db.commit()
     return {"ok": True}

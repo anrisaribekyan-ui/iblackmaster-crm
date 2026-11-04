@@ -20,16 +20,20 @@ function PanelSettings({ onSaved }: { onSaved: () => void }) {
   const [url, setUrl] = useState('')
   const [token, setToken] = useState('')
   const [tokenSet, setTokenSet] = useState(false)
+  const [ptype, setPtype] = useState('marzban')
+  const [login, setLogin] = useState('')
+  const [password, setPassword] = useState('')
+  const [passwordSet, setPasswordSet] = useState(false)
   const [percent, setPercent] = useState('30')
   const [msg, setMsg] = useState('')
   useEffect(() => {
     if (!open) return
-    api.get<{ panel_url: string; token_set: boolean; commission_percent: number }>('/vpn/settings').then((c) => { setUrl(c.panel_url); setTokenSet(c.token_set); setPercent(String(c.commission_percent)) }).catch(() => undefined)
+    api.get<{ panel_url: string; panel_type: string; panel_username: string; token_set: boolean; password_set: boolean; commission_percent: number }>('/vpn/settings').then((c) => { setUrl(c.panel_url); setPtype(c.panel_type); setLogin(c.panel_username); setTokenSet(c.token_set); setPasswordSet(c.password_set); setPercent(String(c.commission_percent)) }).catch(() => undefined)
   }, [open])
   const save = async () => {
     try {
-      await api.put('/vpn/settings', { panel_url: url.trim(), panel_token: token.trim() || undefined, commission_percent: Number(percent) })
-      setMsg('Сохранено'); setToken(''); onSaved()
+      await api.put('/vpn/settings', { panel_type: ptype, panel_url: url.trim(), panel_username: login.trim(), panel_password: password || undefined, panel_token: token.trim() || undefined, commission_percent: Number(percent) })
+      setMsg('Сохранено'); setToken(''); setPassword(''); onSaved()
     } catch (e) { setMsg(e instanceof ApiError ? e.message : 'Не удалось сохранить') }
   }
   return (
@@ -37,14 +41,29 @@ function PanelSettings({ onSaved }: { onSaved: () => void }) {
       <button className="text-sm text-accent" onClick={() => setOpen(!open)}>{open ? 'Скрыть настройки панели' : 'Настройки панели (владелец)'}</button>
       {open && (
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <label className="grid gap-1 text-sm text-muted sm:col-span-2">Адрес панели Remnawave
-            <input className={inputClass} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://panel.example.com" />
+          <label className="grid gap-1 text-sm text-muted">Панель
+            <select className={inputClass} value={ptype} onChange={(e) => setPtype(e.target.value)}>
+              <option value="marzban">Marzban</option>
+              <option value="remnawave">Remnawave</option>
+            </select>
           </label>
+          <label className="grid gap-1 text-sm text-muted sm:col-span-2">Адрес панели
+            <input className={inputClass} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://127.0.0.1:8000 или https://panel.example.com" />
+          </label>
+          {ptype === 'marzban' ? (<>
+            <label className="grid gap-1 text-sm text-muted">Логин админа
+              <input className={inputClass} autoComplete="off" value={login} onChange={(e) => setLogin(e.target.value)} />
+            </label>
+            <label className="grid gap-1 text-sm text-muted">Пароль {passwordSet && <span className="text-success">(сохранён)</span>}
+              <input className={inputClass} type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </label>
+          </>) : (
+            <label className="grid gap-1 text-sm text-muted sm:col-span-2">API-токен {tokenSet && <span className="text-success">(сохранён)</span>}
+              <input className={inputClass} type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} />
+            </label>
+          )}
           <label className="grid gap-1 text-sm text-muted">Сотруднику, % от цены
             <input className={`${inputClass} num`} inputMode="numeric" value={percent} onChange={(e) => setPercent(e.target.value.replace(/[^\d]/g, ''))} />
-          </label>
-          <label className="grid gap-1 text-sm text-muted sm:col-span-3">API-токен {tokenSet && <span className="text-success">(сохранён, оставьте пустым, чтобы не менять)</span>}
-            <input className={inputClass} type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} />
           </label>
           <div className="flex items-center gap-3 sm:col-span-3">
             <button className="rounded-md bg-accent px-3 py-2 text-accent-ink" onClick={() => void save()}>Сохранить</button>
@@ -117,7 +136,7 @@ export default function VpnPage() {
     <section className="mx-auto max-w-5xl">
       <h1 className="mb-1 text-xl font-semibold">VPN iBM</h1>
       <p className="mb-4 text-sm text-muted">Клиент закрепляется за тем, кто выдал первый доступ: он получает {config?.commission_percent ?? 30}% с выдачи и каждого продления.</p>
-      {config && !config.configured && <p className="mb-3 rounded-md border border-warning p-3 text-sm">Панель VPN не подключена. Владелец: Настройки → VPN, адрес панели и токен.</p>}
+      {config && !config.configured && <p className="mb-3 rounded-md border border-warning p-3 text-sm">Панель VPN не подключена. Владелец: внизу страницы «Настройки панели».</p>}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
         <div className="grid content-start gap-4 rounded-xl border border-line bg-surface p-4">
           <label className="grid gap-1 text-sm text-muted">Телефон клиента

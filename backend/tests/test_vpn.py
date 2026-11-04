@@ -20,17 +20,16 @@ class FakePanel:
         self.users[username] = u
         return u
 
-    def update_expire(self, user_id, expire_at):
-        for u in self.users.values():
-            if u.id == user_id:
-                u.expire_at = expire_at
-                return u
+    def update_expire(self, username, user_id, expire_at):
+        u = self.users[username]
+        u.expire_at = expire_at
+        return u
 
 
 def setup(db, monkeypatch):
     panel = FakePanel()
     monkeypatch.setattr(remnawave, "get_panel", lambda cfg: panel)
-    settings_service.put(db, "vpn", {"panel_url": "http://x", "panel_token": "t"})
+    settings_service.put(db, "vpn", {"panel_url": "http://x", "panel_username": "crm", "panel_password": "p"})
     db.commit()
     location = db.scalars(select(Location).order_by(Location.sort)).first()
     register = db.scalars(select(CashRegister).where(CashRegister.location_id == location.id, CashRegister.is_active.is_(True))).first()
@@ -62,3 +61,29 @@ def test_issue_renew_commission_and_free(client, auth_headers, db, owner, monkey
     r = client.post("/api/vpn/issue", json={"phone": "79990001122", "months": 1, "free": True}, headers=auth_headers)
     assert r.status_code == 200
     assert len(db.scalars(select(SalaryEvent).where(SalaryEvent.kind == "vpn")).all()) == 2
+
+
+def test_marzban_client_contract():
+    import httpx
+    from app.services.remnawave import Marzban
+
+    calls = []
+
+    def handler(request: httpx.Request):
+        calls.append((request.method, request.url.path))
+        if request.url.path == "/api/admin/token":
+            return httpx.Response(200, json={"access_token": "T"})
+        assert request.headers["authorization"] == "Bearer T"
+        if request.url.path == "/api/inbounds":
+            return httpx.Response(200, json={"vless": [{}], "trojan": [{}]})
+        if request.url.path == "/api/user" and request.method == "POST":
+            import json as _j
+            body = _j.loads(request.content)
+            assert set(body["proxies"]) == {"vless", "trojan"} and body["expire"] > 0
+            return httpx.Response(200, json={"username": body["username"], "status": "active", "expire": body["expire"], "subscription_url": "/sub/abc"})
+        return httpx.Response(404)
+
+    m = Marzban("https://panel.test", "crm", "pw")
+    m.http = httpx.Client(base_url="https://panel.test", transport=httpx.MockTransport(handler))
+    user = m.create_user(username="crm7900", expire_at=datetime.now(timezone.utc) + timedelta(days=30), device_limit=2, description="x")
+    assert user.subscription_url == "https://panel.test/sub/abc" and user.status == "ACTIVE"

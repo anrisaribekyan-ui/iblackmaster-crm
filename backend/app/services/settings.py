@@ -31,7 +31,10 @@ DEFAULTS: dict[str, dict] = {
     },
     # VPN iBM: панель Remnawave и тарифы
     "vpn": {
+        "panel_type": "marzban",  # marzban | remnawave
         "panel_url": "",
+        "panel_username": "",
+        "panel_password": "",
         "panel_token": "",
         "commission_percent": 30,  # % от цены закреплённому сотруднику за выдачу и каждое продление
         "device_limit": 2,

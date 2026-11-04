@@ -76,7 +76,7 @@ def issue_or_renew(
         username = f"crm{normalized}"
         existing = panel.get_by_username(username)
         if existing:
-            user = panel.update_expire(existing.id, add_months(max(_aware(existing.expire_at), now), months))
+            user = panel.update_expire(username, existing.id, add_months(max(_aware(existing.expire_at), now), months))
         else:
             user = panel.create_user(username=username, expire_at=expire_at, device_limit=int(cfg.get("device_limit") or 2),
                                      description=f"CRM: {name or normalized}")
@@ -89,7 +89,7 @@ def issue_or_renew(
         db.add(client)
         kind = "issue"
     else:
-        user = panel.update_expire(client.panel_user_id, expire_at)
+        user = panel.update_expire(client.panel_username, client.panel_user_id, expire_at)
         client.expires_at = user.expire_at
         client.subscription_url = user.subscription_url or client.subscription_url
         kind = "renew"
