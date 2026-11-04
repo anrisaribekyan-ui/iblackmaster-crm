@@ -19,6 +19,8 @@ export default function PanicPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<Result | null>(null)
+  const [orderNo, setOrderNo] = useState('')
+  const [attachMsg, setAttachMsg] = useState('')
   const photoRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -46,6 +48,22 @@ export default function PanicPage() {
       setError(e instanceof ApiError ? e.message : 'Не удалось проверить')
     } finally {
       setBusy(false)
+    }
+  }
+
+  const attach = async () => {
+    if (!result || !orderNo.trim()) return
+    const summary = [
+      result.device && `Модель: ${result.device}`,
+      result.sensors.length ? `Датчики: ${result.sensors.join(', ')}` : '',
+      ...result.findings.map((f) => `• ${f.title}. ${f.advice}`),
+      result.ai ?? '',
+    ].filter(Boolean).join('\n')
+    try {
+      const r = await api.post<{ number: string }>('/panic/attach', { order_number: orderNo.trim(), summary })
+      setAttachMsg(`Записано в заказ ${r.number}`)
+    } catch (e) {
+      setAttachMsg(e instanceof ApiError ? e.message : 'Не удалось записать')
     }
   }
 
@@ -108,6 +126,17 @@ export default function PanicPage() {
               <p className="text-sm text-muted">{result.ai_enabled ? 'ИИ сейчас не ответил — попробуйте ещё раз. Подсказки выше собраны по правилам.' : 'ИИ не подключён (нет ключа DeepSeek на сервере) — показаны только подсказки по правилам.'}</p>
             )}
             <p className="mt-3 text-xs text-muted">Это подсказка, не приговор: лог показывает узел, который не ответил, а не саму сломанную деталь.</p>
+          </div>
+
+          <div className="rounded-xl border border-line bg-surface p-4">
+            <h2 className="mb-2 font-semibold">Записать в заказ</h2>
+            <div className="flex flex-wrap gap-2">
+              <label className="sr-only" htmlFor="panic-order">Номер заказа</label>
+              <input id="panic-order" value={orderNo} onChange={(e) => { setOrderNo(e.target.value); setAttachMsg('') }} placeholder="Номер заказа, например А15911" className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2 text-sm" />
+              <button type="button" className={btn} onClick={attach} disabled={!orderNo.trim()}>Записать</button>
+            </div>
+            {attachMsg && <p role="status" className="mt-2 text-sm">{attachMsg}</p>}
+            <p className="mt-2 text-xs text-muted">Итог появится в истории заказа комментарием.</p>
           </div>
 
           <details className="rounded-xl border border-line bg-surface p-4 text-sm">

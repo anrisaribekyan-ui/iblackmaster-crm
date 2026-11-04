@@ -34,3 +34,18 @@ def test_ai_failure_falls_back_to_rules(monkeypatch):
 def test_text_from_ips_json():
     data = b'{"bug_type":"210","os_version":"iPhone OS 17.1"}\n{"panicString":"Missing sensor(s): TG0B"}'
     assert "bug_type: 210" in panic.text_from_file("x.ips", data)
+
+
+def test_attach_to_order(client, auth_headers, db):
+    from sqlalchemy import select
+    from app.models import Location, OrderHistory, OrderType
+    from tests.test_orders import order_payload
+
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    created = client.post("/api/orders", json=order_payload(location.id, order_type.id, {"name": "Клиент"}), headers=auth_headers).json()
+    r = client.post("/api/panic/attach", json={"order_number": created["number"][1:], "summary": "АКБ"}, headers=auth_headers)
+    assert r.status_code == 200 and r.json()["number"] == created["number"]
+    texts = [h.text for h in db.scalars(select(OrderHistory).where(OrderHistory.order_id == created["id"]))]
+    assert any(t and "Проверка паник-лога" in t for t in texts)
+    assert client.post("/api/panic/attach", json={"order_number": "99999999", "summary": "x"}, headers=auth_headers).status_code == 404
