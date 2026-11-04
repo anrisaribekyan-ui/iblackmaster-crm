@@ -30,6 +30,7 @@ from app.api import (
     devices,
     how_knows,
     ideas,
+    panic,
     locations,
     measures,
     nomenclature,
@@ -137,6 +138,7 @@ app.include_router(sales.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(day_notes.router, prefix="/api")
 app.include_router(ideas.router, prefix="/api")
+app.include_router(panic.router, prefix="/api")
 app.include_router(transactions.router, prefix="/api")
 app.include_router(app_install.router, prefix="/api")
 app.include_router(vpn_api.router, prefix="/api")

@@ -26,6 +26,7 @@ const OrderCreatePage = lazy(() => import('./pages/OrderCreatePage'))
 const OrderDetailPage = lazy(() => import('./pages/OrderDetailPage'))
 const TasksPage = lazy(() => import('./pages/TasksPage'))
 const PurchasesPage = lazy(() => import('./pages/PurchasesPage'))
+const PanicPage = lazy(() => import('./pages/PanicPage'))
 const VpnPage = lazy(() => import('./pages/VpnPage'))
 const AppInstallPage = lazy(() => import('./pages/AppInstallPage'))
 import DashboardPage from './pages/DashboardPage'
@@ -103,6 +104,7 @@ export default function App() {
             </Route>
             <Route path="sales" element={<SalesPage />} />
             <Route path="day" element={<DayNotePage />} />
+            <Route path="panic" element={<PanicPage />} />
             <Route path="ideas" element={<IdeasPage />} />
             <Route path="transfer" element={<DataTransferPage />} />
             <Route path="store" element={<StoreLayout />}>

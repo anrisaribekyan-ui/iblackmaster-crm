@@ -111,6 +111,7 @@ PERMISSIONS: dict[str, dict] = {
     "appInstallStationAccess": {"section": "Установка приложений", "title": "Может добавлять станции и входить в Apple ID", "parent": "appInstallAccess"},
     "vpnAccess": {"section": "VPN", "title": "Может выдавать и продлевать VPN (с приёмом оплаты)", "parent": None},
     "vpnFreeAccess": {"section": "VPN", "title": "Может выдавать VPN без оплаты и менять закреплённого сотрудника", "parent": "vpnAccess"},
+    "panicAccess": {"section": "Диагностика", "title": "Может проверять panic-логи iPhone", "parent": None},
     "supplierOrderAccess": {"section": "Закупки", "title": "Может оформлять заказы у поставщиков (Moba, Master Mobile, Liberti)", "parent": None},
 }
 
