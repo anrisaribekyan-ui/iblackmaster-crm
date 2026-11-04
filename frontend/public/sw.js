@@ -2,7 +2,7 @@
  * Задача — открываться как приложение и мгновенно показывать интерфейс.
  * Данные (/api) НИКОГДА не кэшируем: заказы, деньги и склад всегда свежие с сервера.
  */
-const VERSION = 'v1'
+const VERSION = 'v2'
 const SHELL = `shell-${VERSION}`
 const ASSETS = 'assets' // файлы сборки с хэшем в имени — неизменяемые, кэш между версиями общий
 
@@ -26,16 +26,26 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return
   if (url.pathname.startsWith('/api/')) return // данные — только из сети
 
-  // Страницы: сначала сеть (свежая версия после обновления), без сети — сохранённая оболочка
+  // Страницы: сразу показываем сохранённую оболочку (мгновенный старт), а свежую версию тянем в фоне —
+  // на следующем заходе будет новая. Первого захода без кэша это не касается: он идёт из сети.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone()
-          caches.open(SHELL).then((cache) => cache.put('/', copy))
-          return response
-        })
-        .catch(() => caches.match('/').then((cached) => cached || Response.error())),
+      caches.match('/').then((cached) => {
+        const network = fetch(request)
+          .then((response) => {
+            if (response.ok) {
+              const copy = response.clone()
+              caches.open(SHELL).then((cache) => cache.put('/', copy))
+            }
+            return response
+          })
+          .catch(() => cached || Response.error())
+        if (cached) {
+          event.waitUntil(network)
+          return cached
+        }
+        return network
+      }),
     )
     return
   }

@@ -64,6 +64,19 @@ function formatDate(value: string | null) {
     : new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', dateStyle: 'short', timeStyle: 'short' }).format(date)
 }
 
+const dashKey = (query: string) => `crm_dash:${query}`
+function readDash(query: string): Dashboard | null {
+  try {
+    const raw = localStorage.getItem(dashKey(query))
+    return raw ? (JSON.parse(raw) as Dashboard) : null
+  } catch {
+    return null
+  }
+}
+function writeDash(query: string, value: Dashboard) {
+  try { localStorage.setItem(dashKey(query), JSON.stringify(value)) } catch { /* нет места или приватный режим */ }
+}
+
 export default function DashboardPage() {
   const rowLink = useRowLink()
   const { can, me } = useAuth()
@@ -73,7 +86,7 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState<Period>('today')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
-  const [data, setData] = useState<Dashboard | null>(null)
+  const [data, setData] = useState<Dashboard | null>(() => readDash(''))
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
 
@@ -92,7 +105,12 @@ export default function DashboardPage() {
         params.set('date_from', range.from)
         params.set('date_to', range.to)
       }
-      setData(await api.get<Dashboard>(`/dashboard?${params.toString()}`))
+      const query = params.toString()
+      const cached = readDash(query)
+      if (cached) setData(cached) // сразу показываем прошлую картину, свежие цифры придут следом
+      const fresh = await api.get<Dashboard>(`/dashboard?${query}`)
+      setData(fresh)
+      writeDash(query, fresh)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Не удалось загрузить главную')
       setData(null)

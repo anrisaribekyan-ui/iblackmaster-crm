@@ -26,8 +26,10 @@ export function getToken(): string | null {
 export function setToken(token: string | null) {
   references.clear() // другой пользователь — другие права и справочники
   try {
+    localStorage.removeItem('crm_me') // профиль и главная принадлежат прежнему пользователю
     if (token) localStorage.setItem(TOKEN_KEY, token)
     else localStorage.removeItem(TOKEN_KEY)
+    for (const key of Object.keys(localStorage)) if (key.startsWith('crm_dash:')) localStorage.removeItem(key)
   } catch {
     /* приватный режим браузера — работаем без сохранения */
   }

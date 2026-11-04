@@ -1,3 +1,5 @@
+import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -74,6 +76,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def server_timing(request: Request, call_next):
+    started = time.perf_counter()
+    response = await call_next(request)
+    elapsed = (time.perf_counter() - started) * 1000
+    response.headers["Server-Timing"] = f"app;dur={elapsed:.0f}"
+    if elapsed > 700 and request.url.path.startswith("/api/"):
+        logging.getLogger("uvicorn.error").warning("МЕДЛЕННО %s %s %.0f мс", request.method, request.url.path, elapsed)
+    return response
 
 
 @app.exception_handler(BusinessError)

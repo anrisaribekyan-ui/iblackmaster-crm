@@ -33,11 +33,29 @@ type AuthState = {
   resetTips: () => Promise<void>
 }
 
+const ME_KEY = 'crm_me'
+function readCachedMe(): Me | null {
+  try {
+    const raw = localStorage.getItem(ME_KEY)
+    return raw ? (JSON.parse(raw) as Me) : null
+  } catch {
+    return null
+  }
+}
+function writeCachedMe(value: Me | null) {
+  try {
+    if (value) localStorage.setItem(ME_KEY, JSON.stringify(value))
+    else localStorage.removeItem(ME_KEY)
+  } catch { /* приватный режим */ }
+}
+
 const AuthContext = createContext<AuthState | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [me, setMe] = useState<Me | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Профиль с прошлого захода показываем сразу, а свежий подтягиваем в фоне — экран не ждёт сервер
+  const cached = getToken() ? readCachedMe() : null
+  const [me, setMe] = useState<Me | null>(cached)
+  const [loading, setLoading] = useState(!cached)
   const [offline, setOffline] = useState(false)
 
   const loadMe = useCallback(async () => {
@@ -47,12 +65,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
     try {
-      setMe(await api.get<Me>('/auth/me'))
+      const fresh = await api.get<Me>('/auth/me')
+      setMe(fresh)
+      writeCachedMe(fresh)
       setOffline(false)
     } catch (error) {
       // Сервер ответил ошибкой (истёк вход) — на страницу входа; сети нет — сохраняем вход и ждём связь
-      if (error instanceof ApiError) setMe(null)
-      else setOffline(true)
+      if (error instanceof ApiError) {
+        setMe(null)
+        writeCachedMe(null)
+      } else if (!readCachedMe()) setOffline(true)
     } finally {
       setLoading(false)
     }
