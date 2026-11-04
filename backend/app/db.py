@@ -71,6 +71,10 @@ def make_engine(url: str):
         from sqlalchemy.pool import StaticPool
 
         kwargs["poolclass"] = StaticPool  # одна общая in-memory БД (для тестов)
+    if not url.startswith("sqlite"):
+        # По умолчанию 5+10 соединений на процесс, а запросов может быть до 40 одновременно: лишние ждали по 30 секунд
+        # и экран «зависал». pre_ping/recycle — чтобы не падать на соединении, которое база закрыла за простой.
+        kwargs.update(pool_size=15, max_overflow=25, pool_timeout=10, pool_pre_ping=True, pool_recycle=1800)
     engine = create_engine(url, **kwargs)
     if url.startswith("sqlite"):
         # В SQLite внешние ключи по умолчанию выключены, а lower() не знает кириллицу.

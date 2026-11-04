@@ -33,13 +33,44 @@ export function setToken(token: string | null) {
   }
 }
 
+const REQUEST_TIMEOUT_MS = 40000
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** Запрос с ограничением по времени: раньше «зависший» запрос крутил «Загрузка…» вечно.
+ *  Чтение (GET) при обрыве связи или перезапуске сервера (502/503/504 — идёт обновление CRM) повторяется до трёх раз. */
+async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+  const canRetry = (init.method ?? 'GET') === 'GET'
+  const attempts = canRetry ? 4 : 1
+  for (let attempt = 1; ; attempt++) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    try {
+      const res = await fetch(url, { ...init, signal: controller.signal })
+      if (attempt < attempts && [502, 503, 504].includes(res.status)) {
+        await sleep(attempt * 1500)
+        continue
+      }
+      return res
+    } catch (e) {
+      if (attempt < attempts) {
+        await sleep(attempt * 1500)
+        continue
+      }
+      const aborted = (e as { name?: string })?.name === 'AbortError'
+      throw new ApiError(0, 'network', aborted ? 'Сервер не отвечает. Проверьте интернет и повторите.' : 'Нет связи с сервером. Проверьте интернет и повторите.')
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = {}
   const token = getToken()
   if (token) headers.Authorization = `Bearer ${token}`
   if (body !== undefined) headers['Content-Type'] = 'application/json'
 
-  const res = await fetch(`/api${path}`, {
+  const res = await fetchWithRetry(`/api${path}`, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -56,7 +87,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     if (res.status === 422) {
       throw new ApiError(422, 'validation', 'Проверьте правильность заполнения полей')
     }
-    throw new ApiError(res.status, data.error ?? 'error', data.message ?? 'Ошибка сервера')
+    const friendly = [502, 503, 504].includes(res.status) ? 'Сервер обновляется, повторите через минуту' : 'Ошибка сервера'
+    throw new ApiError(res.status, data.error ?? 'error', data.message ?? friendly)
   }
   return data as T
 }

@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import ErrorBoundary from './components/ErrorBoundary'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
 import Layout from './components/Layout'
 const HowKnowsPage = lazy(() => import('./pages/HowKnowsPage'))
@@ -70,11 +71,18 @@ function Stub({ title, task }: { title: string; task: string }) {
   )
 }
 
+/** Граница ошибок внутри роутера: при переходе на другую страницу сбрасывается. */
+function Guarded({ children }: { children: ReactNode }) {
+  const location = useLocation()
+  return <ErrorBoundary resetKey={location.pathname}>{children}</ErrorBoundary>
+}
+
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         {/* Редкие разделы (аналитика, закупки, настройки) грузятся при первом открытии — приложение стартует быстрее */}
+        <Guarded>
         <Suspense fallback={<div className="p-6 text-muted">Загрузка…</div>}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -148,6 +156,7 @@ export default function App() {
           </Route>
         </Routes>
         </Suspense>
+        </Guarded>
       </BrowserRouter>
     </AuthProvider>
   )

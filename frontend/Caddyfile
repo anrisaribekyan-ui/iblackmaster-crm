@@ -16,6 +16,11 @@
 	header @fresh Cache-Control "no-cache"
 	# Файлы сборки с хэшем в имени не меняются — пусть браузер держит их год
 	header /assets/* Cache-Control "public, max-age=31536000, immutable"
+	# Файла сборки нет (старая вкладка после обновления) — честный 404, а не страница приложения вместо скрипта
+	handle /assets/* {
+		root * /srv
+		file_server
+	}
 	# Всё остальное — приложение (SPA)
 	handle {
 		root * /srv

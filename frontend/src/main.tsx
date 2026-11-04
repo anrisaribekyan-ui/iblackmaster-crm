@@ -4,8 +4,15 @@ import '@fontsource-variable/onest'
 import './index.css'
 import App from './App.tsx'
 
+import { reloadOnceForNewVersion } from './components/ErrorBoundary'
 import { watchSystem } from './theme'
 watchSystem()
+
+// Vite сообщает, что кусок приложения не загрузился (после обновления CRM): один раз перезагружаем страницу
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault()
+  reloadOnceForNewVersion()
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

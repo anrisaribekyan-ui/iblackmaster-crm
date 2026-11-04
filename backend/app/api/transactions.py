@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Response
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids, require
 from app.errors import BusinessError, Forbidden, NotFound
@@ -122,9 +122,8 @@ def list_transactions(
         query = query.where(Transaction.date >= datetime.combine(date_from, time.min, tzinfo=timezone.utc))
     if date_to is not None:
         query = query.where(Transaction.date < datetime.combine(date_to, time.max, tzinfo=timezone.utc))
-    items = db.scalars(query).all()
-    total = len(items)
-    items = items[(page - 1) * 50 : page * 50]
+    total = db.scalar(query.order_by(None).with_only_columns(func.count(Transaction.id))) or 0
+    items = db.scalars(query.offset((page - 1) * 50).limit(50)).all()
     return TransactionPage(items=[transaction_dict(db, item) for item in items], total=total, page=page)
 
 
