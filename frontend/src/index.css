@@ -344,6 +344,8 @@ html[data-theme="glass"] nav.bg-surface\/95 {
   backdrop-filter: blur(18px) saturate(1.25);
 }
 html[data-theme="glass"] .modal-panel { background-color: rgb(22 24 28 / 0.82); }
+/* Быстрый выбор статуса: в стекле фон карточек полупрозрачный — меню должно быть плотным, иначе строки просвечивают */
+html[data-theme="glass"] .quick-menu { background-color: rgb(22 24 28 / 0.97); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); }
 html[data-theme="glass"] :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) {
   background-color: rgb(255 255 255 / 0.04);
 }

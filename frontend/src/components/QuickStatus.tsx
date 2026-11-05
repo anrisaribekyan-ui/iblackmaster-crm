@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../auth'
 import StatusBadge, { type SmsMark } from './StatusBadge'
 
@@ -84,12 +85,12 @@ export default function QuickStatus({ status, groups, disabled, onPick }: Props)
         <StatusBadge name={status.name} color={status.color} sms={status.sms} />
         <span className="ml-0.5 text-[10px] text-muted" aria-hidden>▾</span>
       </button>
-      {open && (
+      {open && createPortal(
         <>
           <div className="fixed inset-0 z-40 bg-black/30 md:bg-transparent" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setOpen(false) }} aria-hidden />
           <ul role="listbox" aria-label="Выберите статус"
             style={pos && window.matchMedia('(min-width: 768px)').matches ? { top: pos.top, left: pos.left, width: 260 } : undefined}
-            className="fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overflow-y-auto rounded-t-2xl border border-line bg-surface p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-xl md:inset-x-auto md:bottom-auto md:max-h-[360px] md:rounded-xl">
+            className="quick-menu fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overflow-y-auto rounded-t-2xl border border-line bg-surface p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-xl md:inset-x-auto md:bottom-auto md:max-h-[360px] md:rounded-xl">
             {options.map((item) => (
               <li key={item.id}>
                 <button type="button" role="option" aria-selected={item.id === status.id} onClick={(event) => pick(event, item)}
@@ -101,7 +102,8 @@ export default function QuickStatus({ status, groups, disabled, onPick }: Props)
               </li>
             ))}
           </ul>
-        </>
+        </>,
+        document.body, // в стеклянной теме у предков есть blur: fixed-меню внутри них обрезалось и съезжало
       )}
     </>
   )
