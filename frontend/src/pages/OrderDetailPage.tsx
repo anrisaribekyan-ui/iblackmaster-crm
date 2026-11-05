@@ -13,7 +13,8 @@ import OrderChecklistCard, { type Signatures } from '../components/OrderChecklis
 import type { ChecklistValues } from '../components/Checklist'
 import { DevicePasswordInput, parsePattern, PatternView } from '../components/PatternLock'
 import StatusBadge, { SmsTicks, statusColors, type SmsMark } from '../components/StatusBadge'
-import PartOrderModal, { DOSKA_BOARDS, partQuery, type AddedPart } from '../components/PartOrder'
+import OrderParts from '../components/OrderParts'
+import PartOrderModal, { partQuery } from '../components/PartOrder'
 import Copyable from '../components/Copyable'
 
 type Status = { id: number; group: string; name: string; color: string; pay_required: boolean; comment_mode: string; sms?: SmsMark }
@@ -162,7 +163,7 @@ export default function OrderDetailPage() {
   const { orderId } = useParams()
   const { can, me } = useAuth()
   const [partOpen, setPartOpen] = useState(false)
-  const [partsAdded, setPartsAdded] = useState<AddedPart[]>([])
+  const [partsVersion, setPartsVersion] = useState(0)
   const [detail, setDetail] = useState<OrderDetail | null>(null)
   const [fields, setFields] = useState<FormField[]>([])
   const [statusGroups, setStatusGroups] = useState<StatusGroup[]>([])
@@ -825,22 +826,18 @@ export default function OrderDetailPage() {
                     className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink shadow-sm transition-transform active:scale-[0.98]">
                     Заказать запчасть
                   </button>
-                  {partsAdded.map((part) => (
-                    <span key={part.id} className="text-sm text-muted">
-                      <span className="text-success" aria-hidden>✓ </span>
-                      {part.text.length > 48 ? `${part.text.slice(0, 48)}…` : part.text} — в «Что купить» ({DOSKA_BOARDS.find((b) => b.id === part.loc)?.name})
-                    </span>
-                  ))}
                 </div>
               )}
+              <OrderParts orderId={detail.order.id as number} version={partsVersion} />
               {partOpen && (
                 <PartOrderModal
                   initialQuery={partQuery(Array.isArray(detail.order.problems) ? (detail.order.problems as string[]) : [], str(detail.order.brand), str(detail.order.model))}
                   locationName={currentLocation?.name ?? null}
                   author={me?.short_name ?? 'CRM'}
+                  orderId={detail.order.id as number}
                   note={[`Заказ ${detail.order.number}`, [str(detail.order.brand), str(detail.order.model)].filter(Boolean).join(' '), detail.counteragent.name].filter(Boolean).join(' · ')}
                   onClose={() => setPartOpen(false)}
-                  onAdded={(part) => setPartsAdded((current) => [...current, part])}
+                  onAdded={() => setPartsVersion((v) => v + 1)}
                 />
               )}
               {detail.positions.length === 0 ? (

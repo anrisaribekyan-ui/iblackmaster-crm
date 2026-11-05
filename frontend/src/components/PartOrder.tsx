@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { api } from '../api/client'
 import Modal from './Modal'
 import { inputClass } from '../pages/shared'
 
@@ -17,7 +18,8 @@ export const DOSKA_BOARDS: { id: DoskaLoc; name: string }[] = [
 
 type Offer = { name: string; shop: string; color: string | null; stock: string; opt: number | null; price: number; url: string | null }
 type Supplier = { id: string; name: string }
-export type AddedPart = { id: string; text: string; price: number | null; shop: string | null; loc: DoskaLoc }
+export type PartPurpose = 'order' | 'stock_order' | 'stock_sale' | 'other'
+export type AddedPart = { id: string; text: string; price: number | null; shop: string | null; loc: DoskaLoc; purpose?: PartPurpose }
 
 /** Доска закупок по названию точки CRM: «ТК Панфиловский» → Панфиловского, «1000 мелочей» / «Тыща» → 1000 мелочей. */
 export function doskaLoc(locationName: string | null | undefined): DoskaLoc | null {
@@ -78,6 +80,14 @@ const rub = (value: number) => `${value.toLocaleString('ru-RU')} ₽`
 /** Пометка заметки на приёмке: номера у заказа ещё нет, его подставит linkPartsToOrder. */
 export const INTAKE_MARK = 'Новый заказ'
 
+/** Одна карточка: дописать номер заказа в заметку (для привязки задним числом из «Закупок»). */
+export async function noteOrderOnCard(id: string, orderNumber: string, author: string) {
+  const state = await doska<{ items?: { id: string; note?: string | null }[] }>('/api/state')
+  const note = state.items?.find((item) => item.id === id)?.note ?? ''
+  if (note.includes(orderNumber)) return
+  await doska(`/api/items/${id}/edit`, { note: `Заказ ${orderNumber}${note ? ` · ${note}` : ''}`, author })
+}
+
 /** Дописать номер заказа в заметку карточки (на приёмке карточка создаётся раньше, чем заказ получает номер). */
 export async function linkPartsToOrder(parts: AddedPart[], orderNumber: string, author: string) {
   await Promise.all(parts.map(async (part) => {
@@ -86,6 +96,11 @@ export async function linkPartsToOrder(parts: AddedPart[], orderNumber: string, 
       const note = state.items?.find((item) => item.id === part.id)?.note ?? ''
       const linked = note.startsWith(INTAKE_MARK) ? `Заказ ${orderNumber}${note.slice(INTAKE_MARK.length)}` : `Заказ ${orderNumber}${note ? ` · ${note}` : ''}`
       await doska(`/api/items/${part.id}/edit`, { note: linked, author })
+    } catch {
+      // номер в заметке — удобство, заказ от этого не страдает
+    }
+    try {
+      await api.post('/part-requests', { doska_id: part.id, text: part.text, shop: part.shop, price: part.price, purpose: 'order', order_number: orderNumber })
     } catch {
       // номер в заметке — удобство, заказ от этого не страдает
     }
@@ -99,7 +114,10 @@ export default function PartOrderModal({
   note,
   onClose,
   onAdded,
+  orderId,
 }: {
+  /** Заказ, из которого заказываем (на приёмке заказа ещё нет — связь запишется после создания) */
+  orderId?: number | null
   initialQuery: string
   locationName: string | null
   author: string
@@ -117,6 +135,7 @@ export default function PartOrderModal({
   const [picked, setPicked] = useState<number | null>(null)
   const [loc, setLoc] = useState<DoskaLoc | ''>(doskaLoc(locationName) ?? '')
   const [saving, setSaving] = useState(false)
+  const [purpose, setPurpose] = useState<PartPurpose>('order')
   const suppliers = useRef<Supplier[] | null>(null)
 
   const search = useCallback(async (text: string) => {
@@ -175,7 +194,11 @@ export default function PartOrderModal({
         note: lines.filter(Boolean).join('\n'),
       })
       if (offer) await doska(`/api/items/${id}/price`, { price: offer.price, author }).catch(() => undefined)
-      onAdded({ id, text, price: offer?.price ?? null, shop: offer?.shop ?? null, loc })
+      if (orderId) {
+        // Фиксируем связь у нас: в заказе виден список заказанных запчастей, а в истории — запись «Заказана запчасть»
+        await api.post('/part-requests', { doska_id: id, text, shop: offer?.shop ?? null, price: offer?.price ?? null, purpose, order_id: orderId }).catch(() => undefined)
+      }
+      onAdded({ id, text, price: offer?.price ?? null, shop: offer?.shop ?? null, loc, purpose })
       onClose()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не удалось добавить в «Что купить»')
@@ -211,6 +234,18 @@ export default function PartOrderModal({
             </button>
           ))}
         </div>
+
+        {orderId ? (
+          <div className="flex flex-wrap items-center gap-2 text-sm" role="radiogroup" aria-label="Зачем запчасть">
+            <span className="text-muted">Зачем:</span>
+            {([['order', 'Под этот заказ'], ['stock_order', 'Пополнить склад: потратили в заказе']] as [PartPurpose, string][]).map(([value, label]) => (
+              <button key={value} type="button" role="radio" aria-checked={purpose === value} onClick={() => setPurpose(value)}
+                className={`rounded-full border px-3 py-1 ${purpose === value ? 'border-accent bg-accent-soft text-ink' : 'border-line text-muted hover:text-ink'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         <div className="min-h-40" aria-live="polite" aria-busy={loading}>
           {loading ? (

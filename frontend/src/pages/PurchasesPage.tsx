@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../auth'
+import PartLinker from '../components/PartLinker'
 import SupplierOrders, { useSupplierConfig } from '../components/SupplierOrders'
 
 /**
@@ -21,7 +22,7 @@ export default function PurchasesPage() {
   const [height, setHeight] = useState<number>(600)
   const [failed, setFailed] = useState(false)
   const supplierConfig = useSupplierConfig()
-  const [tab, setTab] = useState<'board' | 'order'>('board')
+  const [tab, setTab] = useState<'board' | 'link' | 'order'>('board')
   const canOrder = Boolean(supplierConfig?.enabled)
   // Адрес фиксируем при открытии: смена темы идёт сообщением, без перезагрузки доски
   const [src] = useState(() => {
@@ -64,9 +65,9 @@ export default function PurchasesPage() {
     <section>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold">Закупки</h1>
-        {canOrder && (
+        {(
           <div className="flex rounded-full border border-line bg-surface p-0.5 text-sm" role="tablist" aria-label="Режим закупок">
-            {([['board', 'Доска'], ['order', 'Оформить']] as const).map(([id, label]) => (
+            {([['board', 'Доска'], ['link', 'Зачем'], ...(canOrder ? [['order', 'Оформить']] : [])] as ['board' | 'link' | 'order', string][]).map(([id, label]) => (
               <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
                 className={`rounded-full px-4 py-1.5 ${tab === id ? 'bg-accent font-medium text-accent-ink' : 'text-muted hover:text-ink'}`}>
                 {label}
@@ -78,6 +79,7 @@ export default function PurchasesPage() {
           Открыть отдельно
         </a>
       </div>
+      {tab === 'link' && <PartLinker />}
       {tab === 'order' && supplierConfig?.enabled && <SupplierOrders config={supplierConfig} />}
       {tab !== 'board' ? null : failed ? (
         <p className="rounded-xl border border-line bg-surface p-5 text-muted">
