@@ -2,7 +2,7 @@
  * Задача — открываться как приложение и мгновенно показывать интерфейс.
  * Данные (/api) НИКОГДА не кэшируем: заказы, деньги и склад всегда свежие с сервера.
  */
-const VERSION = 'v3'
+const VERSION = 'v4'
 const SHELL = `shell-${VERSION}`
 const ASSETS = 'assets' // файлы сборки с хэшем в имени — неизменяемые, кэш между версиями общий
 
@@ -37,7 +37,16 @@ self.addEventListener('fetch', (event) => {
           .then((response) => {
             if (response.ok) {
               const copy = response.clone()
+              const fresh = response.clone()
               caches.open(SHELL).then((cache) => cache.put('/', copy))
+              // Вышла новая версия — сообщаем открытым окнам, чтобы показали «Обновить»
+              if (cached) {
+                Promise.all([cached.clone().text(), fresh.text()])
+                  .then(([a, b]) => {
+                    if (a !== b) return self.clients.matchAll({ type: 'window' }).then((all) => all.forEach((c) => c.postMessage({ type: 'shell-updated' })))
+                  })
+                  .catch(() => undefined)
+              }
             }
             return response
           })
