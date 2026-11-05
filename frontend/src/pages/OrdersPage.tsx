@@ -367,11 +367,11 @@ export default function OrdersPage() {
                       {order.is_deleted && <span className="rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger">удалён</span>}
                       <StatusBadge className="ml-auto" name={order.status.name} color={order.status.color} sms={order.status.sms} />
                     </div>
-                    <p className="mt-1.5 truncate font-medium">{device || 'Устройство не указано'}</p>
-                    {order.problems?.length > 0 && <p className="truncate text-sm text-muted">{order.problems.join(', ')}</p>}
+                    <p className="mt-1.5 break-words font-medium">{device || 'Устройство не указано'}</p>
+                    {order.problems?.length > 0 && <p className="break-words text-sm text-muted">{order.problems.join(', ')}</p>}
                     <div className="mt-2 flex items-end justify-between gap-3 text-sm">
                       <div className="min-w-0">
-                        <p className="truncate">{order.counteragent.name}</p>
+                        <p className="break-words">{order.counteragent.name}</p>
                         <p className={`text-xs ${overdue ? 'font-medium text-danger' : 'text-muted'}`}>
                           {formatDate(order.created_at)}{order.deadline ? ` · срок ${formatDate(order.deadline)}` : ''}
                         </p>

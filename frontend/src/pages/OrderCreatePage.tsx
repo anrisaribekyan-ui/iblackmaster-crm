@@ -558,7 +558,7 @@ export default function OrderCreatePage() {
                             <li key={part.id} className="flex items-start gap-2 rounded-md bg-canvas px-3 py-2">
                               <span className="text-success" aria-hidden>✓</span>
                               <span className="min-w-0 flex-1">
-                                <span className="line-clamp-2">{part.text}</span>
+                                <span className="break-words">{part.text}</span>
                                 <span className="text-xs text-muted">
                                   в «Что купить» · {DOSKA_BOARDS.find((b) => b.id === part.loc)?.name}
                                   {part.shop ? ` · ${part.shop}` : ''}

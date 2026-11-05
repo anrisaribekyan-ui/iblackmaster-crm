@@ -289,7 +289,7 @@ export default function SalesPage() {
                     className={`lift relative flex min-h-24 flex-col justify-between rounded-xl border bg-surface p-3 text-left shadow-sm active:scale-[0.98] hover:border-ink/40 ${inCart ? 'border-accent ring-1 ring-accent' : 'border-line'}`}
                   >
                     {inCart && <span className="absolute right-2 top-2 grid h-6 min-w-6 place-items-center rounded-full bg-accent px-1.5 text-xs font-semibold text-white num">{qty(inCart.quantity)}</span>}
-                    <span className="line-clamp-2 pr-6 text-sm leading-snug">{t.name}</span>
+                    <span className="break-words pr-6 text-sm leading-snug">{t.name}</span>
                     <span className="mt-2 flex items-end justify-between gap-2">
                       <strong className="num text-lg leading-none">{money(t.price)}</strong>
                       {stock !== null && <small className={`text-xs ${stock > 0 ? 'text-muted' : 'text-danger'}`}>{stock > 0 ? `${qty(stock)} шт` : 'нет'}</small>}
@@ -324,7 +324,7 @@ export default function SalesPage() {
                   return (
                     <li key={line.key} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-2.5">
                       <div className="min-w-0">
-                        <p className="truncate">{line.name}</p>
+                        <p className="break-words">{line.name}</p>
                         <p className="text-xs text-muted">
                           {line.nomenclatureId === null ? 'своя позиция' : line.isWork ? 'работа' : short ? <span className="text-warning">на складе {qty(line.stock)} — продам без списания</span> : `на складе ${qty(line.stock)}`}
                           {canSeeCost && !line.isWork && Number(line.cost) > 0 && ` · себест. ${money(line.cost)}`}

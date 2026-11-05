@@ -42,7 +42,7 @@ export default function IdeaButton() {
         onClick={() => setOpen(true)}
         title="Что неудобно или чего не хватает? Напишите — Анри увидит"
         aria-label="Идея для Анри"
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] right-3 z-30 flex items-center gap-2 rounded-full bg-ink p-3 md:px-4 md:py-2.5 text-sm font-medium text-white shadow-lg hover:opacity-90 md:bottom-5 md:right-5"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] right-3 z-30 flex items-center gap-2 rounded-full bg-ink/80 p-2.5 md:px-4 md:py-2.5 text-sm font-medium text-white shadow-lg hover:opacity-90 md:bottom-5 md:right-5"
       >
         <Icon name="idea" className="h-[18px] w-[18px]" />
         <span className="hidden md:inline">Идея для Анри</span>

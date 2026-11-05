@@ -119,7 +119,7 @@ export default function SupplierOrders({ config }: { config: Config }) {
               <ul className="divide-y divide-line text-sm">
                 {cards.map((c) => (
                   <li key={c.id} className="flex items-start gap-3 py-2">
-                    <span className="min-w-0 flex-1"><span className="line-clamp-2">{c.text}</span>
+                    <span className="min-w-0 flex-1"><span className="break-words">{c.text}</span>
                       <span className="text-xs text-muted">{boardName(c.loc)}</span></span>
                     {c.price ? <span className="num shrink-0">{rub(c.price)}</span> : null}
                   </li>
@@ -243,7 +243,7 @@ function ConfirmOrder({ supplier, account, cards, live, author, onClose, onDone 
                     <input type="checkbox" className="mt-1 h-4 w-4" checked={l.include} disabled={!c}
                       aria-label={`Заказать: ${l.card.text}`} onChange={(e) => update(i, { include: e.target.checked })} />
                     <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 text-sm font-medium">{l.card.text}</p>
+                      <p className="break-words text-sm font-medium">{l.card.text}</p>
                       <p className="text-xs text-muted">{boardName(l.card.loc)}</p>
                       {l.candidates.length > 0 ? (
                         <select className="mt-2 w-full rounded-md border border-line bg-surface px-2 py-1.5 text-sm" value={l.pick}

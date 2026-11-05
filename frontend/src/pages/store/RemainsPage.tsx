@@ -138,7 +138,7 @@ export default function RemainsPage() {
             <li key={`${r.store_id}-${r.nomenclature_id}`} className="min-w-0">
               <button type="button" onClick={() => open(r.nomenclature_id)} className="flex w-full items-center gap-3 rounded-xl border border-line bg-surface p-3 text-left active:bg-canvas">
                 <span className="min-w-0 flex-1">
-                  <span className="line-clamp-2 [overflow-wrap:anywhere]">{r.name}</span>
+                  <span className="[overflow-wrap:anywhere]">{r.name}</span>
                   <small className="text-muted">{r.group ?? `код ${r.code}`}{!storeId && ` · ${r.store_name}`}</small>
                 </span>
                 <span className="text-right">

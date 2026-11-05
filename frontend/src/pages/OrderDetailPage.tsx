@@ -691,10 +691,16 @@ export default function OrderDetailPage() {
               </span>
               <SmsTicks state={detail.status.sms} onDark />
             </div>
-            <p className="mt-2 truncate text-lg text-white/90">{[str(detail.order.brand), str(detail.order.model)].filter(Boolean).join(' ') || str(detail.order.device_type) || 'Устройство не указано'}</p>
-            <p className="truncate text-sm text-white/50">
+            <p className="mt-2 break-words text-lg text-white/90">{[str(detail.order.brand), str(detail.order.model)].filter(Boolean).join(' ') || str(detail.order.device_type) || 'Устройство не указано'}</p>
+            <p className="break-words text-sm text-white/50">
               {detail.counteragent.name}{detail.counteragent.phones ? `, ${formatPhone(detail.counteragent.phones.split(',')[0])}` : ''}
             </p>
+            {Array.isArray(orderFields.problems) && orderFields.problems.length > 0 && (
+              <p className="mt-1 break-words text-sm text-white/80">Неисправность: <span className="text-white">{(orderFields.problems as unknown[]).join(', ')}</span></p>
+            )}
+            {str(orderFields.deadline) && (
+              <p className="mt-1 text-sm text-white/80">Срок: <span className="text-white">{formatDate(str(orderFields.deadline))}</span></p>
+            )}
             {str(orderFields.approximate_price) && (
               <p className="mt-1 text-sm text-white/80">Ориентировочная цена: <b className="font-semibold text-white">{str(orderFields.approximate_price)}</b></p>
             )}

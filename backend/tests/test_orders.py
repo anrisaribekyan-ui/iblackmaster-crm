@@ -876,3 +876,17 @@ def test_order_tip_split_and_not_in_paid(client, auth_headers, db, owner):
     assert d.status_code == 204
     assert db.get(Order, order.id).paid == Decimal("0")
     assert db.scalars(select(SalaryEvent).where(SalaryEvent.kind == "tip")).first() is None
+
+
+def test_search_matches_several_words_and_brand(client, auth_headers, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    payload = order_payload(location.id, order_type.id, {"name": "Поисковый Клиент"})
+    payload["brand"], payload["model"] = "Samsung", "Galaxy A54"
+    created = client.post("/api/orders", json=payload, headers=auth_headers)
+    assert created.status_code == 200, created.text
+    for q in ("samsung a54", "поисковый a54", "Samsung"):
+        found = client.get("/api/orders", params={"q": q}, headers=auth_headers).json()
+        assert created.json()["number"] in [o["number"] for o in found["items"]], q
+    none = client.get("/api/orders", params={"q": "samsung zzzz"}, headers=auth_headers).json()
+    assert created.json()["number"] not in [o["number"] for o in none["items"]]

@@ -461,17 +461,28 @@ def list_orders(
         term = q.strip()
         normalized = normalize_phone(q)
         raw_digits = "".join(char for char in q if char.isdecimal())
-        conditions = [
-            Order.number.icontains(term, autoescape=True),
-            Order.serial.icontains(term, autoescape=True),
-            Order.model.icontains(term, autoescape=True),
-            Counteragent.name.icontains(term, autoescape=True),
-        ]
-        if normalized:
-            conditions.append(Counteragent.phones.contains(normalized, autoescape=True))
-        elif len(raw_digits) >= 3:
-            conditions.append(Counteragent.phones.contains(raw_digits, autoescape=True))
-        query = query.where(or_(*conditions))
+        def word_match(word: str):
+            checks = [
+                Order.number.icontains(word, autoescape=True),
+                Order.serial.icontains(word, autoescape=True),
+                Order.model.icontains(word, autoescape=True),
+                Order.brand.icontains(word, autoescape=True),
+                Counteragent.name.icontains(word, autoescape=True),
+            ]
+            digits = "".join(char for char in word if char.isdecimal())
+            phone = normalize_phone(word)
+            if phone:
+                checks.append(Counteragent.phones.contains(phone, autoescape=True))
+            elif len(digits) >= 3:
+                checks.append(Counteragent.phones.contains(digits, autoescape=True))
+            return or_(*checks)
+
+        # Несколько слов («samsung a54», «иванов 916») — каждое слово должно найтись в номере, модели, марке, клиенте или телефоне
+        words = term.split()
+        if len(words) > 1 and not normalize_phone(q):
+            query = query.where(*[word_match(word) for word in words])
+        else:
+            query = query.where(word_match(term))
 
     counts = {group.value: 0 for group in StatusGroup}
     count_query = query.where(Order.is_deleted.is_(False)).with_only_columns(OrderStatus.group, func.count(Order.id)).group_by(OrderStatus.group)
