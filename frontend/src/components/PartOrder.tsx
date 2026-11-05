@@ -53,9 +53,20 @@ export function partQuery(problems: string[], brand: string, model: string): str
 }
 
 export async function doska<T>(path: string, body?: unknown): Promise<T> {
-  const response = await fetch(`${DOSKA}${path}`, body === undefined
-    ? { cache: 'no-store' }
-    : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  // Обрыв связи (в том числе в секунды, пока CRM обновляется) раньше показывался как «Failed to fetch».
+  // Чтение повторяем сами; запись не повторяем, чтобы не создать карточку дважды, — просим нажать ещё раз.
+  const attempts = body === undefined ? 3 : 1
+  let response: Response | null = null
+  for (let attempt = 1; attempt <= attempts && !response; attempt++) {
+    try {
+      response = await fetch(`${DOSKA}${path}`, body === undefined
+        ? { cache: 'no-store' }
+        : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    } catch {
+      if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, attempt * 1200))
+    }
+  }
+  if (!response) throw new Error('Нет связи с доской закупок (возможно, идёт обновление CRM). Подождите минуту и нажмите ещё раз')
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error((data as { error?: string }).error || 'Доска закупок не отвечает')
   return data as T
