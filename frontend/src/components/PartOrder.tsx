@@ -243,6 +243,13 @@ export default function PartOrderModal({
 
         {error && offers && <p role="alert" className="text-sm text-danger">{error}</p>}
 
+        {offer && (
+          <p className="rounded-lg bg-canvas p-3 text-sm" aria-live="polite">
+            <span className="block text-xs text-muted">Выбрано полностью:</span>
+            <span className="break-words">{offer.name}</span>
+          </p>
+        )}
+
         <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
           {site && <a href={offer?.url || site} target="_blank" rel="noopener noreferrer" className="text-sm text-muted underline-offset-2 hover:text-accent hover:underline">{offer?.url ? 'Открыть вариант на сайте' : 'Открыть Поиск123'}</a>}
           <button type="button" className="ml-auto rounded-md border border-line px-3 py-2 text-sm hover:border-accent hover:text-accent disabled:opacity-50"
