@@ -8,7 +8,8 @@ import { formatPhone } from '../format'
 import { useAuth } from '../auth'
 import { downloadCsv } from '../csv'
 import Modal from '../components/Modal'
-import StatusBadge, { type SmsMark } from '../components/StatusBadge'
+import type { SmsMark } from '../components/StatusBadge'
+import QuickStatus from '../components/QuickStatus'
 
 type Tab = 'new' | 'inWork' | 'wait' | 'finish' | 'closed' | 'all' | 'open'
 type CustomTab = { id: string; name: string; statusIds: number[] }
@@ -34,7 +35,7 @@ type OrderRow = {
   is_deleted?: boolean
 }
 type OrderList = { items: OrderRow[]; total: number; counts: Record<Exclude<Tab, 'all'>, number> }
-type StatusGroup = { group: string; title: string; statuses: { id: number; name: string; color: string }[] }
+type StatusGroup = { group: string; title: string; statuses: { id: number; name: string; color: string; comment_mode?: string; role_access?: Record<string, { view?: boolean; set?: boolean; change?: boolean }> }[] }
 type OrderType = { id: number; name: string }
 type Employee = { id: number; short_name: string }
 
@@ -202,6 +203,24 @@ export default function OrdersPage() {
     }
   }
 
+  // Быстрая смена статуса из списка: сначала меняем на экране, потом тот же запрос, что и в карточке заказа.
+  // Не прошёл — откатываем. После успеха список тихо перечитываем: заказ мог перестать подходить под фильтр.
+  const quickStatus = async (order: OrderRow, next: { id: number; name: string; color: string }, comment: string | null) => {
+    const before = order.status
+    const group = statusGroups.find((g) => g.statuses.some((s) => s.id === next.id))?.group ?? before.group
+    const patch = (status: OrderRow['status']) => setData((cur) => (cur ? { ...cur, items: cur.items.map((o) => (o.id === order.id ? { ...o, status } : o)) } : cur))
+    setError('')
+    patch({ ...before, id: next.id, name: next.name, color: next.color, group, sms: undefined } as OrderRow['status'])
+    try {
+      await api.post(`/orders/${order.id}/status`, { status_id: next.id, comment })
+      listCache.delete(queryString)
+      void loadOrders()
+    } catch (e) {
+      patch(before)
+      setError(e instanceof ApiError ? e.message : 'Не удалось изменить статус')
+    }
+  }
+
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setParam('q', search.trim())
@@ -366,7 +385,7 @@ export default function OrdersPage() {
                         {order.number}
                       </span>
                       {order.is_deleted && <span className="rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger">удалён</span>}
-                      <StatusBadge className="ml-auto" name={order.status.name} color={order.status.color} sms={order.status.sms} />
+                      <span className="ml-auto"><QuickStatus status={order.status} groups={statusGroups} onPick={(next, comment) => void quickStatus(order, next, comment)} /></span>
                     </div>
                     <p className="mt-1.5 break-words font-medium">{device || 'Устройство не указано'}</p>
                     {order.problems?.length > 0 && <p className="break-words text-sm text-muted">{order.problems.join(', ')}</p>}
@@ -431,7 +450,7 @@ export default function OrdersPage() {
                         <small className="block whitespace-nowrap text-xs text-muted" title={formatDate(order.created_at)}>{ago(order.created_at) ?? formatDate(order.created_at).split(',')[0]}</small>
                         {order.is_deleted && <span className="mt-1 inline-block rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger [text-decoration:none]">удалён</span>}
                       </td>
-                      <td className="px-3 py-2.5"><StatusBadge name={order.status.name} color={order.status.color} sms={order.status.sms} /></td>
+                      <td className="px-3 py-2.5"><QuickStatus status={order.status} groups={statusGroups} onPick={(next, comment) => void quickStatus(order, next, comment)} /></td>
                       <td className="min-w-0 px-3 py-2.5">
                         <p className="truncate font-medium" title={device}>{device || <span className="text-muted">Не указано</span>}</p>
                         <p className="truncate text-xs text-muted" title={order.problems?.join(', ')}>
