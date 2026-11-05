@@ -29,6 +29,7 @@ type OrderRow = {
   total_price: string
   paid: string
   approximate_price: string | null
+  device_password?: string | null
   is_urgent: boolean
   is_deleted?: boolean
 }
@@ -385,6 +386,7 @@ export default function OrdersPage() {
                         ) : (
                           <p className="text-muted">{order.approximate_price ? `≈ ${order.approximate_price}` : '—'}</p>
                         )}
+                        {order.device_password && <p className="num text-xs text-muted">пароль: {order.device_password}</p>}
                       </div>
                     </div>
                   </Link>
@@ -403,6 +405,7 @@ export default function OrdersPage() {
                 <col className="hidden w-[8rem] xl:table-column" />
                 <col className="hidden w-[8.5rem] 2xl:table-column" />
                 <col className="w-[8rem]" />
+                <col className="w-[7rem]" />
               </colgroup>
               <thead className="bg-canvas text-xs text-muted">
                 <tr>
@@ -413,6 +416,7 @@ export default function OrdersPage() {
                   <th className="hidden px-3 py-2 font-medium xl:table-cell">Срок</th>
                   <th className="hidden px-3 py-2 font-medium 2xl:table-cell">Менеджер</th>
                   <th className="px-3 py-2 text-right font-medium">Сумма</th>
+                  <th className="px-3 py-2 font-medium">Пароль</th>
                 </tr>
               </thead>
               <tbody>
@@ -448,6 +452,7 @@ export default function OrdersPage() {
                               : <small className="block text-xs text-muted">оплачен</small>}
                           </>
                         : <span className="text-muted">{order.approximate_price ? `≈ ${order.approximate_price}` : '—'}</span>}</td>
+                      <td className="min-w-0 break-all px-3 py-2.5 num" title="Пароль на устройстве">{order.device_password || <span className="text-muted">—</span>}</td>
                     </tr>
                   )
                 })}

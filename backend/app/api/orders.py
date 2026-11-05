@@ -523,6 +523,7 @@ def list_orders(
                 "total_price": order.total_price,
                 "paid": order.paid,
                 "approximate_price": order.approximate_price,
+                "device_password": order.device_password,
                 "is_urgent": order.is_urgent,
                 "is_deleted": order.is_deleted,
             }
