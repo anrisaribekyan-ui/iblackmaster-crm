@@ -223,7 +223,7 @@ export default function PartOrderModal({
                     className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${picked === index ? 'border-accent bg-accent-soft' : 'border-line hover:border-accent/60'}`}
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="line-clamp-2 text-sm text-ink">{item.name}</span>
+                      <span className="block break-words text-sm text-ink">{item.name}</span>
                       <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
                         <span className="rounded px-1.5 py-0.5 font-medium text-white" style={{ background: item.color || '#667085' }}>{item.shop || 'Магазин'}</span>
                         {item.stock && <span>{item.stock}</span>}

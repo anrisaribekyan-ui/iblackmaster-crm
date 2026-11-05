@@ -695,6 +695,9 @@ export default function OrderDetailPage() {
             <p className="truncate text-sm text-white/50">
               {detail.counteragent.name}{detail.counteragent.phones ? `, ${formatPhone(detail.counteragent.phones.split(',')[0])}` : ''}
             </p>
+            {str(orderFields.approximate_price) && (
+              <p className="mt-1 text-sm text-white/80">Ориентировочная цена: <b className="font-semibold text-white">{str(orderFields.approximate_price)}</b></p>
+            )}
           </div>
           <div className="flex items-end gap-5 md:justify-end">
             <div>
