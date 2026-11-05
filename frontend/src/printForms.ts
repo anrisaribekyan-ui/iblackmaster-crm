@@ -340,7 +340,7 @@ export const FORMS_STYLE = `
   html { background: #e9eaee; }
   body { color: var(--ink); font: 10.5pt/1.45 "Inter","SF Pro Text",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .sheet { width: 210mm; height: 297mm; margin: 12px auto; padding: 12mm 14mm; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.12); overflow: hidden; break-after: page; page-break-after: always; }
-  .sheet:last-child { break-after: auto; page-break-after: auto; }
+  .sheet:last-of-type { break-after: auto; page-break-after: auto; }
   .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 10px; border-bottom: 2px solid var(--ink); }
   .brand { display: flex; align-items: center; gap: 10px; }
   .mark { width: 34px; height: 34px; border-radius: 9px; background: var(--ink); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 15px; letter-spacing: -.02em; }
@@ -439,5 +439,5 @@ export const FORMS_STYLE = `
   .promo h4 { font-size: 13pt; line-height: 1.2; letter-spacing: -.01em; }
   .promo p { margin-top: 6px; font-size: 9.5pt; color: var(--ink-2); }
   .promo .offer { display: inline-block; margin-top: 8px; padding: 4px 10px; background: var(--ink); color: #fff; border-radius: 99px; font-weight: 600; font-size: 9.5pt; }
-  @media print { html { background: #fff; } .sheet { margin: 0; box-shadow: none; } }
+  @media print { html { background: #fff; } .sheet { margin: 0; box-shadow: none; height: 296mm; } .sheet:last-of-type { break-after: avoid; page-break-after: avoid; } }
 `
