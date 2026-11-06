@@ -192,6 +192,8 @@ export default function SalaryEmployeePage() {
         </div>
       </div>
 
+      <BalanceOnDate employeeId={id} />
+
       <nav className="mb-4 flex gap-1 border-b border-line">
         <button className={`border-b-2 px-3 py-2 ${tab === 'accruals' ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab('accruals')}>Начисления</button>
         <button className={`border-b-2 px-3 py-2 ${tab === 'payouts' ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab('payouts')}>Выплаты</button>
@@ -395,5 +397,40 @@ export default function SalaryEmployeePage() {
         </Modal>
       )}
     </div>
+  )
+}
+
+
+// Баланс на начало выбранного дня: сколько начислено/выплачено до этой даты и какой остаток.
+function BalanceOnDate({ employeeId }: { employeeId: string | number }) {
+  const [day, setDay] = useState('')
+  const [data, setData] = useState<{ total: string; paid: string; to_pay: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const show = async (value: string) => {
+    setDay(value)
+    setData(null)
+    if (!value) return
+    setBusy(true)
+    try {
+      setData(await api.get(`/salary/employees/${employeeId}/balance?on=${value}`))
+    } catch {
+      setData(null)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const [y, m, d] = day ? day.split('-') : []
+  return (
+    <section className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface p-3 text-sm">
+      <label className="flex items-center gap-2 text-muted">Баланс на начало дня
+        <input type="date" className="rounded-md border border-line bg-surface px-2 py-1.5 text-ink" value={day} onChange={(event) => void show(event.target.value)} />
+      </label>
+      {busy && <span className="text-muted">Считаю…</span>}
+      {data && (
+        <span>
+          На начало {d}.{m}.{y}: начислено <b className="num">{money(data.total)}</b>, выплачено <b className="num">{money(data.paid)}</b>, остаток к выплате <b className="num">{money(data.to_pay)}</b>
+        </span>
+      )}
+    </section>
   )
 }

@@ -233,3 +233,4 @@ def test_own_percent_on_position_overrides_rule(db, env):
 
     order_service.update_position_price(db, order, pos, env["owner"], reset_salary_percent=True)
     assert total(db, master) == Decimal("1000")
+

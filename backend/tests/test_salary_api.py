@@ -1,5 +1,6 @@
 """API зарплаты: правила, сводка за месяц, бонусы/штрафы, выплаты, права."""
 
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -159,3 +160,12 @@ def test_shift_no_means_no_salary_and_no_more_questions(client, auth_headers, ow
     client.post("/api/salary/shift", json={"worked": False}, headers=auth_headers)
     assert client.get("/api/salary/shift", headers=auth_headers).json()["ask"] is False
     assert Decimal(str(client.get("/api/salary/me", headers=auth_headers).json()["today"])) == Decimal("0")
+
+
+def test_balance_on_date(client, auth_headers, db, owner):
+    assert client.post("/api/salary/events", json={"employee_id": owner.id, "kind": "bonus", "amount": "5000"}, headers=auth_headers).status_code == 200
+    today = datetime.now(timezone.utc).date()
+    before = client.get(f"/api/salary/employees/{owner.id}/balance?on={today - timedelta(days=2)}", headers=auth_headers).json()
+    after = client.get(f"/api/salary/employees/{owner.id}/balance?on={today + timedelta(days=2)}", headers=auth_headers).json()
+    assert Decimal(str(before["total"])) == 0
+    assert Decimal(str(after["total"])) == Decimal("5000") and Decimal(str(after["to_pay"])) == Decimal("5000")

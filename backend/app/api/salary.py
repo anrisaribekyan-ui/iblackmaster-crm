@@ -5,7 +5,7 @@
 Начисления считает app.services.salary; здесь только чтение, ручные бонусы/штрафы, выплаты и правила.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Literal
 from zoneinfo import ZoneInfo
@@ -186,6 +186,14 @@ def salary_summary(
     for employee in visible_employees(db, me):
         rows.append({"employee_id": employee.id, "name": employee.name, **_sums(db, employee.id, start, end, location_id)})
     return {"items": rows, "total": sum((r["total"] for r in rows), Decimal("0")), "to_pay": sum((r["to_pay"] for r in rows), Decimal("0"))}
+
+
+@router.get("/employees/{employee_id}/balance")
+def salary_balance(employee_id: int, db: DbSession, me: CurrentEmployee, on: date, location_id: int | None = None):
+    """Баланс на начало выбранного дня (по МСК): всего начислено и выплачено до этой даты, остаток к выплате."""
+    check_employee(db, me, employee_id)
+    day_start = datetime(on.year, on.month, on.day, tzinfo=MSK)
+    return {"on": on.isoformat(), **_sums(db, employee_id, datetime(2000, 1, 1, tzinfo=MSK), day_start, location_id)}
 
 
 @router.get("/employees/{employee_id}/months")
