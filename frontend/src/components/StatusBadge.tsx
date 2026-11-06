@@ -92,13 +92,13 @@ function BigBadge({ name, color, group, sms, chevron = false }: { name: string; 
   const ink = contrast(L, 0) >= contrast(L, 1) ? '#14161a' : '#ffffff'
   // Слева иконка, справа стрелка (или пустое место той же ширины): текст всегда по центру, ширина у всех одинаковая
   return (
-    <span title={name} className="inline-flex min-h-10 w-[13rem] max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold leading-tight"
+    <span title={name} className="inline-flex min-h-7 w-[10rem] max-w-full items-center gap-1.5 rounded-full px-2 py-1 text-xs font-semibold leading-tight"
       style={{ backgroundColor: toHex(rgb), color: ink }}>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0">
         <path d={ICONS[group ?? ''] ?? ICONS.inWork} />
       </svg>
       <span className="min-w-0 flex-1 text-center break-words">{name}<SmsTicks state={sms} className="ml-1 align-middle" /></span>
-      <span className="grid h-5 w-5 shrink-0 place-items-center text-xs" aria-hidden>{chevron ? '▾' : ''}</span>
+      <span className="grid h-4 w-3.5 shrink-0 place-items-center text-[10px]" aria-hidden>{chevron ? '▾' : ''}</span>
     </span>
   )
 }

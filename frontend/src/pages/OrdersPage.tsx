@@ -380,7 +380,7 @@ export default function OrdersPage() {
                     className={`block rounded-xl border border-line bg-surface p-3 active:bg-canvas ${order.is_deleted ? 'opacity-60' : ''}`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className={`font-semibold ${order.is_deleted ? 'text-muted line-through' : 'text-accent'}`}>
+                      <span className={`text-xl font-bold ${order.is_deleted ? 'text-muted line-through' : 'text-accent'}`}>
                         {order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" className="mr-1 text-danger">●</span>}
                         {order.number}
                       </span>
@@ -388,7 +388,7 @@ export default function OrdersPage() {
                       <span className="ml-auto"><QuickStatus status={order.status} groups={statusGroups} onPick={(next, comment) => void quickStatus(order, next, comment)} /></span>
                     </div>
                     <p className="mt-1.5 break-words font-medium">{device || 'Устройство не указано'}</p>
-                    {order.problems?.length > 0 && <p className="break-words text-sm text-muted">{order.problems.join(', ')}</p>}
+                    {order.problems?.length > 0 && <p className="break-words text-base text-ink/80">{order.problems.join(', ')}</p>}
                     <div className="mt-2 flex items-end justify-between gap-3 text-sm">
                       <div className="min-w-0">
                         <p className="break-words">{order.counteragent.name}</p>
@@ -418,7 +418,7 @@ export default function OrdersPage() {
             <table className="w-full table-fixed text-left text-sm">
               <colgroup>
                 <col className="w-[7.5rem]" />
-                <col className="w-[15.5rem]" />
+                <col className="w-[12.5rem]" />
                 <col />
                 <col className="w-[13rem]" />
                 <col className="hidden w-[8rem] xl:table-column" />
@@ -446,14 +446,14 @@ export default function OrdersPage() {
                   return (
                     <tr key={order.id} {...rowLink(`/orders/${order.id}`)} className={`cursor-pointer border-t border-line align-top hover:bg-canvas ${order.is_deleted ? 'text-muted line-through decoration-[#98a2b3] [&_td]:opacity-70' : ''}`}>
                       <td className="px-3 py-2.5">
-                        <Link to={`/orders/${order.id}`} className={`num font-semibold hover:underline ${order.is_deleted ? 'text-muted' : 'text-accent'}`}>{order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" title="Срочный" className="mr-1 text-danger">●</span>}{order.number}</Link>
+                        <Link to={`/orders/${order.id}`} className={`num text-lg font-bold hover:underline ${order.is_deleted ? 'text-muted' : 'text-accent'}`}>{order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" title="Срочный" className="mr-1 text-danger">●</span>}{order.number}</Link>
                         <small className="block whitespace-nowrap text-xs text-muted" title={formatDate(order.created_at)}>{ago(order.created_at) ?? formatDate(order.created_at).split(',')[0]}</small>
                         {order.is_deleted && <span className="mt-1 inline-block rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger [text-decoration:none]">удалён</span>}
                       </td>
                       <td className="px-3 py-2.5"><QuickStatus status={order.status} groups={statusGroups} onPick={(next, comment) => void quickStatus(order, next, comment)} /></td>
                       <td className="min-w-0 px-3 py-2.5">
-                        <p className="truncate font-medium" title={device}>{device || <span className="text-muted">Не указано</span>}</p>
-                        <p className="truncate text-xs text-muted" title={order.problems?.join(', ')}>
+                        <p className="truncate text-base font-semibold" title={device}>{device || <span className="text-muted">Не указано</span>}</p>
+                        <p className="truncate text-sm text-ink/80" title={order.problems?.join(', ')}>
                           {order.problems?.join(', ') || '—'}{type && type !== 'Негарантийный' && <span className="ml-1.5 rounded bg-accent-soft px-1 text-accent">{type}</span>}
                         </p>
                       </td>
