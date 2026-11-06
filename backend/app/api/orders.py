@@ -125,6 +125,8 @@ class OrderPositionPrice(BaseModel):
     sold_price: Decimal | None = None
     purchase_price: Decimal | None = None
     guarantee_days: int | None = Field(default=None, ge=0, le=3650)
+    salary_percent: Decimal | None = Field(default=None, ge=Decimal("0"), le=Decimal("100"))
+    reset_salary_percent: bool = False
 
 
 class OrderDeleteIn(BaseModel):
@@ -599,6 +601,8 @@ def get_order(order_id: int, db: DbSession, me: CurrentEmployee):
         values["total"] = position.total
         values["purchase_price"] = position.purchase_price if can_view_purchase else None
         values["margin"] = position.margin if can_view_margin else None
+        if not has_permission(me, "changeSalaryAccess"):
+            values["salary_percent"] = None
         position_values.append(values)
 
     history = db.scalars(
@@ -814,10 +818,12 @@ def update_order_position_price(
     position = db.get(OrderPosition, position_id)
     if position is None or position.order_id != order.id:
         raise NotFound("Позиция заказа")
-    if data.price is None and data.sold_price is None and data.purchase_price is None and data.guarantee_days is None:
+    if data.price is None and data.sold_price is None and data.purchase_price is None and data.guarantee_days is None and data.salary_percent is None and not data.reset_salary_percent:
         raise BusinessError("Укажите цену или гарантию для изменения")
     if data.purchase_price is not None and not has_permission(me, "orderPurchasePriceAccess"):
         raise Forbidden("Нет права менять себестоимость")
+    if (data.salary_percent is not None or data.reset_salary_percent) and not has_permission(me, "changeSalaryAccess"):
+        raise Forbidden("Нет права менять процент зарплаты")
     minimum = position.min_price
     if data.price is not None or data.sold_price is not None:
         target_price = data.sold_price if data.sold_price is not None else data.price
@@ -831,6 +837,8 @@ def update_order_position_price(
         sold_price=data.sold_price,
         purchase_price=data.purchase_price,
         guarantee_days=data.guarantee_days,
+        salary_percent=data.salary_percent,
+        reset_salary_percent=data.reset_salary_percent,
     )
     position.min_price = minimum
     db.commit()

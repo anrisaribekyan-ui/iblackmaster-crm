@@ -16,6 +16,7 @@ import StatusBadge, { SmsTicks, statusColors, type SmsMark } from '../components
 import OrderParts from '../components/OrderParts'
 import PartOrderModal, { partQuery } from '../components/PartOrder'
 import Copyable from '../components/Copyable'
+import HeaderMenu from '../components/HeaderMenu'
 
 type Status = { id: number; group: string; name: string; color: string; pay_required: boolean; comment_mode: string; sms?: SmsMark }
 type StatusGroup = { group: string; title: string; statuses: Status[] }
@@ -52,6 +53,7 @@ type Position = {
   margin: string | null
   guarantee_days: number
   store_id: number | null
+  salary_percent?: string | null
 }
 type HistoryItem = {
   id: number
@@ -526,6 +528,13 @@ export default function OrderDetailPage() {
     )
   }
 
+  const editPositionSalary = async (position: Position, percent: string) => {
+    if (!detail) return
+    await run(
+      () => api.put(`/orders/${detail.order.id}/positions/${position.id}`, percent.trim() === '' ? { reset_salary_percent: true } : { salary_percent: percent.replace(',', '.') }),
+      'Не удалось изменить процент зарплаты',
+    )
+  }
   const editPositionCost = async (position: Position, purchasePrice: string) => {
     if (!detail) return
     await run(
@@ -627,19 +636,16 @@ export default function OrderDetailPage() {
       <header className="mb-4 overflow-hidden rounded-2xl bg-rail text-white">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 sm:px-5">
           <Link className="text-sm text-white/50 transition-colors hover:text-white" to="/orders">← Заказы</Link>
-          <span className="flex gap-1.5">
-            <details className="relative">
-              <summary className="cursor-pointer list-none rounded-lg px-3 py-1.5 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white">Печать</summary>
-              <div className="pop absolute right-0 z-20 mt-1 flex w-60 flex-col rounded-lg border border-line bg-surface p-1 text-ink shadow-lg">
-                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('receipt')}>Квитанция о приёме</button>
-                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('checklist')}>Проверка неисправностей</button>
-                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('act')}>Акт выдачи</button>
-                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('refusal')}>Отказной лист</button>
-                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('warranty')}>Гарантийный талон</button>
-                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('check')}>Товарный чек</button>
-                <button className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => printForm('label')}>Бирка на аппарат</button>
-              </div>
-            </details>
+          <span className="flex flex-wrap justify-end gap-1.5">
+            <HeaderMenu label="Печать">{(close) => (<>
+                <button role="menuitem" className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => { close(); printForm('receipt') }}>Квитанция о приёме</button>
+                <button role="menuitem" className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => { close(); printForm('checklist') }}>Проверка неисправностей</button>
+                <button role="menuitem" className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => { close(); printForm('act') }}>Акт выдачи</button>
+                <button role="menuitem" className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => { close(); printForm('refusal') }}>Отказной лист</button>
+                <button role="menuitem" className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => { close(); printForm('warranty') }}>Гарантийный талон</button>
+                <button role="menuitem" className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => { close(); printForm('check') }}>Товарный чек</button>
+                <button role="menuitem" className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => { close(); printForm('label') }}>Бирка на аппарат</button>
+            </>)}</HeaderMenu>
             {!isDeleted && locations.length > 1 && (
               <select
                 aria-label="Передать в локацию"
@@ -657,13 +663,10 @@ export default function OrderDetailPage() {
               </select>
             )}
             {!isDeleted && (
-              <details className="relative">
-                <summary className="cursor-pointer list-none rounded-lg px-3 py-1.5 text-sm text-white/80 transition-colors hover:bg-white/10 hover:text-white">Новый заказ</summary>
-                <div className="pop absolute right-0 z-20 mt-1 flex w-64 flex-col rounded-lg border border-line bg-surface p-1 text-ink shadow-lg">
-                  <Link className="rounded-md px-3 py-2 hover:bg-canvas" to={`/orders/new?repeat=${detail.order.id}`}>Повторить заказ<small className="block text-muted">Тот же клиент и устройство</small></Link>
-                  <Link className="rounded-md px-3 py-2 hover:bg-canvas" to={`/orders/new?client=${detail.counteragent.id}`}>Принять ещё от клиента<small className="block text-muted">Устройство вводится заново</small></Link>
-                </div>
-              </details>
+              <HeaderMenu label="Новый заказ" width={272}>{(close) => (<>
+                  <Link onClick={close} className="rounded-md px-3 py-2 hover:bg-canvas" to={`/orders/new?repeat=${detail.order.id}`}>Повторить заказ<small className="block text-muted">Тот же клиент и устройство</small></Link>
+                  <Link onClick={close} className="rounded-md px-3 py-2 hover:bg-canvas" to={`/orders/new?client=${detail.counteragent.id}`}>Принять ещё от клиента<small className="block text-muted">Устройство вводится заново</small></Link>
+              </>)}</HeaderMenu>
             )}
             {!isDeleted && can('deleteOrderAccess') && (
               <button className="rounded-lg px-3 py-1.5 text-sm text-white/60 transition-colors hover:bg-white/10 hover:text-[#ff8a72]" onClick={() => setDeleting(true)}>Удалить</button>
@@ -820,12 +823,20 @@ export default function OrderDetailPage() {
           ) : (
             <section className="rounded-xl border border-line bg-surface p-4">
               <h2 className="sr-only">Работы и материалы</h2>
-              {!isClosed && (
+              {(!isClosed || (can('operationCashRegisterAccess') && !detail.order.is_deleted)) && (
                 <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <button type="button" onClick={() => setPartOpen(true)}
-                    className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink shadow-sm transition-transform active:scale-[0.98]">
-                    Заказать запчасть
-                  </button>
+                  {!isClosed && (
+                    <button type="button" onClick={() => setPartOpen(true)}
+                      className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink shadow-sm transition-transform active:scale-[0.98]">
+                      Заказать запчасть
+                    </button>
+                  )}
+                  {can('operationCashRegisterAccess') && !detail.order.is_deleted && (
+                    <button type="button" title="Чаевые мастеру: половина идёт ему в зарплату, половина остаётся в кассе" onClick={() => openPayment('tip')}
+                      className="rounded-lg border border-line px-4 py-2 text-sm font-medium">
+                      + Чаевые
+                    </button>
+                  )}
                 </div>
               )}
               <OrderParts orderId={detail.order.id as number} version={partsVersion} />
@@ -855,6 +866,8 @@ export default function OrderDetailPage() {
                       canViewCost={canSeeCost}
                       onSavePrice={(price) => void editPositionPrice(position, price)}
                           onSaveDiscount={(d) => void editPositionDiscount(position, d)}
+                      canSalary={can('changeSalaryAccess') && !isClosed}
+                      onSaveSalary={(percent) => void editPositionSalary(position, percent)}
                       onSaveGuarantee={(days) => void editPositionGuarantee(position, days)}
                       onOpen={() => setOpenPositionId(position.id)}
                       onDelete={() => void removePosition(position)}
@@ -863,7 +876,7 @@ export default function OrderDetailPage() {
                 </ul>
                 <div className="mb-4 hidden overflow-x-auto md:block">
                   <table className="w-full min-w-[820px] text-left text-sm">
-                    <thead className="bg-canvas text-muted"><tr>{['Позиция', 'Тип', 'Кол-во', 'Цена', 'Скидка, ₽', ...(canSeeCost ? ['Себестоимость'] : []), 'Гарантия, дн.', 'Итого', ...(can('marginPriceAccess') ? ['Прибыль'] : []), ''].map((item) => <th key={item} className="px-2 py-2 font-medium">{item}</th>)}</tr></thead>
+                    <thead className="bg-canvas text-muted"><tr>{['Позиция', 'Тип', 'Кол-во', 'Цена', 'Скидка, ₽', ...(canSeeCost ? ['Себестоимость'] : []), 'Гарантия, дн.', ...(can('changeSalaryAccess') ? ['ЗП, %'] : []), 'Итого', ...(can('marginPriceAccess') ? ['Прибыль'] : []), ''].map((item) => <th key={item} className="px-2 py-2 font-medium">{item}</th>)}</tr></thead>
                     <tbody>
                       {detail.positions.map((position) => (
                         <PositionRow
@@ -876,6 +889,9 @@ export default function OrderDetailPage() {
                           onSavePrice={(price) => void editPositionPrice(position, price)}
                           onSaveDiscount={(d) => void editPositionDiscount(position, d)}
                           onSaveCost={(cost) => void editPositionCost(position, cost)}
+                          canSalary={can('changeSalaryAccess') && !isClosed}
+                          showSalary={can('changeSalaryAccess')}
+                          onSaveSalary={(percent) => void editPositionSalary(position, percent)}
                           onSaveGuarantee={(days) => void editPositionGuarantee(position, days)}
                           onOpen={() => setOpenPositionId(position.id)}
                           onDelete={() => void removePosition(position)}
@@ -1157,6 +1173,9 @@ function PositionRow({
   onSaveDiscount,
   onSaveCost,
   onSaveGuarantee,
+  canSalary,
+  showSalary,
+  onSaveSalary,
   onOpen,
   onDelete,
 }: {
@@ -1169,11 +1188,17 @@ function PositionRow({
   onSaveDiscount: (discount: string) => void
   onSaveCost: (cost: string) => void
   onSaveGuarantee: (days: string) => void
+  canSalary: boolean
+  showSalary: boolean
+  onSaveSalary: (percent: string) => void
   onOpen: () => void
   onDelete: () => void
 }) {
   const [price, setPrice] = useState(position.price)
   useEffect(() => setPrice(position.price), [position.price])
+  const salaryNow = position.salary_percent == null ? '' : String(Number(position.salary_percent))
+  const [salary, setSalary] = useState(salaryNow)
+  useEffect(() => setSalary(salaryNow), [salaryNow])
   const discountNow = String(Math.max(0, Math.round((Number(position.price) - Number(position.sold_price)) * Number(position.quantity))))
   const [discount, setDiscount] = useState(discountNow)
   useEffect(() => setDiscount(discountNow), [discountNow])
@@ -1194,6 +1219,7 @@ function PositionRow({
           : <span className="num">{position.purchase_price === null ? '—' : formatMoney(position.purchase_price)}</span>}</td>
       )}
       <td className="px-2 py-2">{canEdit ? <input className={`${inputClass} w-20 text-right num`} type="number" min="0" step="1" value={guarantee} title="Гарантия на позицию, дней" onChange={(event) => setGuarantee(event.target.value)} onBlur={() => { if (guarantee !== String(position.guarantee_days)) onSaveGuarantee(guarantee) }} /> : <span className="num">{position.guarantee_days}</span>}</td>
+      {showSalary && <td className="px-2 py-2"><input className={`${inputClass} w-20 text-right num`} inputMode="decimal" disabled={!canSalary} placeholder="по правилу" title="Свой процент зарплаты исполнителю за эту позицию. Пусто — по общему правилу" value={salary} onChange={(event) => setSalary(event.target.value.replace(/[^\d.,]/g, ''))} onBlur={() => { if (salary !== salaryNow) onSaveSalary(salary) }} /></td>}
       <td className="px-2 py-2 num">{formatMoney(position.total)}</td>
       {canViewMargin && <td className="px-2 py-2 num">{position.margin === null ? '—' : formatMoney(position.margin)}</td>}
       <td className="px-2 py-2">{canEdit && <button className="text-danger" onClick={onDelete}>Удалить</button>}</td>
@@ -1201,17 +1227,22 @@ function PositionRow({
   )
 }
 
-function PositionCard({ position, canEdit, canViewMargin, canViewCost, onSavePrice, onSaveDiscount, onSaveGuarantee, onOpen, onDelete }: {
+function PositionCard({ position, canEdit, canViewMargin, canViewCost, canSalary, onSaveSalary, onSavePrice, onSaveDiscount, onSaveGuarantee, onOpen, onDelete }: {
   position: Position
   canEdit: boolean
   canViewMargin: boolean
   canViewCost: boolean
+  canSalary: boolean
+  onSaveSalary: (percent: string) => void
   onSavePrice: (price: string) => void
   onSaveDiscount: (discount: string) => void
   onSaveGuarantee: (days: string) => void
   onOpen: () => void
   onDelete: () => void
 }) {
+  const salaryNow = position.salary_percent == null ? '' : String(Number(position.salary_percent))
+  const [salary, setSalary] = useState(salaryNow)
+  useEffect(() => setSalary(salaryNow), [salaryNow])
   const [price, setPrice] = useState(position.price)
   useEffect(() => setPrice(position.price), [position.price])
   const [guarantee, setGuarantee] = useState(String(position.guarantee_days))
@@ -1245,6 +1276,11 @@ function PositionCard({ position, canEdit, canViewMargin, canViewCost, onSavePri
           Гарантия, дн.
           <input className="h-9 w-20 rounded-md border border-line bg-surface px-2 text-right text-sm text-ink num" inputMode="numeric" value={guarantee}
             onChange={(event) => setGuarantee(event.target.value.replace(/[^\d]/g, ''))} onBlur={() => { if (guarantee !== String(position.guarantee_days)) onSaveGuarantee(guarantee) }} />
+          {canSalary && <>
+            ЗП, %
+            <input className="h-9 w-24 rounded-md border border-line bg-surface px-2 text-right text-sm text-ink num" inputMode="decimal" placeholder="по правилу" value={salary}
+              onChange={(event) => setSalary(event.target.value.replace(/[^\d.,]/g, ''))} onBlur={() => { if (salary !== salaryNow) onSaveSalary(salary) }} />
+          </>}
         </label>
       )}
     </li>

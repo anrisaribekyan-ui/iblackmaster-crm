@@ -194,6 +194,8 @@ class OrderPosition(Base, TimestampMixin):
     guarantee_days: Mapped[int] = mapped_column(default=0)
     # Исполнитель: мастер для работы, установивший для запчасти
     performer_id: Mapped[int | None] = mapped_column(ForeignKey("employee.id"))
+    # Свой процент зарплаты исполнителю за эту позицию (NULL — по общему правилу сотрудника)
+    salary_percent: Mapped[Decimal | None]
     # Склад, с которого списана запчасть
     store_id: Mapped[int | None] = mapped_column(ForeignKey("store.id"))
 

@@ -200,7 +200,7 @@ def describe_position_changes(name: str, changes: list[dict], *, hide_cost: bool
 
 def update_position_price(
     db: Session, order: Order, position: OrderPosition, employee: Employee, *, price=None, sold_price=None, purchase_price=None,
-    guarantee_days: int | None = None,
+    guarantee_days: int | None = None, salary_percent=None, reset_salary_percent: bool = False,
 ) -> None:
     """Меняет цену / цену со скидкой / себестоимость / гарантию. Права (minPriceAccess, orderPurchasePriceAccess) проверяет роутер.
     В истории заказа пишется, что и с какого значения на какое изменилось, и кем."""
@@ -222,6 +222,10 @@ def update_position_price(
             raise BusinessError("Гарантия не может быть отрицательной")
         record("guarantee_days", position.guarantee_days, guarantee_days)
         position.guarantee_days = guarantee_days
+    if salary_percent is not None or reset_salary_percent:
+        value = None if reset_salary_percent else Decimal(str(salary_percent))
+        record("salary_percent", position.salary_percent if position.salary_percent is not None else "по правилу", value if value is not None else "по правилу")
+        position.salary_percent = value
     if price is not None:
         before_sold = position.sold_price
         record("price", position.price, money.to_money(price))

@@ -218,3 +218,18 @@ def test_my_earnings_tile(client, auth_headers, db, owner):
     assert top["number"] == order.number and Decimal(str(top["amount"])) == 1000 and len(top["kinds"]) == 2
     assert len(body["week"]) == 7 and Decimal(str(body["week"][-1]["amount"])) == 1500
     assert Decimal(str(body["month"])) >= 1500  # событие 40 дней назад в месяц не входит
+
+
+def test_own_percent_on_position_overrides_rule(db, env):
+    master = env["master"]
+    rule(db, master, AccrualKind.WORK_ORDER, 50)
+    order = new_order(db, env)
+    pos = order_service.add_position(db, order, env["owner"], name="Замена дисплея", is_work=True, price="3000", purchase_price="1000")
+    order_service.change_status(db, order, status(db, StatusGroup.FINISH), env["owner"])
+    assert total(db, master) == Decimal("1000")  # по правилу 50% от 2000
+
+    order_service.update_position_price(db, order, pos, env["owner"], salary_percent="30")
+    assert total(db, master) == Decimal("600")  # свой 30%
+
+    order_service.update_position_price(db, order, pos, env["owner"], reset_salary_percent=True)
+    assert total(db, master) == Decimal("1000")

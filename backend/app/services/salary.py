@@ -157,6 +157,13 @@ def recalc_order(db: Session, order: Order) -> None:
         date = _reached(order, rule.accrue_on)
         if date is None:
             continue
+        if position.salary_percent is not None:  # свой процент на позицию вместо общего правила
+            own = Decimal(str(position.salary_percent))
+            base = _position_base(rule, position, ratio)
+            amount = _rub(base * own / 100) if base > 0 or rule.subtract_negative_margin else ZERO
+            details = {"base": rule.base, "base_value": str(_rub(base)), "from": 0, "value": str(own), "value_type": "percent", "own": True}
+            add(position.performer_id, kind, rule, amount, details, date, position)
+            continue
         amount, details = apply_rule(rule, _position_base(rule, position, ratio), position.quantity)
         add(position.performer_id, kind, rule, amount, details, date, position)
 
