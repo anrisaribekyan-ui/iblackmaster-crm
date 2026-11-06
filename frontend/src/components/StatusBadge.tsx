@@ -77,7 +77,34 @@ export function SmsTicks({ state, onDark = false, className = '' }: { state: Sms
   )
 }
 
-export default function StatusBadge({ name, color, sms, className = '' }: { name: string; color: string | null | undefined; sms?: SmsMark; className?: string }) {
+const ICONS: Record<string, string> = {
+  new: 'M12 5v14M5 12h14',
+  inWork: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z',
+  wait: 'M10 5v14M16 5v14',
+  finish: 'M20 6 9 17l-5-5',
+  closed: 'M1.5 12.4 6 17 14.5 7M10 15.5l1.5 1.5L22 6',
+}
+
+/** Крупный сплошной бейдж для списка заказов: цвет статуса — заливка, иконка группы слева, одинаковая ширина. */
+function BigBadge({ name, color, group, sms, chevron = false }: { name: string; color: string | null | undefined; group?: string; sms?: SmsMark; chevron?: boolean }) {
+  const rgb = parse(color ?? '') ?? [102, 112, 133]
+  const L = luminance(rgb)
+  const ink = contrast(L, 0) >= contrast(L, 1) ? '#14161a' : '#ffffff'
+  // Слева иконка, справа стрелка (или пустое место той же ширины): текст всегда по центру, ширина у всех одинаковая
+  return (
+    <span title={name} className="inline-flex min-h-10 w-[13rem] max-w-full items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold leading-tight"
+      style={{ backgroundColor: toHex(rgb), color: ink }}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0">
+        <path d={ICONS[group ?? ''] ?? ICONS.inWork} />
+      </svg>
+      <span className="min-w-0 flex-1 text-center break-words">{name}<SmsTicks state={sms} className="ml-1 align-middle" /></span>
+      <span className="grid h-5 w-5 shrink-0 place-items-center text-xs" aria-hidden>{chevron ? '▾' : ''}</span>
+    </span>
+  )
+}
+
+export default function StatusBadge({ name, color, sms, className = '', big = false, group, chevron = false }: { name: string; color: string | null | undefined; sms?: SmsMark; className?: string; big?: boolean; group?: string; chevron?: boolean }) {
+  if (big) return <BigBadge name={name} color={color} group={group} sms={sms} chevron={chevron} />
   const c = statusColors(color)
   // Цвета через переменные: в тёмных темах CSS берёт светлый текст и полупрозрачный фон того же оттенка
   return (

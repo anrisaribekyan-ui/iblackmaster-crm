@@ -418,7 +418,7 @@ export default function OrdersPage() {
             <table className="w-full table-fixed text-left text-sm">
               <colgroup>
                 <col className="w-[7.5rem]" />
-                <col className="w-[11.5rem]" />
+                <col className="w-[15.5rem]" />
                 <col />
                 <col className="w-[13rem]" />
                 <col className="hidden w-[8rem] xl:table-column" />

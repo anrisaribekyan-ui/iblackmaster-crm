@@ -48,7 +48,7 @@ export default function QuickStatus({ status, groups, disabled, onPick }: Props)
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
-  if (!canChange) return <StatusBadge name={status.name} color={status.color} sms={status.sms} />
+  if (!canChange) return <StatusBadge big group={status.group} name={status.name} color={status.color} sms={status.sms} />
 
   const toggle = (event: MouseEvent) => {
     event.preventDefault() // внутри ссылки на заказ: не открываем карточку
@@ -82,8 +82,7 @@ export default function QuickStatus({ status, groups, disabled, onPick }: Props)
     <>
       <button ref={button} type="button" onClick={toggle} aria-haspopup="listbox" aria-expanded={open} aria-label={`Статус: ${status.name}. Изменить`}
         className="-mx-1 -my-3.5 inline-flex max-w-full items-center rounded-full px-1 py-3.5 disabled:opacity-60" disabled={disabled}>
-        <StatusBadge name={status.name} color={status.color} sms={status.sms} />
-        <span className="ml-0.5 text-[10px] text-muted" aria-hidden>▾</span>
+        <StatusBadge big chevron group={status.group} name={status.name} color={status.color} sms={status.sms} />
       </button>
       {open && createPortal(
         <>
