@@ -915,3 +915,20 @@ def test_change_payment_method_moves_money_and_fee(client, auth_headers, db, own
     assert len(live) == 1 and live[0].is_bank is False
     again = client.post(f"/api/orders/{order.id}/payments/{live[0].id}/change-method", json={"is_bank": False}, headers=auth_headers)
     assert again.status_code in (400, 422)
+
+
+def test_change_position_performer_even_when_order_closed(client, auth_headers, db, owner):
+    from app.models import Employee, OrderPosition
+    order = create_payment_test_order(db, owner, "PERF-1")
+    other = db.scalars(select(Employee).where(Employee.id != owner.id, Employee.is_active.is_(True))).first()
+    assert other is not None
+    pos = OrderPosition(order_id=order.id, is_work=True, name="Работа", quantity=1, price=1000, sold_price=1000, performer_id=owner.id)
+    db.add(pos)
+    db.commit()
+    r = client.put(f"/api/orders/{order.id}/positions/{pos.id}/performer", json={"performer_id": other.id}, headers=auth_headers)
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    assert db.get(OrderPosition, pos.id).performer_id == other.id
+    r = client.put(f"/api/orders/{order.id}/positions/{pos.id}/performer", json={"performer_id": owner.id}, headers=auth_headers)
+    assert r.status_code == 200
+    assert client.put(f"/api/orders/{order.id}/positions/{pos.id}/performer", json={"performer_id": 999999}, headers=auth_headers).status_code in (400, 404)

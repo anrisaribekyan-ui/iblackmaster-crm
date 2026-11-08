@@ -129,6 +129,11 @@ class OrderPositionPrice(BaseModel):
     reset_salary_percent: bool = False
 
 
+class PerformerIn(BaseModel):
+    performer_id: int
+    apply_to_all: bool = False  # поставить этого исполнителя на все позиции заказа
+
+
 class OrderDeleteIn(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
 
@@ -601,6 +606,8 @@ def get_order(order_id: int, db: DbSession, me: CurrentEmployee):
         values["total"] = position.total
         values["purchase_price"] = position.purchase_price if can_view_purchase else None
         values["margin"] = position.margin if can_view_margin else None
+        performer = db.get(Employee, position.performer_id) if position.performer_id else None
+        values["performer_name"] = performer.short_name if performer else None
         if not has_permission(me, "changeSalaryAccess"):
             values["salary_percent"] = None
         position_values.append(values)
@@ -801,6 +808,22 @@ def add_order_position(order_id: int, data: OrderPositionCreate, db: DbSession, 
         "purchase_price": position.purchase_price if has_permission(me, "purchasePriceAccess") else None,
         "margin": position.margin if has_permission(me, "marginPriceAccess") else None,
     }
+
+
+@router.put(
+    "/{order_id}/positions/{position_id}/performer",
+    dependencies=[Depends(require("changeOrderPositionAccess"))],
+)
+def change_position_performer(order_id: int, position_id: int, data: PerformerIn, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me)
+    position = db.get(OrderPosition, position_id)
+    if position is None or position.order_id != order.id:
+        raise NotFound("Позиция заказа")
+    order_service.change_performer(
+        db, order, me, performer_id=data.performer_id, position=None if data.apply_to_all else position
+    )
+    db.commit()
+    return {"ok": True}
 
 
 @router.put(

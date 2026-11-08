@@ -54,6 +54,8 @@ type Position = {
   guarantee_days: number
   store_id: number | null
   salary_percent?: string | null
+  performer_id?: number | null
+  performer_name?: string | null
 }
 type HistoryItem = {
   id: number
@@ -172,6 +174,7 @@ export default function OrderDetailPage() {
   const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([])
   const [stores, setStores] = useState<Store[]>([])
   const [masters, setMasters] = useState<Employee[]>([])
+  const [staff, setStaff] = useState<Employee[]>([])
   const [howKnows, setHowKnows] = useState<{ id: number; name: string }[]>([])
   const [deleting, setDeleting] = useState(false)
   const [deleteReason, setDeleteReason] = useState('')
@@ -249,6 +252,7 @@ export default function OrderDetailPage() {
       setCashRegisters(registers.filter((register) => register.location_id === null || register.location_id === current.order.location_id))
       setStores(storeData)
       setMasters(masterData)
+      api.get<Employee[]>(`/employees/short`).then(setStaff).catch(() => setStaff(masterData))
       setManagers(managerData)
       api.get<LocationInfo[]>('/locations').then(setLocations).catch(() => setLocations([]))
       if (storeData.length) setStoreId(String(storeData.find((store) => store.is_default)?.id ?? storeData[0].id))
@@ -561,6 +565,14 @@ export default function OrderDetailPage() {
     )
   }
 
+  const editPositionPerformer = async (position: Position, performerId: string) => {
+    if (!detail || !performerId) return
+    const all = detail.positions.length > 1 && window.confirm('Поставить этого исполнителя на ВСЕ позиции заказа?\n\nОК — на все, Отмена — только на эту.')
+    await run(
+      () => api.put(`/orders/${detail.order.id}/positions/${position.id}/performer`, { performer_id: Number(performerId), apply_to_all: all }),
+      'Не удалось сменить исполнителя',
+    )
+  }
   const editPositionSalary = async (position: Position, percent: string) => {
     if (!detail) return
     await run(
@@ -894,6 +906,9 @@ export default function OrderDetailPage() {
                     <PositionCard
                       key={position.id}
                       position={position}
+                      staff={staff}
+                      canPerformer={can('changeOrderPositionAccess') && !detail.order.is_deleted}
+                      onSavePerformer={(id) => void editPositionPerformer(position, id)}
                       canEdit={can('changeOrderPositionAccess') && !isClosed}
                       canViewMargin={can('marginPriceAccess')}
                       canViewCost={canSeeCost}
@@ -908,13 +923,16 @@ export default function OrderDetailPage() {
                   ))}
                 </ul>
                 <div className="mb-4 hidden overflow-x-auto md:block">
-                  <table className="w-full min-w-[820px] text-left text-sm">
-                    <thead className="bg-canvas text-muted"><tr>{['Позиция', 'Тип', 'Кол-во', 'Цена', 'Скидка, ₽', ...(canSeeCost ? ['Себестоимость'] : []), 'Гарантия, дн.', ...(can('changeSalaryAccess') ? ['ЗП, %'] : []), 'Итого', ...(can('marginPriceAccess') ? ['Прибыль'] : []), ''].map((item) => <th key={item} className="px-2 py-2 font-medium">{item}</th>)}</tr></thead>
+                  <table className="w-full min-w-[960px] text-left text-sm">
+                    <thead className="bg-canvas text-muted"><tr>{['Позиция', 'Тип', 'Исполнитель', 'Кол-во', 'Цена', 'Скидка, ₽', ...(canSeeCost ? ['Себестоимость'] : []), 'Гарантия, дн.', ...(can('changeSalaryAccess') ? ['ЗП, %'] : []), 'Итого', ...(can('marginPriceAccess') ? ['Прибыль'] : []), ''].map((item) => <th key={item} className="px-2 py-2 font-medium">{item}</th>)}</tr></thead>
                     <tbody>
                       {detail.positions.map((position) => (
                         <PositionRow
                           key={position.id}
                           position={position}
+                          staff={staff}
+                          canPerformer={can('changeOrderPositionAccess') && !detail.order.is_deleted}
+                          onSavePerformer={(id) => void editPositionPerformer(position, id)}
                           canEdit={can('changeOrderPositionAccess') && !isClosed}
                           canViewMargin={can('marginPriceAccess')}
                           canViewCost={canSeeCost}
@@ -1250,7 +1268,13 @@ function PositionRow({
   onSaveSalary,
   onOpen,
   onDelete,
+  staff,
+  canPerformer,
+  onSavePerformer,
 }: {
+  staff: Employee[]
+  canPerformer: boolean
+  onSavePerformer: (id: string) => void
   position: Position
   canEdit: boolean
   canViewMargin: boolean
@@ -1282,6 +1306,7 @@ function PositionRow({
     <tr className="border-t border-line">
       <td className="px-2 py-2"><button type="button" className="text-left underline-offset-2 hover:underline" onClick={onOpen}>{position.name}</button></td>
       <td className="px-2 py-2">{position.is_work ? 'Работа' : 'Материал'}</td>
+      <td className="px-2 py-2"><PerformerSelect position={position} staff={staff} disabled={!canPerformer} onChange={onSavePerformer} /></td>
       <td className="px-2 py-2 num">{Number(position.quantity).toLocaleString('ru-RU')}</td>
       <td className="px-2 py-2">{canEdit ? <input className={`${inputClass} w-28 text-right num`} type="number" min="0" step="1" value={price} onChange={(event) => setPrice(event.target.value)} onBlur={() => { if (price !== position.price) onSavePrice(price) }} /> : <span className="num">{formatMoney(position.sold_price)}</span>}</td>
       <td className="px-2 py-2">{canEdit ? <input className={`${inputClass} w-24 text-right num`} type="number" min="0" step="1" value={discount} title="Скидка на всю позицию, ₽" onChange={(event) => setDiscount(event.target.value)} onBlur={() => { if (discount !== discountNow) onSaveDiscount(discount) }} /> : <span className="num">{discountNow === '0' ? '—' : formatMoney(discountNow)}</span>}</td>
@@ -1299,12 +1324,27 @@ function PositionRow({
   )
 }
 
-function PositionCard({ position, canEdit, canViewMargin, canViewCost, canSalary, onSaveSalary, onSavePrice, onSaveDiscount, onSaveGuarantee, onOpen, onDelete }: {
+function PerformerSelect({ position, staff, disabled, onChange }: { position: Position; staff: Employee[]; disabled: boolean; onChange: (id: string) => void }) {
+  const current = position.performer_id ?? ''
+  const known = staff.some((item) => item.id === position.performer_id)
+  return (
+    <select className={`${inputClass} h-9 min-w-36 max-w-52 text-sm`} disabled={disabled} value={current} title="Кому пойдёт зарплата за эту позицию. Менять можно и после выдачи заказа" onChange={(event) => onChange(event.target.value)}>
+      {!position.performer_id && <option value="">не назначен</option>}
+      {position.performer_id && !known && <option value={position.performer_id}>{position.performer_name ?? `№${position.performer_id}`}</option>}
+      {staff.map((item) => <option key={item.id} value={item.id}>{item.short_name}</option>)}
+    </select>
+  )
+}
+
+function PositionCard({ staff, canPerformer, onSavePerformer, position, canEdit, canViewMargin, canViewCost, canSalary, onSaveSalary, onSavePrice, onSaveDiscount, onSaveGuarantee, onOpen, onDelete }: {
   position: Position
   canEdit: boolean
   canViewMargin: boolean
   canViewCost: boolean
   canSalary: boolean
+  staff: Employee[]
+  canPerformer: boolean
+  onSavePerformer: (id: string) => void
   onSaveSalary: (percent: string) => void
   onSavePrice: (price: string) => void
   onSaveDiscount: (discount: string) => void
@@ -1337,6 +1377,9 @@ function PositionCard({ position, canEdit, canViewMargin, canViewCost, canSalary
         </div>
         <p className="num whitespace-nowrap font-semibold">{formatMoney(position.total)}</p>
         {canEdit && <button className="-mr-1 grid h-8 w-8 place-items-center rounded-md text-lg text-muted hover:text-danger" onClick={onDelete} aria-label={`Удалить ${position.name}`}>×</button>}
+      </div>
+      <div className="mt-2 flex items-center gap-2 text-xs text-muted">Исполнитель
+        <PerformerSelect position={position} staff={staff} disabled={!canPerformer} onChange={onSavePerformer} />
       </div>
       {canEdit && (
         <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">Цена

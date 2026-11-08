@@ -185,6 +185,7 @@ POSITION_FIELD_LABELS = {
     "sold_price": "цена со скидкой",
     "purchase_price": "себестоимость",
     "guarantee_days": "гарантия, дн.",
+    "performer": "исполнитель",
 }
 
 
@@ -246,6 +247,32 @@ def update_position_price(
             text=describe_position_changes(position.name, changes),
             position_id=position.id, position=position.name, changes=changes,
         )
+    salary.recalc_order(db, order)
+
+
+def change_performer(
+    db: Session, order: Order, employee: Employee, *, performer_id: int, position: OrderPosition | None = None
+) -> None:
+    """Назначает исполнителя (кому пойдёт зарплата за работу/запчасть) — у одной позиции или у всех.
+    Работает и в выданном заказе: ошибку «поставил на себя» можно исправить в любой момент, зарплата пересчитается."""
+    if order.is_deleted:
+        raise BusinessError("Заказ удалён")
+    target = db.get(Employee, performer_id)
+    if target is None or not target.is_active:
+        raise BusinessError("Сотрудник не найден или отключён")
+    for pos in ([position] if position is not None else list(order.positions)):
+        if pos.performer_id == target.id:
+            continue
+        before = db.get(Employee, pos.performer_id) if pos.performer_id else None
+        before_name = before.short_name if before else "не назначен"
+        pos.performer_id = target.id
+        change = {"field": "performer", "from": before_name, "to": target.short_name}
+        add_history(
+            db, order, "change_work" if pos.is_work else "change_product", employee,
+            text=describe_position_changes(pos.name, [change]),
+            position_id=pos.id, position=pos.name, changes=[change],
+        )
+    db.flush()
     salary.recalc_order(db, order)
 
 
