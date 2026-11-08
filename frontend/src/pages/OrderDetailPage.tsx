@@ -567,9 +567,8 @@ export default function OrderDetailPage() {
 
   const editPositionPerformer = async (position: Position, performerId: string) => {
     if (!detail || !performerId) return
-    const all = detail.positions.length > 1 && window.confirm('Поставить этого исполнителя на ВСЕ позиции заказа?\n\nОК — на все, Отмена — только на эту.')
     await run(
-      () => api.put(`/orders/${detail.order.id}/positions/${position.id}/performer`, { performer_id: Number(performerId), apply_to_all: all }),
+      () => api.put(`/orders/${detail.order.id}/positions/${position.id}/performer`, { performer_id: Number(performerId) }),
       'Не удалось сменить исполнителя',
     )
   }
