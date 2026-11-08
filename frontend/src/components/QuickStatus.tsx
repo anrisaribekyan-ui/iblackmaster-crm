@@ -22,7 +22,8 @@ type Props = {
 /**
  * Бейдж статуса в списке заказов: тап открывает быстрый выбор статуса (внизу на телефоне, рядом на компьютере).
  * Меняет статус тем же запросом, что и карточка заказа, — SMS, зарплата и склад срабатывают на сервере так же.
- * «Выдан» отсюда не ставится: выдача требует оплаты и идёт через карточку заказа.
+ * Закрывающие статусы («Выдан», «Без ремонта») тоже здесь, внизу списка, с подтверждением; если для выдачи
+ * нужна оплата, сервер откажет и скажет почему.
  */
 export default function QuickStatus({ status, groups, disabled, onPick }: Props) {
   const { me } = useAuth()
@@ -38,7 +39,7 @@ export default function QuickStatus({ status, groups, disabled, onPick }: Props)
     const access = item?.role_access?.[String(me.role_id)]
     return access?.[right] !== false // права роли не заданы — разрешено всем
   }
-  const options = groups.filter((g) => g.group !== 'closed').flatMap((g) => g.statuses).filter((s) => allowed(s, 'set'))
+  const options = groups.flatMap((g) => g.statuses.map((s) => ({ ...s, group: g.group }))).filter((s) => allowed(s, 'set'))
   const canChange = status.group !== 'closed' && allowed(current, 'change') && options.length > 0
 
   useEffect(() => {
@@ -70,6 +71,7 @@ export default function QuickStatus({ status, groups, disabled, onPick }: Props)
     event.stopPropagation()
     setOpen(false)
     if (next.id === status.id) return
+    if ((next as { group?: string }).group === 'closed' && !confirm(`Закрыть заказ со статусом «${next.name}»?`)) return
     let comment: string | null = ''
     if (next.comment_mode && next.comment_mode !== 'none') {
       comment = prompt(next.comment_mode === 'required' ? 'Укажите обязательный комментарий' : 'Комментарий к смене статуса (необязательно)')
@@ -90,12 +92,12 @@ export default function QuickStatus({ status, groups, disabled, onPick }: Props)
           <ul role="listbox" aria-label="Выберите статус"
             style={pos && window.matchMedia('(min-width: 768px)').matches ? { top: pos.top, left: pos.left, width: 260 } : undefined}
             className="quick-menu fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overflow-y-auto rounded-t-2xl border border-line bg-surface p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-xl md:inset-x-auto md:bottom-auto md:max-h-[360px] md:rounded-xl">
-            {options.map((item) => (
-              <li key={item.id}>
+            {options.map((item, index) => (
+              <li key={item.id} className={item.group === 'closed' && options[index - 1]?.group !== 'closed' ? 'mt-1 border-t border-line pt-1' : undefined}>
                 <button type="button" role="option" aria-selected={item.id === status.id} onClick={(event) => pick(event, item)}
                   className={`flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-canvas ${item.id === status.id ? 'bg-accent-soft font-medium' : ''}`}>
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} aria-hidden />
-                  <span className="min-w-0 flex-1 break-words">{item.name}</span>
+                  <span className="min-w-0 flex-1 break-words">{item.name}{item.group === 'closed' && <small className="ml-1.5 text-muted">закрыть заказ</small>}</span>
                   {item.id === status.id && <span aria-hidden>✓</span>}
                 </button>
               </li>
