@@ -1011,6 +1011,31 @@ def delete_order_payment(order_id: int, tx_id: int, db: DbSession, me: CurrentEm
     order_service.delete_payment(db, order, transaction, me)
     db.commit()
 
+class ChangePaymentMethodIn(BaseModel):
+    is_bank: bool
+    cash_register_id: int | None = None
+
+
+@router.post(
+    "/{order_id}/payments/{tx_id}/change-method",
+    dependencies=[Depends(require("changeTransactionAccess")), Depends(require("operationCashRegisterAccess"))],
+)
+def change_order_payment_method(order_id: int, tx_id: int, data: ChangePaymentMethodIn, db: DbSession, me: CurrentEmployee):
+    order = get_order_for_employee(db, order_id, me)
+    transaction = db.get(Transaction, tx_id)
+    if transaction is None or transaction.is_deleted or transaction.order_id != order.id:
+        raise NotFound("Оплата заказа")
+    if data.cash_register_id:
+        register = get_order_cash_register(db, me, data.cash_register_id)
+        if register.location_id is not None:
+            check_location(me, register.location_id)
+    new_tx = order_service.change_payment_method(
+        db, order, transaction, me, is_bank=data.is_bank, cash_register_id=data.cash_register_id
+    )
+    db.commit()
+    return {"id": new_tx.id, "amount": new_tx.amount, "debt": order.debt}
+
+
 # --- Перенос архива выданных заказов из LiveSklad (отчёт «Заказы»): только суммы и даты ----
 
 

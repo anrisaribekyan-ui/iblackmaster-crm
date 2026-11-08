@@ -439,3 +439,8 @@ html[data-theme="glass"] .hero-card {
 .sms-bubble { background: var(--color-ink); color: var(--color-surface); }
 html[data-theme="dark"] .sms-bubble,
 html[data-theme="glass"] .sms-bubble { background: color-mix(in srgb, var(--color-accent) 85%, black); color: #fff; }
+
+/* «Сменить способ оплаты» — уникальный фиолетовый, нигде больше в системе не используется */
+.switch-pay-btn { background-color: #7c3aed; color: #fff; border: 1px solid #6d28d9; }
+.switch-pay-btn:hover:not(:disabled) { background-color: #6d28d9; }
+.switch-pay-btn:focus-visible { outline: 2px solid #a78bfa; outline-offset: 2px; }

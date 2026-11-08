@@ -890,3 +890,28 @@ def test_search_matches_several_words_and_brand(client, auth_headers, db):
         assert created.json()["number"] in [o["number"] for o in found["items"]], q
     none = client.get("/api/orders", params={"q": "samsung zzzz"}, headers=auth_headers).json()
     assert created.json()["number"] not in [o["number"] for o in none["items"]]
+
+
+def test_change_payment_method_moves_money_and_fee(client, auth_headers, db, owner):
+    order = create_payment_test_order(db, owner, "PAY-CHANGE")
+    register = db.scalars(
+        select(CashRegister).where(CashRegister.location_id == order.location_id, CashRegister.is_active.is_(True))
+    ).first()
+    register.accepts_cash = register.accepts_bank = True
+    register.bank_percent = Decimal("2")
+    db.commit()
+    cash0, bank0 = register.cash_balance, register.bank_balance
+    pay = client.post(f"/api/orders/{order.id}/payments", json={"cash_register_id": register.id, "amount": "1000", "is_bank": True}, headers=auth_headers)
+    assert pay.status_code == 200
+    r = client.post(f"/api/orders/{order.id}/payments/{pay.json()['id']}/change-method", json={"is_bank": False}, headers=auth_headers)
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    register = db.get(CashRegister, register.id)
+    assert register.cash_balance == cash0 + 1000
+    assert register.bank_balance == bank0
+    assert db.get(Order, order.id).paid == Decimal("1000.00")
+    assert db.get(Transaction, pay.json()["id"]).is_deleted is True
+    live = db.scalars(select(Transaction).where(Transaction.order_id == order.id, Transaction.is_deleted.is_(False))).all()
+    assert len(live) == 1 and live[0].is_bank is False
+    again = client.post(f"/api/orders/{order.id}/payments/{live[0].id}/change-method", json={"is_bank": False}, headers=auth_headers)
+    assert again.status_code in (400, 422)

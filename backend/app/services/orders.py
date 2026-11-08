@@ -12,7 +12,9 @@ from sqlalchemy.orm import Session
 from app.db import MONEY_STEP, utcnow
 from app.errors import BusinessError, Forbidden
 from app.models import (
+    CashItem,
     CashItemType,
+    CashRegister,
     Company,
     Employee,
     Nomenclature,
@@ -394,3 +396,43 @@ def delete_payment(db: Session, order: Order, tx: Transaction, employee: Employe
     money.delete_transaction(db, tx)
     order.paid = order.paid - amount if was_income else order.paid + amount
     add_history(db, order, "delete_cash", employee, text=f"{amount} руб", transaction_id=tx.id)
+
+
+def change_payment_method(
+    db: Session, order: Order, tx: Transaction, employee: Employee, *, is_bank: bool, cash_register_id: int | None = None
+) -> Transaction:
+    """Меняет способ уже пробитой оплаты/возврата: старая транзакция (и её комиссия эквайринга) удаляется,
+    вместо неё создаётся новая с той же суммой, датой и примечанием. Итог «оплачено» в заказе не меняется."""
+    from app.services import tips
+
+    if tx.order_id != order.id or tx.is_deleted:
+        raise BusinessError("Транзакция не из этого заказа")
+    item = tx.cash_item or db.get(CashItem, tx.cash_item_id)
+    if tips.is_tip(tx) or item.type not in (CashItemType.ORDER, CashItemType.ORDER_RETURN):
+        raise BusinessError("Сменить способ можно только у оплаты или возврата по заказу")
+    register_id = cash_register_id or tx.cash_register_id
+    if register_id == tx.cash_register_id and is_bank == tx.is_bank:
+        raise BusinessError("Способ оплаты уже такой")
+    old_is_bank, old_register = tx.is_bank, db.get(CashRegister, tx.cash_register_id)
+    amount, date, note = tx.amount, tx.date, tx.note
+    money.delete_transaction(db, tx)
+    new_tx = money.create_transaction(
+        db,
+        cash_register_id=register_id,
+        cash_item=item,
+        amount=amount,
+        is_bank=is_bank,
+        date=date,
+        counteragent_id=tx.counteragent_id,
+        created_by_id=employee.id,
+        order_id=order.id,
+        note=note,
+    )
+    new_register = db.get(CashRegister, register_id)
+    kind = lambda b: "безнал" if b else "наличные"  # noqa: E731
+    add_history(
+        db, order, "change_payment", employee,
+        text=f"{amount} руб: {kind(old_is_bank)} ({old_register.name}) → {kind(is_bank)} ({new_register.name})",
+        transaction_id=new_tx.id,
+    )
+    return new_tx

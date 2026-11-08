@@ -183,6 +183,9 @@ export default function OrderDetailPage() {
   const [tab, setTab] = useState<'info' | 'positions'>('positions')
   const [infoVersion, setInfoVersion] = useState(0)
   const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null)
+  const [switching, setSwitching] = useState<Transaction | null>(null)
+  const [switchBank, setSwitchBank] = useState(false)
+  const [switchRegister, setSwitchRegister] = useState('')
   const [closeAfterPay, setCloseAfterPay] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentRegisterId, setPaymentRegisterId] = useState('')
@@ -363,6 +366,36 @@ export default function OrderDetailPage() {
     setPaymentRegisterId(defaultRegister ? String(defaultRegister.id) : '')
     setPaymentMethod(defaultRegister?.accepts_cash ? 'cash' : 'bank')
     setPaymentError('')
+  }
+
+  const openSwitch = (transaction: Transaction) => {
+    const target = !transaction.is_bank
+    const same = cashRegisters.find((register) => register.id === transaction.cash_register_id)
+    const fits = (register: CashRegister) => (target ? register.accepts_bank : register.accepts_cash)
+    const pick = same && fits(same) ? same : cashRegisters.find(fits)
+    setSwitchBank(target)
+    setSwitchRegister(pick ? String(pick.id) : '')
+    setPaymentError('')
+    setSwitching(transaction)
+  }
+
+  const submitSwitch = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!detail || !switching) return
+    setSaving(true)
+    setPaymentError('')
+    try {
+      await api.post(`/orders/${detail.order.id}/payments/${switching.id}/change-method`, {
+        is_bank: switchBank,
+        cash_register_id: Number(switchRegister),
+      })
+      setSwitching(null)
+      await loadDetail()
+    } catch (e) {
+      setPaymentError(e instanceof ApiError ? e.message : 'Не удалось сменить способ оплаты')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const giveOrder = () => {
@@ -1051,6 +1084,11 @@ export default function OrderDetailPage() {
                       <strong className={`num ${transaction.is_income ? '' : 'text-danger'}`}>{transaction.is_income ? '' : '−'}{formatMoney(transaction.amount)}</strong>
                     </div>
                     <small className="text-muted">{formatDate(transaction.date)} · {transaction.cash_register_name}{transaction.note ? ` · ${transaction.note}` : ''}</small>
+                    {can('changeTransactionAccess') && can('operationCashRegisterAccess') && !detail.order.is_deleted && (transaction.cash_item_type === 'order' || transaction.cash_item_type === 'orderReturn') && (
+                      <button type="button" onClick={() => openSwitch(transaction)} className="switch-pay-btn mt-2 flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold">
+                        <span aria-hidden>⇄</span> Сменить способ: на {transaction.is_bank ? 'наличные' : 'безнал'}
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -1111,6 +1149,40 @@ export default function OrderDetailPage() {
 
       {taskCreating && (
         <TaskForm employees={taskEmployees} orderId={Number(orderId)} onSave={createTask} onClose={() => setTaskCreating(false)} />
+      )}
+      {switching && (
+        <Modal title="Сменить способ оплаты" onClose={() => setSwitching(null)}>
+          <form onSubmit={(event) => void submitSwitch(event)} className="grid gap-3">
+            <p className="text-sm">
+              Оплата <strong className="num">{formatMoney(switching.amount)}</strong> ({switching.is_bank ? 'безнал' : 'наличные'}, {switching.cash_register_name}) будет перепробита по-новому.
+              Старая операция удалится вместе с комиссией банка, сумма в заказе и долг не изменятся.
+            </p>
+            <label className="grid gap-1 text-sm text-muted">Новый способ
+              <select className={inputClass} value={switchBank ? 'bank' : 'cash'} onChange={(event) => {
+                const bank = event.target.value === 'bank'
+                setSwitchBank(bank)
+                const current = cashRegisters.find((register) => String(register.id) === switchRegister)
+                if (!current || !(bank ? current.accepts_bank : current.accepts_cash)) {
+                  const next = cashRegisters.find((register) => (bank ? register.accepts_bank : register.accepts_cash))
+                  setSwitchRegister(next ? String(next.id) : '')
+                }
+              }}>
+                <option value="cash">Наличные</option>
+                <option value="bank">Безналичные</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm text-muted">Касса
+              <select className={inputClass} value={switchRegister} onChange={(event) => setSwitchRegister(event.target.value)} required>
+                {cashRegisters.filter((register) => (switchBank ? register.accepts_bank : register.accepts_cash)).map((register) => <option key={register.id} value={register.id}>{register.name}</option>)}
+              </select>
+            </label>
+            {paymentError && <p role="alert" className="text-sm text-danger">{paymentError}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => setSwitching(null)}>Отмена</button>
+              <button disabled={saving || !switchRegister} className="switch-pay-btn rounded-md px-3 py-2 font-semibold disabled:opacity-60">{saving ? 'Меняю…' : 'Сменить способ'}</button>
+            </div>
+          </form>
+        </Modal>
       )}
       {paymentMode && (
         <Modal title={paymentMode === 'payment' ? closeAfterPay ? 'Оплата для выдачи' : prepayMode ? 'Предоплата' : 'Принять оплату' : paymentMode === 'tip' ? 'Чаевые' : 'Возврат'} onClose={() => { setPaymentMode(null); setCloseAfterPay(false) }}>
