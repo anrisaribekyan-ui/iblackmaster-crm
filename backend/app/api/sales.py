@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, require
 from app.db import Rubles
 from app.errors import BusinessError, Forbidden, NotFound
-from app.models import CashRegister, Counteragent, Employee, Location, Nomenclature, Sale, SalePosition, Store
+from app.models import CashRegister, Counteragent, Employee, Location, Nomenclature, Sale, SalePosition, Store, Transaction
 from app.services import sales as sales_service
 
 router = APIRouter(prefix="/sales", tags=["Продажи"])
@@ -281,6 +281,13 @@ def get_sale(sale_id: int, db: DbSession, me: CurrentEmployee):
     check_location(me, sale.location_id)
     agent = db.get(Counteragent, sale.counteragent_id) if sale.counteragent_id else None
     seller = db.get(Employee, sale.seller_id) if sale.seller_id else None
+    # Как оплачено: каждая проводка по чеку (приход) со способом: наличные / безнал и названием кассы или терминала
+    pay_rows = db.execute(
+        select(Transaction, CashRegister)
+        .join(CashRegister, CashRegister.id == Transaction.cash_register_id)
+        .where(Transaction.sale_id == sale.id, Transaction.is_income.is_(True), Transaction.is_deleted.is_(False), Transaction.pair_id.is_(None))
+        .order_by(Transaction.id)
+    ).all()
     return {
         "id": sale.id,
         "number": sale.number,
@@ -289,6 +296,10 @@ def get_sale(sale_id: int, db: DbSession, me: CurrentEmployee):
         "store_id": sale.store_id,
         "total_price": sale.total_price,
         "paid": sale.paid,
+        "payments": [
+            {"amount": t.amount, "method": "bank" if t.is_bank else "cash", "register": r.name}
+            for t, r in pay_rows
+        ],
         "discount_percent": sale.discount_percent,
         "discount_sum": sale.discount_sum,
         "note": sale.note,

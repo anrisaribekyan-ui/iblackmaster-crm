@@ -7,10 +7,13 @@ export default function CatalogPicker({
   locationId,
   onlyProducts = false,
   onPick,
+  onCreate,
 }: {
   locationId: string
   onlyProducts?: boolean
   onPick: (item: CatalogItem) => void
+  /** Если задано, при пустой выдаче предлагаем тут же создать товар */
+  onCreate?: (name: string) => void
 }) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<CatalogItem[] | null>(null)
@@ -65,7 +68,15 @@ export default function CatalogPicker({
       {error && <p className="mt-1 text-sm text-danger">{error}</p>}
       {results && (
         results.length === 0 ? (
-          <p className="mt-2 text-sm text-muted">Ничего не найдено. Добавьте позицию в «Справочники → Товары».</p>
+          <div className="mt-2 grid gap-2">
+            <p className="text-sm text-muted">Ничего не найдено{onCreate ? '.' : '. Добавьте позицию в «Справочники → Товары».'}</p>
+            {onCreate && q.trim() && (
+              <button type="button" className="min-h-11 rounded-lg border border-accent bg-accent-soft px-4 py-2 text-left font-semibold text-accent"
+                onClick={() => { onCreate(q.trim()); setResults(null); setQ('') }}>
+                + Создать «{q.trim()}» и добавить в чек
+              </button>
+            )}
+          </div>
         ) : (
           <ul className="mt-2 max-h-64 divide-y divide-line overflow-auto rounded-md border border-line bg-surface">
             {results.map((item) => (

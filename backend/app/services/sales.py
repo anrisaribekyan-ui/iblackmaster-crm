@@ -71,6 +71,8 @@ def create_sale(
             purchase_price = money.to_money(manual_cost or 0)
         elif item.get("no_stock"):
             purchase_price = money.to_money(manual_cost if manual_cost is not None else nomenclature.purchase_price)
+            if manual_cost is not None and not nomenclature.is_work and purchase_price != nomenclature.purchase_price:
+                nomenclature.purchase_price = purchase_price  # запоминаем последнюю себестоимость товара
         else:
             purchase_price = stock.write_off(db, store_id, nomenclature.id, quantity)
         position = SalePosition(

@@ -6,7 +6,7 @@ import { useAuth } from '../auth'
 import CatalogPicker from '../components/CatalogPicker'
 import Modal from '../components/Modal'
 import { escapeHtml, openPrint } from '../print'
-import { formatDateTime, inputClass, money, qty, retailPrice, useLocationsAndRegisters, type CashRegisterRef } from './shared'
+import { formatDateTime, inputClass, money, qty, retailPrice, useLocationsAndRegisters, type CashRegisterRef, type CatalogItem } from './shared'
 import Skeleton from '../components/Skeleton'
 
 /** Строка чека: из справочника (nomenclatureId) или свободная — название + себестоимость руками. */
@@ -27,7 +27,9 @@ type Payment = { cash_register_id: string; amount: string; is_bank: boolean }
 type SaleRow = { id: number; number: string; date: string; total_price: string; paid: string; counteragent: string | null; seller: string | null }
 type SaleDetail = SaleRow & {
   positions: { id: number; name: string; is_work: boolean; quantity: string; sold_price: string; returned_quantity: string }[]
+  payments?: { amount: string; method: 'cash' | 'bank'; register: string }[]
 }
+const payMethod = (method: string) => (method === 'bank' ? 'Безнал' : 'Наличные')
 
 const DISCOUNTS = [0, 5, 10, 15]
 
@@ -72,6 +74,7 @@ export default function SalesPage() {
   const [month, setMonth] = useState('') // '' — все чеки, иначе 2026-09
   const [viewing, setViewing] = useState<SaleDetail | null>(null)
   const [quick, setQuick] = useState(params.get('quick') === '1')
+  const [creating, setCreating] = useState<string | null>(null)
   // ?open=15 — сразу показать чек (ссылка из карточки товара)
   useEffect(() => {
     const id = Number(params.get('open'))
@@ -305,6 +308,7 @@ export default function SalesPage() {
           <div className="rounded-xl border border-line bg-surface p-4">
             <CatalogPicker
               locationId={locationId}
+              onCreate={(name) => setCreating(name)}
               onPick={(item) => addLine({
                 nomenclatureId: item.id,
                 name: item.name,
@@ -343,6 +347,12 @@ export default function SalesPage() {
                           onChange={(e) => set({ price: e.target.value.replace(/[^\d]/g, '') })} />
                         <span className="ml-auto whitespace-nowrap num font-medium">{money(lineNet(line))}</span>
                       </div>
+                      {canSeeCost && short && !line.isWork && (
+                        <label className="col-span-full flex items-center justify-end gap-2 text-xs text-muted">Себестоимость, ₽
+                          <input aria-label="Себестоимость" className="h-8 w-24 rounded-md border border-line bg-surface px-2 text-right num" inputMode="numeric" value={line.cost}
+                            onChange={(e) => set({ cost: e.target.value.replace(/[^\d]/g, '') })} />
+                        </label>
+                      )}
                       {can('discountSaleAccess') && (
                         <label className="col-span-full flex items-center justify-end gap-2 text-xs text-muted">Скидка на позицию, ₽
                           <input aria-label="Скидка на позицию" className="h-8 w-24 rounded-md border border-line bg-surface px-2 text-right num" inputMode="numeric" placeholder="0" value={line.discount ?? ''}
@@ -518,11 +528,92 @@ export default function SalesPage() {
           }}
         />
       )}
+      {creating !== null && (
+        <NewProductModal
+          initialName={creating}
+          canSeeCost={canSeeCost}
+          onClose={() => setCreating(null)}
+          onCreated={(item) => {
+            addLine({ nomenclatureId: item.id, name: item.name, isWork: item.is_work, price: String(Number(retailPrice(item))), cost: String(Number(item.purchase_price ?? 0)), stock: item.is_work ? null : 0 })
+            setCreating(null)
+          }}
+        />
+      )}
       {viewing && (
         <SaleModal sale={viewing} registers={localRegisters} canReturn={can('saleReturnAccess')}
           onClose={() => setViewing(null)} onReturned={() => { setViewing(null); void loadHistory() }} />
       )}
     </section>
+  )
+}
+
+/** Новый товар прямо из чека: название, себестоимость и цена. Попадает в справочник и в чек. */
+function NewProductModal({ initialName, canSeeCost, onClose, onCreated }: {
+  initialName: string
+  canSeeCost: boolean
+  onClose: () => void
+  onCreated: (item: CatalogItem) => void
+}) {
+  const [name, setName] = useState(initialName)
+  const [isWork, setIsWork] = useState(false)
+  const [cost, setCost] = useState('')
+  const [price, setPrice] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const priceRef = useRef<HTMLInputElement>(null)
+  const profit = Number(price || 0) - Number(cost || 0)
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!name.trim()) return setError('Как называется?')
+    if (!price) return setError('Укажите цену продажи')
+    setBusy(true)
+    setError('')
+    try {
+      const types = await api.get<{ id: number; name: string }[]>('/price-types')
+      const retail = types.find((t) => t.name === 'Розничная') ?? types[0]
+      const item = await api.post<CatalogItem>('/nomenclature', {
+        name: name.trim(),
+        is_work: isWork,
+        purchase_price: cost || '0',
+        prices: retail ? [{ price_type_id: retail.id, price }] : [],
+      })
+      onCreated(item)
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Не удалось создать товар')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal title="Новый товар" onClose={onClose}>
+      <form className="grid gap-3" onSubmit={(e) => void submit(e)}>
+        <label className="grid gap-1 text-sm text-muted">Наименование
+          <input autoFocus className={`${inputClass} text-ink`} value={name} onChange={(e) => setName(e.target.value)} enterKeyHint="next" />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          {canSeeCost && (
+            <label className="grid gap-1 text-sm text-muted">Себестоимость, ₽
+              <input className={`${inputClass} text-right text-ink num`} inputMode="numeric" value={cost} onChange={(e) => setCost(e.target.value.replace(/[^\d]/g, ''))}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); priceRef.current?.focus() } }} placeholder="0" enterKeyHint="next" />
+            </label>
+          )}
+          <label className={`grid gap-1 text-sm text-muted ${canSeeCost ? '' : 'col-span-2'}`}>Цена продажи, ₽
+            <input ref={priceRef} className={`${inputClass} text-right text-lg font-semibold text-ink num`} inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ''))} placeholder="0" enterKeyHint="done" />
+          </label>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-muted">
+          <input type="checkbox" checked={isWork} onChange={(e) => setIsWork(e.target.checked)} /> Это работа (услуга), а не товар
+        </label>
+        {canSeeCost && price && !isWork && (
+          <span className={`text-sm ${profit < 0 ? 'text-danger' : 'text-success'}`}>прибыль с единицы {money(profit)}{profit < 0 ? ' — ниже себестоимости!' : ''}</span>
+        )}
+        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+        <button disabled={busy} className="min-h-12 rounded-lg bg-accent px-4 py-3 font-semibold text-accent-ink disabled:opacity-60">{busy ? 'Создаю…' : 'Создать и добавить в чек'}</button>
+        <p className="text-center text-xs text-muted">Товар сохранится в «Справочниках». Себестоимость запомнится по последней продаже, её можно поменять при следующей.</p>
+      </form>
+    </Modal>
   )
 }
 
@@ -651,6 +742,7 @@ function SaleModal({ sale, registers, canReturn, onClose, onReturned }: {
         <tbody>${rows}</tbody>
       </table>
       <p style="margin-top: 3mm"><strong>Итого: ${escapeHtml(money(sale.total_price))}</strong></p>
+      ${(sale.payments ?? []).map((pay) => `<p>${escapeHtml(payMethod(pay.method))}${pay.register ? ` (${escapeHtml(pay.register)})` : ''}: ${escapeHtml(money(pay.amount))}</p>`).join('')}
     `
     openPrint(`Чек ${sale.number}`, body)
   }
@@ -679,7 +771,15 @@ function SaleModal({ sale, registers, canReturn, onClose, onReturned }: {
           })}
         </tbody>
       </table>
-      <p className="mb-4 text-right">Итого {money(sale.total_price)} · оплачено {money(sale.paid)}</p>
+      <p className="mb-1 text-right">Итого {money(sale.total_price)} · оплачено {money(sale.paid)}</p>
+      {(sale.payments ?? []).length > 0 && (
+        <ul className="mb-4 text-right text-sm text-muted">
+          {(sale.payments ?? []).map((pay, i) => (
+            <li key={i}>{payMethod(pay.method)} · {pay.register}: <span className="num">{money(pay.amount)}</span></li>
+          ))}
+        </ul>
+      )}
+      {(sale.payments ?? []).length === 0 && <p className="mb-4 text-right text-sm text-muted">Способ оплаты не указан{Number(sale.paid) > 0 ? '' : ' (в долг)'}</p>}
       {tipDone && <p className="mb-3 text-sm text-success">{tipDone}</p>}
       {tipping ? (
         <div className="grid gap-2">

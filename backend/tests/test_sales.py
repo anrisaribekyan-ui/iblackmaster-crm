@@ -141,6 +141,16 @@ def test_quick_sale_free_position_and_top(client, auth_headers, db):
     })
     assert r.status_code == 200, r.text
     assert Decimal(str(r.json()["total_purchase"])) == 90
+    # Ввели другую себестоимость — товар запоминает последнюю
+    r = client.post("/api/sales", headers=auth_headers, json={
+        "location_id": location.id, "store_id": store.id,
+        "positions": [{"nomenclature_id": product.id, "quantity": "1", "price": "700", "no_stock": True, "purchase_price": "150"}],
+        "payments": [{"cash_register_id": register.id, "amount": "700"}],
+    })
+    assert r.status_code == 200, r.text
+    assert Decimal(str(r.json()["total_purchase"])) == 150
+    db.refresh(product)
+    assert product.purchase_price == Decimal("150")
     # Без названия — нельзя
     r = client.post("/api/sales", headers=auth_headers, json={
         "location_id": location.id, "store_id": store.id,
@@ -208,3 +218,19 @@ def test_sale_per_position_discount(client, auth_headers, db):
     )
     assert response.status_code == 200, response.text
     assert Decimal(str(response.json()["total_price"])) == Decimal("2200")
+
+
+def test_sale_detail_shows_payment_method(client, auth_headers, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    store = db.scalars(select(Store).where(Store.location_id == location.id)).first()
+    register = db.scalars(select(CashRegister).where(CashRegister.location_id == location.id, CashRegister.is_active.is_(True))).first()
+    r = client.post("/api/sales", headers=auth_headers, json={
+        "location_id": location.id, "store_id": store.id,
+        "positions": [{"name": "Чай", "quantity": "1", "price": "500", "purchase_price": "100"}],
+        "payments": [{"cash_register_id": register.id, "amount": "500"}],
+    })
+    assert r.status_code == 200, r.text
+    detail = client.get(f"/api/sales/{r.json()['id']}", headers=auth_headers).json()
+    assert len(detail["payments"]) == 1
+    assert detail["payments"][0]["method"] == "cash" and Decimal(str(detail["payments"][0]["amount"])) == 500
+    assert detail["payments"][0]["register"] == register.name
