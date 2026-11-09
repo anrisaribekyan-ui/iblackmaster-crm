@@ -151,6 +151,17 @@ class PendingLogin:
     since: float
 
 
+
+def _ipa_ok(path: Path) -> bool:
+    """Целый ли файл .ipa: оглавление архива читается и внутри есть приложение (недокачанный файл — нет)."""
+    import zipfile
+
+    try:
+        with zipfile.ZipFile(path) as zf:
+            return any(n.startswith("Payload/") and ".app/" in n for n in zf.namelist())
+    except (zipfile.BadZipFile, OSError, ValueError):
+        return False
+
 class Agent:
     def __init__(self, settings: config.Settings):
         if not settings.crm_url or not settings.station_token:
@@ -377,7 +388,10 @@ class Agent:
         name = job.get("app_name") or "приложение"
         cached = self.ipatool.cached_path(job["adam_id"], job.get("version_id"))
         if cached.is_file() and cached.stat().st_size > 0:
-            return cached, "кэша станции"
+            if _ipa_ok(cached):
+                return cached, "кэша станции"
+            log.warning("Файл «%s» в кэше повреждён — беру заново", name)
+            cached.unlink(missing_ok=True)
 
         if job.get("ipa_in_crm") and job.get("app_id"):
             mb = (job.get("ipa_size") or 0) / 1_048_576
@@ -389,7 +403,10 @@ class Agent:
                     progress=lambda p: self.report(job_id, progress=5 + p * 35 // 100,
                                                    message=f"Беру «{name}» из архива CRM… {p}%"),
                 )
-                return cached, "архива CRM"
+                if _ipa_ok(cached):
+                    return cached, "архива CRM"
+                log.warning("Файл «%s» из архива CRM повреждён — качаю у Apple", name)
+                cached.unlink(missing_ok=True)
             except CrmError as exc:
                 log.warning("Архив CRM не отдал файл, качаю у Apple: %s", exc)
 
@@ -502,7 +519,11 @@ class Agent:
                 last.update(sent=now, value=value)
                 self.report(job_id, progress=min(value, 99), message=f"Установка… {percent}%")
 
-        device.install_ipa(job["target_udid"], path, progress=on_progress)
+        try:
+            device.install_ipa(job["target_udid"], path, progress=on_progress)
+        except device.BrokenPackage:
+            path.unlink(missing_ok=True)  # следующая попытка возьмёт файл заново
+            raise
         self.report(job_id, state="done",
                     message=f"«{name}» установлено (файл из {source}). На телефоне в App Store должен быть вход в тот же Apple ID.")
 
