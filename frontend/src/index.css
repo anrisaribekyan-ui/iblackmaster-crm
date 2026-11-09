@@ -444,3 +444,14 @@ html[data-theme="glass"] .sms-bubble { background: color-mix(in srgb, var(--colo
 .switch-pay-btn { background-color: #7c3aed; color: #fff; border: 1px solid #6d28d9; }
 .switch-pay-btn:hover:not(:disabled) { background-color: #6d28d9; }
 .switch-pay-btn:focus-visible { outline: 2px solid #a78bfa; outline-offset: 2px; }
+
+/* Боковое меню: тонкая тёмная полоса прокрутки, видна только при наведении (вместо белой системной) */
+@media (min-width: 768px) {
+  .rail-scroll { scrollbar-width: thin; scrollbar-color: transparent transparent; scrollbar-gutter: stable; }
+  .rail-scroll:hover { scrollbar-color: rgba(255, 255, 255, 0.22) transparent; }
+  .rail-scroll::-webkit-scrollbar { width: 6px; background: transparent; }
+  .rail-scroll::-webkit-scrollbar-track { background: transparent; }
+  .rail-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 999px; }
+  .rail-scroll:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
+  .rail-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.38); }
+}

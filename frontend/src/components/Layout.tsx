@@ -136,7 +136,7 @@ export default function Layout() {
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-[15px] font-bold text-white" aria-hidden>i</span>
           <span className="text-[17px] font-semibold tracking-tight text-white">iBlack<span className="text-rail-ink">Master</span></span>
         </div>
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3">
+        <nav className="rail-scroll flex flex-1 flex-col gap-0.5 overflow-y-auto px-3">
           {MENU.filter((m) => !m.permission || can(m.permission)).map((m) => (
             <NavLink
               key={m.to}
