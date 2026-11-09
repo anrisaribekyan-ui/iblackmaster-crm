@@ -241,8 +241,46 @@ def scan_apps(udid: str) -> list[dict]:
 
 # ---------------- установка ----------------
 
+STAGING_DIR = "/PublicStaging/pymobiledevice3"
+MB = 1_048_576
+
+
+class NoSpace(InstallFailed):
+    code = "NO_SPACE"
+
+
+def _mb(value: float) -> str:
+    return f"{value / 1024 / MB:.1f} ГБ" if value >= 1024 * MB else f"{value / MB:.0f} МБ"
+
+
+def _space_message(free: Optional[int], need: int) -> str:
+    have = f"свободно {_mb(free)}, " if free is not None else ""
+    return (f"На телефоне не хватает памяти: {have}нужно около {_mb(need)}. "
+            "Удалите ненужные приложения, видео или фото (Настройки → Основные → Хранилище), "
+            "перезагрузите телефон и нажмите «Повторить».")
+
+
+async def _prepare_space(lockdown, ipa_size: int) -> Optional[int]:
+    """Убрать хвосты прошлых неудачных установок и узнать, сколько места свободно на телефоне."""
+    try:
+        async with AfcService(lockdown) as afc:
+            try:
+                if await afc.exists(STAGING_DIR):
+                    await afc.rm(STAGING_DIR, force=True)
+            except Exception:  # noqa: BLE001 — не мешаем установке, если не вышло прибраться
+                log.debug("Не удалось очистить %s", STAGING_DIR, exc_info=True)
+            info = await afc.get_device_info()
+            return int(info.get("FSFreeBytes")) if info.get("FSFreeBytes") is not None else None
+    except Exception:  # noqa: BLE001
+        log.debug("Не удалось узнать свободное место", exc_info=True)
+        return None
+
+
 async def _install(udid: str, ipa: Path, progress: Optional[ProgressCb]) -> None:
     lockdown = await _lockdown(udid)
+    ipa_size = ipa.stat().st_size
+    # iOS кладёт на телефон сам файл и рядом распаковывает его — нужно примерно вдвое больше места
+    need = ipa_size * 2 + 200 * MB
 
     def handler(percent: Any, *_: Any) -> None:
         if progress is None:
@@ -253,15 +291,38 @@ async def _install(udid: str, ipa: Path, progress: Optional[ProgressCb]) -> None
             log.debug("progress callback failed", exc_info=True)
 
     try:
+        free = await _prepare_space(lockdown, ipa_size)
+        # Явно не влезет даже сам файл — не мучаем телефон. Пограничные случаи пробуем: iOS умеет чистить кэши
+        if free is not None and free < ipa_size + 100 * MB:
+            raise NoSpace(_space_message(free, need))
         async with InstallationProxyService(lockdown) as svc:
             await svc.install_from_local(ipa, handler=handler)
+    except NoSpace:
+        raise
     except Exception as exc:  # noqa: BLE001
+        text = str(exc)
+        if "NO_SPACE" in text or "PackageExtractionFailed" in text or "No space" in text:
+            free = None
+            try:
+                free = await _prepare_space(lockdown, ipa_size)
+            except Exception:  # noqa: BLE001
+                pass
+            if "PackageExtractionFailed" in text and free is not None and free >= need:
+                raise BrokenPackage("Телефон не смог распаковать файл приложения — похоже, файл повреждён. "
+                                    "Станция скачает его заново: нажмите «Повторить».") from exc
+            if free is not None and free >= need:
+                need = free + ipa_size  # iOS посчитал иначе — просим запас сверх того, что уже есть
+            raise NoSpace(_space_message(free, need)) from exc
         err = _translate(exc, udid)
         if type(err) is DeviceError:
             err = InstallFailed(f"Установка не удалась: {err}")
         raise err from exc
     finally:
         await lockdown.close()
+
+
+class BrokenPackage(InstallFailed):
+    code = "BROKEN_IPA"
 
 
 def install_ipa(udid: str, ipa_path: str | Path, progress: Optional[ProgressCb] = None) -> None:
