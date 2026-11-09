@@ -623,7 +623,7 @@ export default function OrderDetailPage() {
       note: str(orderFields.note),
       approximatePrice: str(orderFields.approximate_price),
       verdict: str((detail.order as unknown as { verdict?: string | null }).verdict),
-      prepaid: orderFields.has_prepayment && paid > 0 ? formatMoney(paid) : 'Нет',
+      prepaid: paid > 0 ? formatMoney(paid) : 'Нет',
       ready: orderFields.deadline ? day(orderFields.deadline) : '',
       positions: detail.positions.map((position) => ({
         name: position.name,
@@ -647,7 +647,7 @@ export default function OrderDetailPage() {
     const data = buildFormData()
     if (!data) return
     const forms = {
-      receipt: { title: 'Квитанция', html: (d: FormData) => receiptHtml(d) + checkSheetHtml(d) },
+      receipt: { title: 'Квитанция', html: (d: FormData) => receiptHtml(d) },
       checklist: { title: 'Проверка неисправностей', html: checkSheetHtml },
       act: { title: 'Акт', html: actHtml },
       refusal: { title: 'Отказной лист', html: refusalHtml },
