@@ -16,7 +16,7 @@ export const DOSKA_BOARDS: { id: DoskaLoc; name: string }[] = [
   { id: '1000melochey', name: '1000 мелочей' },
 ]
 
-type Offer = { name: string; shop: string; color: string | null; stock: string; opt: number | null; price: number; url: string | null }
+type Offer = { name: string; shop: string; color: string | null; stock: string; opt: number | null; price: number; url: string | null; retail?: number | null }
 type Supplier = { id: string; name: string }
 export type PartPurpose = 'order' | 'stock_order' | 'stock_sale' | 'other'
 export type AddedPart = { id: string; text: string; price: number | null; shop: string | null; loc: DoskaLoc; purpose?: PartPurpose }
@@ -148,9 +148,13 @@ export default function PartOrderModal({
     setSite(`https://poisk123.ru/s/moskva/?s=${encodeURIComponent(q).replace(/%20/g, '+')}`)
     try {
       const data = await doska<{ items: Offer[]; site: string }>(`/api/p123?q=${encodeURIComponent(q)}`)
-      setOffers(data.items)
+      // У нас везде опт: оптовая цена — главная. Розничную берём, только если оптовой нет.
+      const wholesale = data.items
+        .map((item) => (item.opt && item.opt > 0 ? { ...item, retail: item.price, price: item.opt } : { ...item, retail: null }))
+        .sort((a, b) => a.price - b.price)
+      setOffers(wholesale)
       setSite(data.site)
-      if (data.items.length) setPicked(0)
+      if (wholesale.length) setPicked(0)
     } catch (e) {
       setOffers(null)
       setError(e instanceof Error ? e.message : 'Поиск123 сейчас не отвечает')
@@ -273,7 +277,7 @@ export default function PartOrderModal({
                       <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
                         <span className="rounded px-1.5 py-0.5 font-medium text-white" style={{ background: item.color || '#667085' }}>{item.shop || 'Магазин'}</span>
                         {item.stock && <span>{item.stock}</span>}
-                        {item.opt && <span>опт {rub(item.opt)}</span>}
+                        {item.retail ? <span className="font-medium text-ink">опт · розница {rub(item.retail)}</span> : <span>розница (опта нет)</span>}
                         {index === 0 && <span className="text-success">дешевле всех</span>}
                       </span>
                     </span>
