@@ -44,7 +44,7 @@ export default function ChecklistSettingsPage() {
       </ul>
       <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (newItem.trim()) { void save([...items, newItem.trim()]); setNewItem('') } }}>
         <input value={newItem} onChange={(e) => setNewItem(e.target.value)} placeholder="Например, NFC" className="min-w-0 flex-1 rounded-md border border-line bg-surface px-3 py-2" />
-        <button className="rounded-md bg-accent px-4 py-2 text-accent-ink">Добавить</button>
+        <button className="rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink">Добавить</button>
       </form>
       {message && <p className="mt-2 text-sm text-muted">{message}</p>}
     </section>

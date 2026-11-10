@@ -117,7 +117,7 @@ export default function ProfitSettings({ onSaved }: { onSaved: () => void }) {
           <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => setCfg({ ...cfg, fixed: [...cfg.fixed, { name: '', amount: 0, location_id: null }] })}>
             + Статья
           </button>
-          <button type="button" disabled={busy} className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink disabled:opacity-60" onClick={() => void save()}>Сохранить</button>
+          <button type="button" disabled={busy} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60" onClick={() => void save()}>Сохранить</button>
           {msg && <span role="status" className="text-sm text-muted">{msg}</span>}
         </div>
       )}

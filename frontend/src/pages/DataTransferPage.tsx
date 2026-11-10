@@ -80,7 +80,7 @@ export default function DataTransferPage() {
             <h2 className="text-lg font-semibold">{sourceTitle} → {destTitle}</h2>
             <input value={client} onChange={(e) => setClient(e.target.value)} placeholder="Клиент (для печати)" aria-label="Клиент"
               className="rounded-md border border-line bg-surface px-3 py-1.5 text-sm sm:ml-auto" />
-            <button type="button" className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink" onClick={print}>Распечатать</button>
+            <button type="button" className="rounded-md bg-accent font-semibold px-4 py-2 text-sm text-accent-ink" onClick={print}>Распечатать</button>
           </div>
           {source === 'iphone' && (dest === 'flash' || dest === 'pc') && (
             <p className="rounded-lg bg-accent/10 p-3 text-sm">

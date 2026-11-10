@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { confirmDialog } from '../../components/dialogs'
 import { api, ApiError } from '../../api/client'
 import Modal from '../../components/Modal'
 import { useAuth } from '../../auth'
@@ -120,7 +121,7 @@ export default function LocationsPage() {
 
   const archive = async (kind: 'store' | 'register', item: Store | CashRegister) => {
     const title = item.name
-    if (!confirm(`Архивировать «${title}»?`)) return
+    if (!(await confirmDialog(`Архивировать «${title}»?`))) return
     setError('')
     try {
       await api.del(`/${kind === 'store' ? 'stores' : 'cash-registers'}/${item.id}`)
@@ -139,12 +140,12 @@ export default function LocationsPage() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Локации, склады и кассы</h2>
         {can('settingAccess') && (
-          <button className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" onClick={() => setEditor({ kind: 'location' })}>
+          <button className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink" onClick={() => setEditor({ kind: 'location' })}>
             Добавить локацию
           </button>
         )}
       </div>
-      {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="mb-4 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
       {loading ? (
         <Skeleton />
       ) : locations === null ? (
@@ -335,7 +336,7 @@ export default function LocationsPage() {
             {error && <p role="alert" className="text-sm text-danger">{error}</p>}
             <div className="mt-2 flex justify-end gap-2">
               <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => setEditor(null)}>Отмена</button>
-              <button disabled={saving} className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink disabled:opacity-60">
+              <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">
                 {saving ? 'Сохранение…' : 'Сохранить'}
               </button>
             </div>

@@ -307,7 +307,7 @@ function OrderSummary({ result, supplier, moveNote, onClose, onRetry }: {
       )}
       <div className="flex gap-2 pt-1">
         {onRetry && <button type="button" onClick={onRetry} className="rounded-md border border-line px-4 py-2 text-sm hover:border-accent hover:text-accent">Попробовать снова</button>}
-        <button type="button" onClick={onClose} className="ml-auto rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink">Готово</button>
+        <button type="button" onClick={onClose} className="ml-auto rounded-md bg-accent font-semibold px-4 py-2 text-sm text-accent-ink">Готово</button>
       </div>
     </div>
   )

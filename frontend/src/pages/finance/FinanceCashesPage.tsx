@@ -1,3 +1,4 @@
+import Skeleton from '../../components/Skeleton'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../../api/client'
@@ -100,9 +101,9 @@ export default function FinanceCashesPage() {
 
   return (
     <section>
-      {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="mb-4 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка касс…</p>
+        <Skeleton rows={4} />
       ) : registers.length === 0 ? (
         <p className="rounded-lg border border-line bg-surface p-4 text-muted">Активных касс нет. Добавьте кассу в настройках локаций.</p>
       ) : (
@@ -231,7 +232,7 @@ function CashOperationModal({
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2">
           <button type="button" className={buttonClass} onClick={onClose}>Отмена</button>
-          <button disabled={saving || methods.length === 0 || showItemWarning || showDestinationWarning} className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink disabled:opacity-60">
+          <button disabled={saving || methods.length === 0 || showItemWarning || showDestinationWarning} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">
             {saving ? 'Выполнение…' : 'Сохранить'}
           </button>
         </div>

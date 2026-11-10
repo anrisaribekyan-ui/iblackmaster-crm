@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { confirmDialog } from '../../components/dialogs'
 import { api, ApiError } from '../../api/client'
 import Modal from '../../components/Modal'
 import { inputClass, money } from '../shared'
@@ -176,7 +177,7 @@ export default function SalarySettings({ employeeId }: { employeeId: number }) {
   }
 
   const deleteRule = async (rule: Rule) => {
-    if (!confirm('Удалить это начисление?')) return
+    if (!(await confirmDialog('Удалить это начисление?'))) return
     try {
       await api.del(`/salary/rules/${rule.id}`)
       setDraft(null)
@@ -377,7 +378,7 @@ export default function SalarySettings({ employeeId }: { employeeId: number }) {
               ) : <span />}
               <div className="flex gap-2">
                 <button type="button" className={buttonClass} onClick={() => setDraft(null)}>Отмена</button>
-                <button disabled={saving} className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
+                <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
               </div>
             </div>
           </form>
@@ -398,7 +399,7 @@ export default function SalarySettings({ employeeId }: { employeeId: number }) {
             {error && <p role="alert" className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
               <button type="button" className={buttonClass} onClick={() => setRecalcOpen(false)}>Отмена</button>
-              <button disabled={saving} className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink disabled:opacity-60">{saving ? 'Пересчёт…' : 'Пересчитать'}</button>
+              <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Пересчёт…' : 'Пересчитать'}</button>
             </div>
           </form>
         </Modal>

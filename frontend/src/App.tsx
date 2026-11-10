@@ -1,3 +1,4 @@
+import Skeleton from './components/Skeleton'
 import { lazy, Suspense, type ReactNode } from 'react'
 import ErrorBoundary from './components/ErrorBoundary'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
@@ -48,7 +49,7 @@ const InventoryPage = lazy(() => import('./pages/store/InventoryPage'))
 
 function Protected({ children }: { children: ReactNode }) {
   const { me, loading, offline, retry } = useAuth()
-  if (loading) return <div className="p-6 text-muted">Загрузка…</div>
+  if (loading) return <div className="p-6"><Skeleton rows={6} /></div>
   if (!me && offline) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center gap-3 p-6 text-center">
@@ -84,7 +85,7 @@ export default function App() {
       <BrowserRouter>
         {/* Редкие разделы (аналитика, закупки, настройки) грузятся при первом открытии — приложение стартует быстрее */}
         <Guarded>
-        <Suspense fallback={<div className="p-6 text-muted">Загрузка…</div>}>
+        <Suspense fallback={<div className="p-6"><Skeleton rows={6} /></div>}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/track/:code" element={<TrackPage />} />

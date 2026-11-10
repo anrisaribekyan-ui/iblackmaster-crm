@@ -1,3 +1,4 @@
+import Skeleton from '../components/Skeleton'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, ApiError } from '../api/client'
 import { inputClass, money, useLocationsAndRegisters, type CashRegisterRef } from './shared'
@@ -134,9 +135,9 @@ export default function DayNotePage() {
       <h1 className="mb-1 text-[22px] font-bold leading-tight md:text-[26px]">Что сегодня было</h1>
       <p className="mb-4 text-muted">Пишите как удобно: кто, что, сколько, нал или безнал. Потом нажмите «Разобрать» — CRM предложит, что внести в заказы и продажи.</p>
 
-      {error && <p className="mb-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-red-700" role="alert">{error}</p>}
+      {error && <p className="mb-3 rounded-md border border-danger bg-danger-soft px-3 py-2 text-danger" role="alert">{error}</p>}
 
-      {loading ? <p className="text-muted">Загрузка…</p> : (
+      {loading ? <Skeleton rows={4} /> : (
         <>
           <textarea
             className={`${inputClass} min-h-40 text-base`}

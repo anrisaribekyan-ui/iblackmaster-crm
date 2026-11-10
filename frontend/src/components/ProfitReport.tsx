@@ -208,7 +208,7 @@ export default function ProfitReport({ range, locationId, filenameBase }: { rang
 
           <div className="overflow-x-auto rounded-xl border border-line bg-surface">
             <table className="w-full text-left text-sm">
-              <thead className="bg-canvas text-xs text-muted">
+              <thead className="bg-head">
                 <tr>
                   <th className="px-3 py-2 font-medium">Период</th>
                   {['Выручка', 'Себестоимость', 'Валовая', 'Зарплата', 'Комиссия', 'Расходы', 'Налог', 'Пост. расходы', 'Доли', 'Чистая', '%'].map((h) => (
@@ -264,7 +264,7 @@ function Line({ label, value, hint, strong }: { label: string; value: string; hi
 function TableRow({ row, name }: { row: ProfitRow; name: string }) {
   const cell = 'num whitespace-nowrap px-3 py-2 text-right'
   return (
-    <tr className="border-t border-line">
+    <tr className="border-t border-line-soft">
       <td className="whitespace-nowrap px-3 py-2">{name}</td>
       <td className={cell}>{rub(row.revenue)}</td>
       <td className={cell}>{rub(row.cost)}</td>

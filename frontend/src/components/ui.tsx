@@ -83,11 +83,11 @@ export type TabItem = { key: string; label: string; count?: number | null; onEdi
 /** Вкладки с подчёркиванием и счётчиками. На узком экране прокручиваются пальцем. */
 export function Tabs({ items, value, onChange, label, after }: { items: TabItem[]; value: string; onChange: (key: string) => void; label: string; after?: ReactNode }) {
   return (
-    <nav aria-label={label} className="flex items-end gap-0.5 overflow-x-auto border-b border-line">
+    <nav aria-label={label} className="flex items-end gap-0.5 overflow-x-auto tab-line">
       {items.map((item) => {
         const on = item.key === value
         return (
-          <span key={item.key} className={`-mb-px flex shrink-0 items-center border-b-2 ${on ? 'border-accent' : 'border-transparent'}`}>
+          <span key={item.key} className={`flex shrink-0 items-center border-b-2 ${on ? 'border-accent' : 'border-transparent'}`}>
             <button
               type="button"
               aria-current={on ? 'page' : undefined}

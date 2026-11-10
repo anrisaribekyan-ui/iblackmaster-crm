@@ -37,11 +37,11 @@ export default function Modal({
       <section
         aria-labelledby="modal-title"
         aria-modal="true"
-        className={`modal-panel flex h-dvh w-full flex-col bg-surface sm:h-auto sm:max-h-[90vh] ${wide ? 'sm:max-w-3xl' : 'sm:max-w-lg'} sm:rounded-xl sm:border sm:border-line sm:shadow-xl`}
+        className={`modal-panel flex h-dvh w-full flex-col bg-surface sm:h-auto sm:max-h-[90vh] ${wide ? 'sm:max-w-3xl' : 'sm:max-w-lg'} sm:rounded-2xl sm:border sm:border-line sm:shadow-[var(--shadow-pop)]`}
         role="dialog"
       >
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line py-2 pl-5 pr-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:py-3 sm:pt-3">
-          <h2 id="modal-title" className="text-lg font-semibold">{title}</h2>
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line-soft py-2 pl-5 pr-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:py-3 sm:pt-3">
+          <h2 id="modal-title" className="text-lg font-bold leading-tight">{title}</h2>
           <button type="button" onClick={onClose} aria-label="Закрыть" className="grid h-10 w-10 place-items-center rounded-md text-2xl leading-none text-muted hover:bg-canvas hover:text-ink">
             ×
           </button>

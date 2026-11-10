@@ -362,7 +362,7 @@ export default function OrdersPage() {
           items={tabItems}
           value={currentTab}
           onChange={(key) => setParam('tab', key)}
-          after={<button aria-label="Добавить свою вкладку" title="Своя вкладка: выберите нужные статусы" className="-mb-px grid h-10 w-9 shrink-0 place-items-center text-accent hover:text-accent-hover md:h-[38px]" onClick={() => setTabEditor({ id: `c_${Date.now()}`, name: '', statusIds: [] })}><Icon name="plus" className="h-4 w-4" /></button>}
+          after={<button aria-label="Добавить свою вкладку" title="Своя вкладка: выберите нужные статусы" className="grid h-10 w-9 shrink-0 place-items-center text-accent hover:text-accent-hover md:h-[38px]" onClick={() => setTabEditor({ id: `c_${Date.now()}`, name: '', statusIds: [] })}><Icon name="plus" className="h-4 w-4" /></button>}
         />
       </div>
       {tabEditor && (

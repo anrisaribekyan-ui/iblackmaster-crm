@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { confirmDialog } from '../../components/dialogs'
 import PhoneInput from '../../components/PhoneInput'
 import { api, ApiError, setToken } from '../../api/client'
 import { useAuth } from '../../auth'
@@ -150,12 +151,12 @@ export default function StaffPage() {
   }
 
   const deactivate = async (employee: Employee) => {
-    if (!confirm(`Отключить сотрудника «${employee.short_name}»?`)) return
+    if (!(await confirmDialog(`Отключить сотрудника «${employee.short_name}»?`))) return
     await mutate(() => api.del(`/employees/${employee.id}`), 'Не удалось отключить сотрудника')
   }
 
   const removeRole = async (role: Role) => {
-    if (!confirm(`Удалить роль «${role.name}»?`)) return
+    if (!(await confirmDialog(`Удалить роль «${role.name}»?`))) return
     await mutate(() => api.del(`/roles/${role.id}`), 'Не удалось удалить роль')
   }
 
@@ -165,25 +166,25 @@ export default function StaffPage() {
   return (
     <section>
       <h2 className="mb-4 text-lg font-semibold">Сотрудники и роли</h2>
-      <div className="mb-4 flex gap-1 border-b border-line">
+      <div className="mb-4 flex gap-1 tab-line">
         {(['employees', 'roles'] as const).map((item) => (
           <button
             key={item}
-            className={`-mb-px h-10 border-b-2 px-3 ${tab === item ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`}
+            className={`h-10 border-b-2 px-3 ${tab === item ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`}
             onClick={() => setTab(item)}
           >
             {item === 'employees' ? 'Сотрудники' : 'Роли'}
           </button>
         ))}
       </div>
-      {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="mb-4 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
       {loading ? (
         <Skeleton />
       ) : tab === 'employees' ? (
         <section>
           {can('settingAccess') && (
             <div className="mb-3 flex justify-end">
-              <button className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" onClick={() => setEditor({ kind: 'employee' })}>
+              <button className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink" onClick={() => setEditor({ kind: 'employee' })}>
                 Добавить сотрудника
               </button>
             </div>
@@ -193,7 +194,7 @@ export default function StaffPage() {
           ) : (
             <div className="overflow-x-auto rounded-xl border border-line bg-surface">
               <table className="w-full text-left">
-                <thead className="bg-canvas text-sm text-muted">
+                <thead className="bg-head">
                   <tr>
                     <th className="px-3 py-2 font-medium">Имя</th>
                     <th className="hidden px-3 py-2 font-medium md:table-cell">Email</th>
@@ -205,7 +206,7 @@ export default function StaffPage() {
                 </thead>
                 <tbody>
                   {employees.map((employee) => (
-                    <tr key={employee.id} className={`border-t border-line ${can('settingAccess') ? 'cursor-pointer' : ''} ${employee.is_active ? '' : 'text-muted'}`} onClick={(e) => { if (can('settingAccess') && !(e.target as HTMLElement).closest('button')) setEditor({ kind: 'employee', employee }) }}>
+                    <tr key={employee.id} className={`border-t border-line-soft ${can('settingAccess') ? 'cursor-pointer' : ''} ${employee.is_active ? '' : 'text-muted'}`} onClick={(e) => { if (can('settingAccess') && !(e.target as HTMLElement).closest('button')) setEditor({ kind: 'employee', employee }) }}>
                       <td className="px-3 py-2">{employee.short_name}{employee.is_owner && <small className="ml-1 text-muted">владелец</small>}</td>
                       <td className="hidden px-3 py-2 md:table-cell">{employee.email}</td>
                       <td className="px-3 py-2">{roleNames.get(employee.role_id) ?? '—'}</td>
@@ -234,7 +235,7 @@ export default function StaffPage() {
         <section>
           {can('settingAccess') && (
             <div className="mb-3 flex justify-end">
-              <button className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" onClick={() => setEditingRole(null)}>Добавить роль</button>
+              <button className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink" onClick={() => setEditingRole(null)}>Добавить роль</button>
             </div>
           )}
           {roles.length === 0 ? (
@@ -283,7 +284,7 @@ export default function StaffPage() {
             {error && <p role="alert" className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
               <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => setEditor(null)}>Отмена</button>
-              <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">Сохранить</button>
+              <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">Сохранить</button>
             </div>
           </form>
         </Modal>
@@ -365,7 +366,7 @@ function EmployeeForm({
         <div className="flex flex-wrap items-center justify-end gap-2 sm:col-span-2">
           {onPassword && <button type="button" className="mr-auto rounded-md border border-line px-3 py-2" onClick={onPassword}>Сменить пароль</button>}
           <button type="button" className="rounded-md border border-line px-3 py-2" onClick={onClose}>Отмена</button>
-          <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
+          <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
         </div>
       </form>
     </Modal>
@@ -473,7 +474,7 @@ function RoleForm({
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2">
           <button type="button" className="rounded-md border border-line px-3 py-2" onClick={onClose}>Отмена</button>
-          <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
+          <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
         </div>
       </form>
     </Modal>

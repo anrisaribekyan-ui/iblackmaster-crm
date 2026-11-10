@@ -84,7 +84,7 @@ function Editor({ item, onClose, onSaved }: { item: Partial<QuickOrder> | null; 
           <label className="ml-auto flex items-center gap-2 text-sm text-muted">Порядок <input name="sort" type="number" className="w-20 rounded-md border border-line px-2 py-1" defaultValue={item?.sort ?? 0} /></label>
         </div>
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
-        <button disabled={saving} className="rounded-md bg-accent px-4 py-2.5 font-medium text-accent-ink disabled:opacity-60">{saving ? 'Сохраняю…' : 'Сохранить'}</button>
+        <button disabled={saving} className="rounded-md bg-accent font-semibold px-4 py-2.5 text-accent-ink disabled:opacity-60">{saving ? 'Сохраняю…' : 'Сохранить'}</button>
       </form>
     </Modal>
   )
@@ -135,9 +135,9 @@ export default function QuickOrdersPage() {
           <h2 className="text-lg font-semibold">Быстрые заказы</h2>
           <p className="text-sm text-muted">Частый ремонт — одна кнопка на приёмке: устройство, неисправность, цена и работы заполняются сами.</p>
         </div>
-        <button type="button" onClick={() => setEditing(null)} className="rounded-md bg-accent px-4 py-2 text-accent-ink">Добавить</button>
+        <button type="button" onClick={() => setEditing(null)} className="rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink">Добавить</button>
       </header>
-      {error && <p role="alert" className="rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
 
       {items.length === 0 ? (
         <p className="rounded-xl border border-line bg-surface p-5 text-muted">Пока нет ни одного. Начните с подсказок ниже — это ваши самые частые ремонты.</p>

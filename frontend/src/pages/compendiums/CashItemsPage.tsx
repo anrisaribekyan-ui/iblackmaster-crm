@@ -1,4 +1,6 @@
+import Skeleton from '../../components/Skeleton'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { confirmDialog } from '../../components/dialogs'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
@@ -63,7 +65,7 @@ export default function CashItemsPage() {
   }
 
   const remove = async (item: CashItem) => {
-    if (!confirm(`Архивировать статью «${item.name}»?`)) return
+    if (!(await confirmDialog(`Архивировать статью «${item.name}»?`))) return
     setError('')
     try {
       await api.del(`/cash-items/${item.id}`)
@@ -77,11 +79,11 @@ export default function CashItemsPage() {
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Статьи движения денег</h2>
-        {canEdit && <button className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" onClick={() => { setError(''); setEditor(null) }}>Добавить статью</button>}
+        {canEdit && <button className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink" onClick={() => { setError(''); setEditor(null) }}>Добавить статью</button>}
       </div>
-      {error && <p role="alert" className="mb-3 rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="mb-3 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка статей…</p>
+        <Skeleton rows={4} />
       ) : items === null ? (
         <p className="text-muted">Не удалось загрузить статьи.</p>
       ) : items.length === 0 ? (
@@ -140,7 +142,7 @@ export default function CashItemsPage() {
             {error && <p role="alert" className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
               <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => setEditor(undefined)}>Отмена</button>
-              <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
+              <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
             </div>
           </form>
         </Modal>

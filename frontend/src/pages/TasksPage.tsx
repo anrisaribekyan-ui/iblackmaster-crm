@@ -1,4 +1,6 @@
+import Skeleton from '../components/Skeleton'
 import { useCallback, useEffect, useState } from 'react'
+import { confirmDialog } from '../components/dialogs'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../auth'
@@ -76,7 +78,7 @@ export default function TasksPage() {
   }
 
   const remove = async (task: Task) => {
-    if (!confirm(`Удалить задачу «${task.title}»?`)) return
+    if (!(await confirmDialog(`Удалить задачу «${task.title}»?`))) return
     setError('')
     try {
       await api.del(`/tasks/${task.id}`)
@@ -100,7 +102,7 @@ export default function TasksPage() {
     <section>
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-[22px] font-bold leading-tight md:text-[26px]">Задачи</h1>
-        {canCreate && <button className="rounded-md bg-accent px-4 py-2 font-medium text-accent-ink" onClick={() => setCreating(true)}>Новая задача</button>}
+        {canCreate && <button className="rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink" onClick={() => setCreating(true)}>Новая задача</button>}
       </header>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -122,7 +124,7 @@ export default function TasksPage() {
 
       {error && <p role="alert" className="mb-3 text-danger">{error}</p>}
       {loading ? (
-        <p className="text-muted">Загрузка задач…</p>
+        <Skeleton rows={4} />
       ) : data === null ? (
         <p className="text-muted">Список задач недоступен.</p>
       ) : data.items.length === 0 ? (
@@ -130,7 +132,7 @@ export default function TasksPage() {
       ) : (
         <div className="overflow-x-auto rounded-xl border border-line bg-surface">
           <table className="w-full text-left text-sm">
-            <thead className="bg-canvas text-xs text-muted">
+            <thead className="bg-head">
               <tr>
                 <th className="w-10 px-3 py-2" />
                 <th className="px-3 py-2 font-medium">Задача</th>
@@ -144,7 +146,7 @@ export default function TasksPage() {
               {data.items.map((task) => {
                 const overdue = !task.is_done && task.deadline && new Date(task.deadline).getTime() < Date.now()
                 return (
-                  <tr key={task.id} className="border-t border-line">
+                  <tr key={task.id} className="border-t border-line-soft">
                     <td className="px-3 py-2">
                       <input type="checkbox" checked={task.is_done} onChange={() => void toggle(task)} aria-label="Выполнено" />
                     </td>

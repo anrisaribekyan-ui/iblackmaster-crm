@@ -58,7 +58,7 @@ export default function ForgottenSettings() {
         <span className="text-xs">Те же переменные, что в шаблонах, плюс {'{дней}'} — сколько дней аппарат ждёт.</span>
       </label>
       <div className="mt-3 flex items-center gap-3">
-        <button type="button" onClick={() => void save()} className="rounded-md bg-accent px-4 py-2 text-accent-ink">Сохранить</button>
+        <button type="button" onClick={() => void save()} className="rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink">Сохранить</button>
         {saved && <span className="text-sm text-success">{saved}</span>}
         {error && <span role="alert" className="text-sm text-danger">{error}</span>}
       </div>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { confirmDialog } from '../../components/dialogs'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
@@ -131,7 +132,7 @@ export default function OrderTypesPage() {
   }
 
   const archiveType = async (orderType: OrderType) => {
-    if (!confirm(`Архивировать тип заказа «${orderType.name}»?`)) return
+    if (!(await confirmDialog(`Архивировать тип заказа «${orderType.name}»?`))) return
     setSaving(true)
     setError('')
     try {
@@ -214,7 +215,7 @@ export default function OrderTypesPage() {
   return (
     <section>
       <h2 className="mb-4 text-lg font-semibold">Типы заказов и форма</h2>
-      {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="mb-4 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
       {loading ? (
         <Skeleton />
       ) : types === null ? (
@@ -250,14 +251,14 @@ export default function OrderTypesPage() {
               {can('settingAccess') && selectedTypeId !== null && fields && (
                 <span className="flex gap-2">
                   <button className="rounded-md border border-line px-3 py-2" onClick={addField}>+ поле</button>
-                  <button disabled={saving} className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink disabled:opacity-60" onClick={() => void saveFields()}>
+                  <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60" onClick={() => void saveFields()}>
                     {saving ? 'Сохранение…' : 'Сохранить форму'}
                   </button>
                 </span>
               )}
             </header>
             {fieldsLoading ? (
-              <p className="text-muted">Загрузка полей…</p>
+              <Skeleton rows={4} />
             ) : selectedTypeId === null ? (
               <p className="text-muted">Выберите тип заказа или добавьте новый.</p>
             ) : fields === null ? (
@@ -273,7 +274,7 @@ export default function OrderTypesPage() {
                     <h4 className="mb-2 font-medium">{groups[group]}</h4>
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-[850px] text-left text-sm">
-                        <thead className="bg-canvas text-muted">
+                        <thead className="bg-head">
                           <tr>
                             <th className="px-2 py-2">Метка</th>
                             <th className="px-2 py-2">Тип данных</th>
@@ -286,7 +287,7 @@ export default function OrderTypesPage() {
                         </thead>
                         <tbody>
                           {groupItems.map((field, index) => (
-                            <tr key={field.id ?? `custom-${index}`} className="border-t border-line">
+                            <tr key={field.id ?? `custom-${index}`} className="border-t border-line-soft">
                               <td className="px-2 py-2"><input className={`${inputClass} w-44`} value={field.label} onChange={(event) => updateField(field, { label: event.target.value })} /></td>
                               <td className="px-2 py-2">
                                 <select className={inputClass} value={field.data_type} onChange={(event) => updateField(field, { data_type: event.target.value as DataType })}>
@@ -327,7 +328,7 @@ export default function OrderTypesPage() {
             {error && <p role="alert" className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
               <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => setTypeEditor(undefined)}>Отмена</button>
-              <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
+              <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
             </div>
           </form>
         </Modal>

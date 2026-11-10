@@ -151,7 +151,7 @@ export default function RemainsPage() {
         </ul>
         <div className="hidden overflow-x-auto rounded-xl border border-line bg-surface md:block">
           <table className="w-full text-left text-sm">
-            <thead className="bg-canvas text-xs text-muted">
+            <thead className="bg-head">
               <tr>
                 <th className="px-3 py-2 font-medium">Код</th>
                 <th className="px-3 py-2 font-medium">Товар</th>
@@ -163,7 +163,7 @@ export default function RemainsPage() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={`${r.store_id}-${r.nomenclature_id}`} className="cursor-pointer border-t border-line hover:bg-canvas" onClick={() => open(r.nomenclature_id)}>
+                <tr key={`${r.store_id}-${r.nomenclature_id}`} className="cursor-pointer border-t border-line-soft hover:bg-canvas" onClick={() => open(r.nomenclature_id)}>
                   <td className="px-3 py-2 num text-muted">{r.code}</td>
                   <td className="px-3 py-2">
                     {r.name}{r.article && <small className="ml-2 text-muted">{r.article}</small>}

@@ -36,7 +36,7 @@ export default function ChartCard({ title, subtitle, children, table, action, cl
             </thead>
             <tbody>
               {table.rows.map((row, ri) => (
-                <tr key={ri} className="border-t border-line">
+                <tr key={ri} className="border-t border-line-soft">
                   {row.map((cell, ci) => <td key={ci} className={`py-1.5 ${ci ? 'num text-right' : ''}`}>{cell}</td>)}
                 </tr>
               ))}

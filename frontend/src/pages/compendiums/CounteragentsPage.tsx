@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { confirmDialog } from '../../components/dialogs'
 import PhoneInput from '../../components/PhoneInput'
 import { useRowLink } from '../../components/rowLink'
 import { Link } from 'react-router-dom'
@@ -145,7 +146,7 @@ export default function CounteragentsPage() {
   }
 
   const remove = async (item: Counteragent) => {
-    if (!confirm(`Удалить контрагента «${item.name}»?`)) return
+    if (!(await confirmDialog(`Удалить контрагента «${item.name}»?`))) return
     setError('')
     try {
       await api.del(`/counteragents/${item.id}`)
@@ -200,14 +201,14 @@ export default function CounteragentsPage() {
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Контрагенты</h2>
-        {canEdit && <button className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" onClick={() => setEditor(null)}>Добавить контрагента</button>}
+        {canEdit && <button className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink" onClick={() => setEditor(null)}>Добавить контрагента</button>}
       </div>
       <form className="mb-3 flex gap-2" onSubmit={(event) => { event.preventDefault(); setPage(1); void load(search, 1) }}>
         <input className={`${inputClass} max-w-sm`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Имя или телефон" />
         <button className="rounded-md border border-line bg-surface px-3 py-2">Найти</button>
         <button type="button" className="rounded-md border border-line bg-surface px-3 py-2" onClick={() => void exportCsv()}>Скачать CSV</button>
       </form>
-      {error && <p role="alert" className="mb-3 rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="mb-3 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
       {loading ? (
         <Skeleton />
       ) : data === null ? (
@@ -218,7 +219,7 @@ export default function CounteragentsPage() {
         <>
           <div className="overflow-x-auto rounded-xl border border-line bg-surface">
             <table className="w-full text-left text-sm">
-              <thead className="bg-canvas text-muted">
+              <thead className="bg-head">
                 <tr>
                   <th className="px-3 py-2 font-medium">Имя</th>
                   <th className="hidden px-3 py-2 font-medium md:table-cell">Телефоны</th>
@@ -229,7 +230,7 @@ export default function CounteragentsPage() {
               </thead>
               <tbody>
                 {data.items.map((item) => (
-                  <tr key={item.id} className="group cursor-pointer border-t border-line" onClick={(e) => { if (!(e.target as HTMLElement).closest('button')) void openCard(item) }}>
+                  <tr key={item.id} className="group cursor-pointer border-t border-line-soft" onClick={(e) => { if (!(e.target as HTMLElement).closest('button')) void openCard(item) }}>
                     <td className="px-3 py-2"><button className="text-left font-medium hover:underline" onClick={() => void openCard(item)}>{item.name}</button>{item.is_vendor && <small className="ml-2 text-muted">поставщик</small>}</td>
                     <td className="hidden px-3 py-2 md:table-cell">{formatPhoneList(item.phones) || '—'}</td>
                     <td className="hidden px-3 py-2 md:table-cell">{typeNames.get(item.type_id ?? -1) ?? '—'}</td>
@@ -287,7 +288,7 @@ export default function CounteragentsPage() {
             {error && <p role="alert" className="text-sm text-danger sm:col-span-2">{error}</p>}
             <div className="flex justify-end gap-2 sm:col-span-2">
               <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => setEditor(undefined)}>Отмена</button>
-              <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
+              <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
             </div>
           </form>
         </Modal>
@@ -338,9 +339,9 @@ function CounteragentCard({ item, onClose }: { item: Counteragent; onClose: () =
             {details.note && <div className="sm:col-span-2"><dt className="text-sm text-muted">Примечание</dt><dd className="whitespace-pre-wrap">{details.note}</dd></div>}
           </dl>
 
-          <nav className="mt-4 flex gap-1 border-b border-line">
+          <nav className="mt-4 flex gap-1 tab-line">
             {([['orders', 'Заказы'], ['sales', 'Продажи'], ['transactions', 'Платежи']] as [HistoryTab, string][]).map(([key, label]) => (
-              <button key={key} className={`-mb-px h-10 border-b-2 px-3 ${tab === key ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab(key)}>
+              <button key={key} className={`h-10 border-b-2 px-3 ${tab === key ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab(key)}>
                 {label}
               </button>
             ))}

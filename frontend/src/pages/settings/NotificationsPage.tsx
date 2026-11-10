@@ -157,7 +157,7 @@ export default function NotificationsPage() {
   return (
     <section className="space-y-6">
       <h2 className="text-lg font-semibold">Уведомления клиентам</h2>
-      {error && <p role="alert" className="rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
       {loading ? <Skeleton /> : (
         <>
           {status && (
@@ -214,7 +214,7 @@ export default function NotificationsPage() {
               <input value={testPhone} onChange={(e) => setTestPhone(e.target.value)} placeholder="+7 900 000-00-00"
                 inputMode="tel" className={`${field} max-w-xs`} />
               <button onClick={sendTest} disabled={testPhone.replace(/\D/g, '').length < 10}
-                className="rounded-md bg-accent px-4 py-2 text-accent-ink disabled:opacity-50">Отправить тестовое SMS</button>
+                className="rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink disabled:opacity-50">Отправить тестовое SMS</button>
             </div>
             {testMsg && <p className="mt-2 text-sm text-muted">{testMsg}</p>}
           </div>
@@ -224,13 +224,13 @@ export default function NotificationsPage() {
             {journal.items.length === 0 ? <p className="text-sm text-muted">Пока ни одного сообщения.</p> : (
               <div className="overflow-x-auto rounded-xl border border-line">
                 <table className="w-full text-sm">
-                  <thead className="bg-canvas text-left text-muted">
+                  <thead className="bg-head text-left">
                     <tr><th className="px-3 py-2">Когда</th><th className="px-3 py-2">Заказ</th><th className="px-3 py-2">Телефон</th>
                       <th className="px-3 py-2">Текст</th><th className="px-3 py-2">Состояние</th></tr>
                   </thead>
                   <tbody>
                     {journal.items.map((i) => (
-                      <tr key={i.id} {...(i.order_id ? rowLink(`/orders/${i.order_id}`) : {})} className={`border-t border-line align-top ${i.order_id ? 'cursor-pointer hover:bg-canvas' : ''}`}>
+                      <tr key={i.id} {...(i.order_id ? rowLink(`/orders/${i.order_id}`) : {})} className={`border-t border-line-soft align-top ${i.order_id ? 'cursor-pointer hover:bg-canvas' : ''}`}>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums">{formatDateTime(i.sent_at ?? i.created_at)}</td>
                         <td className="px-3 py-2">{i.order_id ? <a className="text-accent" href={`/orders/${i.order_id}`}>{i.order_number}</a> : i.kind === 'test' ? 'тест' : '—'}</td>
                         <td className="whitespace-nowrap px-3 py-2 tabular-nums">{i.phone}</td>

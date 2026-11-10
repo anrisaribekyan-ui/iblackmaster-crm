@@ -1,3 +1,4 @@
+import { confirmDialog } from '../components/dialogs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../auth'
@@ -152,7 +153,7 @@ function ReportModal({ report, onClose }: { report: PhoneReport; onClose: () => 
     + (report.warnings.length ? `<h2>Рекомендации</h2>${report.warnings.map((w) => `<p>• ${escapeHtml(w)}</p>`).join('')}` : '<p class="muted">Замечаний нет.</p>'))
   return (
     <Modal title="Отчёт о телефоне" onClose={onClose}>
-      <table className="w-full text-sm"><tbody>{rows.map(([k, v]) => <tr key={k} className="border-t border-line first:border-0"><td className="py-1.5 text-muted">{k}</td><td className="py-1.5 text-right">{v}</td></tr>)}</tbody></table>
+      <table className="w-full text-sm"><tbody>{rows.map(([k, v]) => <tr key={k} className="border-t border-line-soft first:border-0"><td className="py-1.5 text-muted">{k}</td><td className="py-1.5 text-right">{v}</td></tr>)}</tbody></table>
       {report.warnings.map((w) => <p key={w} className="mt-2 rounded-lg bg-warning/10 p-2 text-sm">{w}</p>)}
       <div className="mt-4 flex justify-end gap-2"><button className="rounded-md border border-line px-3 py-2" onClick={print}>Распечатать</button><button className="rounded-md bg-ink px-3 py-2 text-white" onClick={onClose}>Закрыть</button></div>
     </Modal>
@@ -676,7 +677,7 @@ export default function AppInstallPage() {
   }
 
   const clearHistory = async () => {
-    if (!confirm('Стереть завершённые задачи? Текущие останутся.')) return
+    if (!(await confirmDialog('Стереть завершённые задачи? Текущие останутся.'))) return
     try {
       await api.del('/app-install/jobs')
       await loadJobs()
@@ -686,7 +687,7 @@ export default function AppInstallPage() {
   }
 
   const regenerate = async () => {
-    if (!station || !confirm(`Выдать станции «${station.name}» новый код? Старый перестанет работать.`)) return
+    if (!station || !(await confirmDialog(`Выдать станции «${station.name}» новый код? Старый перестанет работать.`))) return
     try {
       const r = await api.post<{ token: string }>(`/app-install/stations/${station.id}/token`)
       setReissue({ stationId: station.id, name: station.name, token: r.token })
@@ -696,7 +697,7 @@ export default function AppInstallPage() {
   }
 
   const removeStation = async () => {
-    if (!station || !confirm(`Удалить станцию «${station.name}»?`)) return
+    if (!station || !(await confirmDialog(`Удалить станцию «${station.name}»?`))) return
     try {
       await api.del(`/app-install/stations/${station.id}`)
       await refresh()
@@ -742,7 +743,7 @@ export default function AppInstallPage() {
             <li>Подключить айфон кабелем и нажать на нём «Доверять».</li>
           </ol>
           {manage
-            ? <button className="justify-self-start rounded-md bg-accent px-4 py-2 text-sm font-medium text-accent-ink" onClick={() => setModal('station')}>Подключить компьютер</button>
+            ? <button className="justify-self-start rounded-md bg-accent font-semibold px-4 py-2 text-sm text-accent-ink" onClick={() => setModal('station')}>Подключить компьютер</button>
             : <p className="text-sm text-warning">Подключать компьютеры может руководитель или сотрудник с правом «Может добавлять станции».</p>}
         </section>
       ) : (

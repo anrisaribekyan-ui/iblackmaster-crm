@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { confirmDialog } from '../../components/dialogs'
 import { api, getToken } from '../../api/client'
 
 type Result = {
@@ -38,7 +39,7 @@ export default function LiveskladImportPage() {
 
   const start = async (commit: boolean) => {
     if (!file) return
-    if (commit && !confirm('Записать заказы в базу? Заказы Панфиловского не будут изменены, у Ленты и «1000 мелочей» обновятся и добавятся.')) return
+    if (commit && !(await confirmDialog('Записать заказы в базу? Заказы Панфиловского не будут изменены, у Ленты и «1000 мелочей» обновятся и добавятся.'))) return
     setError('')
     setResult(null)
     setJob(null)
@@ -69,7 +70,7 @@ export default function LiveskladImportPage() {
         <button type="button" disabled={!file || running} className="rounded-md border border-line px-3 py-2 disabled:opacity-50" onClick={() => void start(false)}>
           Пробный прогон
         </button>
-        <button type="button" disabled={!file || running} className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink disabled:opacity-50" onClick={() => void start(true)}>
+        <button type="button" disabled={!file || running} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-50" onClick={() => void start(true)}>
           Записать в базу
         </button>
       </div>

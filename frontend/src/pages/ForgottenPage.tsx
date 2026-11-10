@@ -82,7 +82,7 @@ export default function ForgottenPage() {
         </div>
       </div>
 
-      {error && <p role="alert" className="mb-3 rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="mb-3 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
       {data && (
         <>
           <div className="mb-4 grid grid-cols-2 gap-3 sm:max-w-md">

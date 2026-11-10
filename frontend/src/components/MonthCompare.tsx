@@ -67,7 +67,7 @@ export default function MonthCompare({ locationId }: { locationId?: string }) {
                 const pct = b !== 0 ? Math.round((diff / Math.abs(b)) * 100) : null
                 const fmt = (v: number) => (mt.money ? (v < 0 ? `−${rub(-v)}` : rub(v)) : String(v))
                 return (
-                  <tr key={mt.key} className="border-t border-line">
+                  <tr key={mt.key} className="border-t border-line-soft">
                     <td className="py-1.5">{mt.label}</td>
                     <td className="py-1.5 text-right num">{fmt(a)}</td>
                     <td className="py-1.5 text-right num text-muted">{fmt(b)}</td>

@@ -135,7 +135,7 @@ export default function OrderChecklistCard({
               <SignaturePad onChange={setSignature} />
               {error && <p role="alert" className="text-sm text-danger">{error}</p>}
               <button type="button" disabled={saving} onClick={() => void save()}
-                className="rounded-md bg-accent px-4 py-2.5 font-medium text-accent-ink disabled:opacity-60">{saving ? 'Сохраняю…' : 'Сохранить'}</button>
+                className="rounded-md bg-accent font-semibold px-4 py-2.5 text-accent-ink disabled:opacity-60">{saving ? 'Сохраняю…' : 'Сохранить'}</button>
             </div>
           )}
         </Modal>

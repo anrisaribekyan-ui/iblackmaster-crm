@@ -81,7 +81,7 @@ export default function TaskForm({
         {error && <p className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2">
           <button type="button" className="rounded-md border border-line px-3 py-2" onClick={onClose}>Отмена</button>
-          <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : submitLabel}</button>
+          <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : submitLabel}</button>
         </div>
       </form>
     </Modal>

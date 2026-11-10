@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { confirmDialog, promptDialog } from '../components/dialogs'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api/client'
 import { formatPhone, isoToLocalInput, localInputToIso } from '../format'
@@ -338,10 +339,10 @@ export default function OrderDetailPage() {
     )
   }
 
-  const selectStatus = (statusId: string) => {
+  const selectStatus = async (statusId: string) => {
     const status = statusGroups.flatMap((group) => group.statuses).find((item) => item.id === Number(statusId))
     if (!status) return
-    const commentText = askStatusComment(status)
+    const commentText = await askStatusComment(status)
     if (commentText === null) return
     void changeStatus(status, commentText)
   }
@@ -354,9 +355,9 @@ export default function OrderDetailPage() {
   const getFirstClosedStatus = () =>
     statusGroups.find((group) => group.group === 'closed')?.statuses[0]
 
-  const askStatusComment = (status: Status): string | null => {
+  const askStatusComment = async (status: Status): Promise<string | null> => {
     if (status.comment_mode === 'none') return ''
-    const commentText = prompt(status.comment_mode === 'required' ? 'Укажите обязательный комментарий' : 'Комментарий к смене статуса (необязательно)')
+    const commentText = await promptDialog(status.comment_mode === 'required' ? 'Укажите обязательный комментарий' : 'Комментарий к смене статуса (необязательно)', '', { required: status.comment_mode === 'required' })
     if (commentText === null || status.comment_mode === 'required' && !commentText.trim()) return null
     return commentText
   }
@@ -405,14 +406,14 @@ export default function OrderDetailPage() {
     }
   }
 
-  const giveOrder = () => {
+  const giveOrder = async () => {
     if (!detail) return
     const status = getFirstClosedStatus()
     if (!status) {
       setError('Не настроен статус выдачи заказа')
       return
     }
-    const commentText = askStatusComment(status)
+    const commentText = await askStatusComment(status)
     if (commentText === null) return
     if (Number(detail.debt) > 0) {
       setPrepayMode(false)
@@ -662,7 +663,7 @@ export default function OrderDetailPage() {
   }
 
   const removePosition = async (position: Position) => {
-    if (!detail || !confirm(`Удалить «${position.name}» из заказа?`)) return
+    if (!detail || !(await confirmDialog(`Удалить «${position.name}» из заказа?`))) return
     await run(() => api.del(`/orders/${detail.order.id}/positions/${position.id}`), 'Не удалось удалить позицию')
   }
 
@@ -691,7 +692,7 @@ export default function OrderDetailPage() {
       <header className="mb-4 overflow-hidden rounded-2xl bg-rail text-white">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 sm:px-5">
           <Link className="text-sm text-white/50 transition-colors hover:text-white" to="/orders">← Заказы</Link>
-          <span className="flex flex-wrap justify-end gap-1.5">
+          <span className="flex flex-wrap justify-end gap-1.5 max-md:-mx-2 max-md:w-full max-md:justify-start">
             <HeaderMenu label="Печать">{(close) => (<>
                 <button role="menuitem" className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => { close(); printForm('receipt') }}>Квитанция о приёме</button>
                 <button role="menuitem" className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => { close(); printForm('checklist') }}>Проверка неисправностей</button>
@@ -709,9 +710,9 @@ export default function OrderDetailPage() {
                 value={detail.order.location_id}
                 onChange={(event) => {
                   const target = locations.find((location) => location.id === Number(event.target.value))
-                  if (target && confirm(`Передать заказ в «${target.name}»?`)) {
-                    void run(() => api.put(`/orders/${detail.order.id}`, { location_id: target.id }), 'Не удалось передать заказ')
-                  }
+                  if (target) void confirmDialog(`Передать заказ в «${target.name}»?`, { ok: 'Передать' }).then((ok) => {
+                    if (ok) void run(() => api.put(`/orders/${detail.order.id}`, { location_id: target.id }), 'Не удалось передать заказ')
+                  })
                 }}
               >
                 {locations.map((location) => <option key={location.id} value={location.id} className="text-ink">{location.name.replace(/^iBlackMaster \((.*)\)$/, '$1')}</option>)}
@@ -738,7 +739,7 @@ export default function OrderDetailPage() {
                   aria-label="Статус заказа"
                   className="dark-select w-auto rounded-full border-0 bg-white/10 py-1.5 pl-7 pr-8 font-medium text-white"
                   value={detail.status.id}
-                  onChange={(event) => selectStatus(event.target.value)}
+                  onChange={(event) => void selectStatus(event.target.value)}
                   disabled={isDeleted}
                 >
                   {statusGroups.map((group) => (
@@ -776,7 +777,7 @@ export default function OrderDetailPage() {
               </div>
             )}
             {!isDeleted && detail.status.group !== 'closed' && (
-              <button className="ml-auto h-11 rounded-[10px] bg-accent px-6 text-[15px] font-semibold text-accent-ink md:ml-2" onClick={giveOrder}>Выдать</button>
+              <button className="ml-auto h-11 rounded-[10px] bg-accent px-6 text-[15px] font-semibold text-accent-ink md:ml-2" onClick={() => void giveOrder()}>Выдать</button>
             )}
           </div>
         </div>
@@ -813,12 +814,12 @@ export default function OrderDetailPage() {
           </div>
         </Modal>
       )}
-      {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="mb-4 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0">
-          <nav className="mb-3 flex gap-0.5 border-b border-line">
-            <button aria-current={tab === 'positions' ? 'page' : undefined} className={`-mb-px h-10 border-b-2 px-3 ${tab === 'positions' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('positions')}>Работы и материалы</button>
-            <button aria-current={tab === 'info' ? 'page' : undefined} className={`-mb-px h-10 border-b-2 px-3 ${tab === 'info' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('info')}>Информация</button>
+          <nav className="mb-3 flex gap-0.5 tab-line">
+            <button aria-current={tab === 'positions' ? 'page' : undefined} className={`h-10 border-b-2 px-3 ${tab === 'positions' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('positions')}>Работы и материалы</button>
+            <button aria-current={tab === 'info' ? 'page' : undefined} className={`h-10 border-b-2 px-3 ${tab === 'info' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('info')}>Информация</button>
           </nav>
           {tab === 'info' ? (
             <section className="rounded-xl border border-line bg-surface p-4">
@@ -1042,7 +1043,7 @@ export default function OrderDetailPage() {
                         </label>
                       )}
                       <div className="flex items-end gap-2 sm:col-span-4">
-                        <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">Добавить</button>
+                        <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">Добавить</button>
                         <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => setSelectedItem(null)}>Отмена</button>
                       </div>
                     </form>
@@ -1096,7 +1097,7 @@ export default function OrderDetailPage() {
             <p className="mb-3 text-sm text-muted">Долг: <strong className="text-ink num">{formatMoney(detail.debt)}</strong></p>
             <div className="flex flex-wrap gap-2">
               {can('operationCashRegisterAccess') && !detail.order.is_deleted && <>
-                <button className="rounded-md bg-accent px-3 py-2 text-sm text-accent-ink" onClick={() => openPayment('payment')}>Принять оплату</button>
+                <button className="rounded-md bg-accent font-semibold px-3 py-2 text-sm text-accent-ink" onClick={() => openPayment('payment')}>Принять оплату</button>
                 <button className="rounded-md border border-line px-3 py-2 text-sm" title="Половина — мастеру в зарплату, половина остаётся в кассе" onClick={() => openPayment('tip')}>Чаевые</button>
                 {detail.status.group !== 'closed' && <button className="rounded-md border border-line px-3 py-2 text-sm" onClick={() => openPayment('payment', false, true)}>Внести предоплату</button>}
               </>}
@@ -1249,7 +1250,7 @@ export default function OrderDetailPage() {
             {paymentError && <p role="alert" className="text-sm text-danger">{paymentError}</p>}
             <div className="flex justify-end gap-2">
               <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => { setPaymentMode(null); setCloseAfterPay(false) }}>Отмена</button>
-              {activeRegisters.length > 0 && <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Обработка…' : paymentMode === 'payment' ? 'Оплатить' : paymentMode === 'tip' ? 'Принять чаевые' : 'Вернуть'}</button>}
+              {activeRegisters.length > 0 && <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Обработка…' : paymentMode === 'payment' ? 'Оплатить' : paymentMode === 'tip' ? 'Принять чаевые' : 'Вернуть'}</button>}
             </div>
           </form>
         </Modal>
@@ -1432,7 +1433,7 @@ function VerdictBlock({ initial, disabled, onSave }: { initial: string; disabled
         <div className="mt-2 flex justify-end">
           <button
             disabled={busy}
-            className="rounded-md bg-accent px-3 py-2 text-sm text-accent-ink disabled:opacity-60"
+            className="rounded-md bg-accent font-semibold px-3 py-2 text-sm text-accent-ink disabled:opacity-60"
             onClick={async () => {
               setBusy(true)
               if (await onSave(text.trim())) setSaved(text.trim())
@@ -1542,7 +1543,7 @@ function OrderInfoEditor({
           <div className="sticky bottom-20 z-10 flex items-center justify-end gap-2 rounded-lg border border-accent/40 bg-surface p-2 shadow-lg sm:col-span-2 md:bottom-2">
             <span className="mr-auto text-sm text-muted">Есть несохранённые изменения</span>
             <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => { setValues(saved); setError('') }}>Отменить</button>
-            <button disabled={saving} className="rounded-md bg-accent px-4 py-2 font-medium text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
+            <button disabled={saving} className="rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
           </div>
         )}
       </form>
@@ -1607,7 +1608,7 @@ function PositionModal({ position, canEdit, canViewCost, canEditCost, canViewMar
         {isClosed && <p className="text-sm text-muted">Заказ выдан — позицию можно только смотреть. Чтобы изменить, верните заказ в работу.</p>}
         <div className="flex justify-end gap-2">
           <button type="button" className="rounded-md border border-line px-3 py-2" onClick={onClose}>{canEdit ? 'Отмена' : 'Закрыть'}</button>
-          {canEdit && <button className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60" disabled={saving}>Сохранить</button>}
+          {canEdit && <button className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60" disabled={saving}>Сохранить</button>}
         </div>
       </form>
     </Modal>

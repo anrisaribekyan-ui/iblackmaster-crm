@@ -476,12 +476,12 @@ export default function SalesPage() {
       ) : (
         <div className="overflow-x-auto rounded-xl border border-line bg-surface">
           <table className="w-full text-left text-sm">
-            <thead className="bg-canvas text-xs text-muted">
+            <thead className="bg-head">
               <tr><th className="px-3 py-2 font-medium">Чек</th><th className="px-3 py-2 font-medium">Дата</th><th className="hidden px-3 py-2 font-medium sm:table-cell">Покупатель</th><th className="hidden px-3 py-2 font-medium sm:table-cell">Продавец</th><th className="px-3 py-2 text-right font-medium">Сумма</th><th className="hidden px-3 py-2 text-right font-medium sm:table-cell">Оплачено</th></tr>
             </thead>
             <tbody>
               {history.map((s) => (
-                <tr key={s.id} className="cursor-pointer border-t border-line hover:bg-canvas" onClick={() => void api.get<SaleDetail>(`/sales/${s.id}`).then(setViewing)}>
+                <tr key={s.id} className="cursor-pointer border-t border-line-soft hover:bg-canvas" onClick={() => void api.get<SaleDetail>(`/sales/${s.id}`).then(setViewing)}>
                   <td className="px-3 py-2 font-medium text-accent">{s.number}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{formatDateTime(s.date)}</td>
                   <td className="hidden px-3 py-2 sm:table-cell">{s.counteragent ?? '—'}</td>
@@ -756,7 +756,7 @@ function SaleModal({ sale, registers, canReturn, onClose, onReturned }: {
           {sale.positions.map((p) => {
             const left = Number(p.quantity) - Number(p.returned_quantity)
             return (
-              <tr key={p.id} className="border-t border-line">
+              <tr key={p.id} className="border-t border-line-soft">
                 <td className="py-1.5">{p.name}{Number(p.returned_quantity) > 0 && <small className="block text-muted">возвращено {qty(p.returned_quantity)}</small>}</td>
                 <td className="py-1.5 text-right num">{qty(p.quantity)}</td>
                 <td className="py-1.5 text-right num">{money(p.sold_price)}</td>
@@ -798,7 +798,7 @@ function SaleModal({ sale, registers, canReturn, onClose, onReturned }: {
           {error && <p className="text-sm text-danger">{error}</p>}
           <div className="flex justify-end gap-2">
             <button className="rounded-md border border-line px-3 py-2" onClick={() => setTipping(false)}>Отмена</button>
-            <button className="rounded-md bg-accent px-3 py-2 text-accent-ink" onClick={() => void submitTip()}>Принять чаевые</button>
+            <button className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink" onClick={() => void submitTip()}>Принять чаевые</button>
           </div>
         </div>
       ) : returning ? (
@@ -814,7 +814,7 @@ function SaleModal({ sale, registers, canReturn, onClose, onReturned }: {
           {error && <p className="text-sm text-danger">{error}</p>}
           <div className="flex justify-end gap-2">
             <button className="rounded-md border border-line px-3 py-2" onClick={() => setReturning(false)}>Отмена</button>
-            <button className="rounded-md bg-accent px-3 py-2 text-accent-ink" onClick={() => void submit()}>Оформить возврат</button>
+            <button className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink" onClick={() => void submit()}>Оформить возврат</button>
           </div>
         </div>
       ) : (

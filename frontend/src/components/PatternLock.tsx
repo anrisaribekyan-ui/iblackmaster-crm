@@ -107,7 +107,7 @@ export function PatternLockDialog({ initial, onSave, onClose }: { initial: numbe
       <div className="mt-4 flex gap-2">
         <button type="button" onClick={() => setDots([])} className="rounded-md border border-line px-4 py-2.5">Заново</button>
         <button type="button" disabled={dots.length < 2} onClick={() => onSave(dots)}
-          className="flex-1 rounded-md bg-accent px-4 py-2.5 font-medium text-accent-ink disabled:opacity-50">Сохранить ключ</button>
+          className="flex-1 rounded-md bg-accent font-semibold px-4 py-2.5 text-accent-ink disabled:opacity-50">Сохранить ключ</button>
       </div>
     </Modal>
   )

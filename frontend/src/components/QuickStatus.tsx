@@ -1,3 +1,4 @@
+import { confirmDialog, promptDialog } from './dialogs'
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../auth'
@@ -66,15 +67,15 @@ export default function QuickStatus({ status, groups, disabled, onPick }: Props)
     setOpen((value) => !value)
   }
 
-  const pick = (event: MouseEvent, next: QuickStatusItem) => {
+  const pick = async (event: MouseEvent, next: QuickStatusItem) => {
     event.preventDefault()
     event.stopPropagation()
     setOpen(false)
     if (next.id === status.id) return
-    if ((next as { group?: string }).group === 'closed' && !confirm(`Закрыть заказ со статусом «${next.name}»?`)) return
+    if ((next as { group?: string }).group === 'closed' && !(await confirmDialog(`Закрыть заказ со статусом «${next.name}»?`))) return
     let comment: string | null = ''
     if (next.comment_mode && next.comment_mode !== 'none') {
-      comment = prompt(next.comment_mode === 'required' ? 'Укажите обязательный комментарий' : 'Комментарий к смене статуса (необязательно)')
+      comment = await promptDialog(next.comment_mode === 'required' ? 'Укажите обязательный комментарий' : 'Комментарий к смене статуса (необязательно)', '', { required: next.comment_mode === 'required' })
       if (comment === null || (next.comment_mode === 'required' && !comment.trim())) return
     }
     onPick(next, comment || null)
@@ -94,7 +95,7 @@ export default function QuickStatus({ status, groups, disabled, onPick }: Props)
             className="quick-menu fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overflow-y-auto rounded-t-2xl border border-line bg-surface p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-[var(--shadow-pop)] md:inset-x-auto md:bottom-auto md:max-h-[360px] md:rounded-xl">
             {options.map((item, index) => (
               <li key={item.id} className={item.group === 'closed' && options[index - 1]?.group !== 'closed' ? 'mt-1 border-t border-line pt-1' : undefined}>
-                <button type="button" role="option" aria-selected={item.id === status.id} onClick={(event) => pick(event, item)}
+                <button type="button" role="option" aria-selected={item.id === status.id} onClick={(event) => void pick(event, item)}
                   className={`flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-canvas ${item.id === status.id ? 'bg-accent-soft font-medium' : ''}`}>
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} aria-hidden />
                   <span className="min-w-0 flex-1 break-words">{item.name}{item.group === 'closed' && <small className="ml-1.5 text-muted">закрыть заказ</small>}</span>

@@ -66,7 +66,7 @@ function PanelSettings({ onSaved }: { onSaved: () => void }) {
             <input className={`${inputClass} num`} inputMode="numeric" value={percent} onChange={(e) => setPercent(e.target.value.replace(/[^\d]/g, ''))} />
           </label>
           <div className="flex items-center gap-3 sm:col-span-3">
-            <button className="rounded-md bg-accent px-3 py-2 text-accent-ink" onClick={() => void save()}>Сохранить</button>
+            <button className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink" onClick={() => void save()}>Сохранить</button>
             {msg && <span className="text-sm text-muted">{msg}</span>}
           </div>
         </div>

@@ -47,7 +47,7 @@ export default class ErrorBoundary extends Component<Props, State> {
         <h2 className="mb-2 text-lg font-semibold">{chunk ? 'Вышла новая версия CRM' : 'Экран не открылся'}</h2>
         <p className="mb-4 text-sm text-muted">{chunk ? 'Нажмите «Обновить», страница загрузится заново. Ваши данные не потеряны.' : 'Что-то пошло не так на этой странице. Остальные разделы работают.'}</p>
         <div className="flex justify-center gap-2">
-          <button className="rounded-md bg-accent px-4 py-2 text-accent-ink" onClick={() => window.location.reload()}>Обновить</button>
+          <button className="rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink" onClick={() => window.location.reload()}>Обновить</button>
           {!chunk && <button className="rounded-md border border-line px-4 py-2" onClick={() => this.setState({ error: null })}>Попробовать снова</button>}
         </div>
       </div>

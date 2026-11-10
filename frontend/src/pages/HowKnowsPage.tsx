@@ -1,3 +1,4 @@
+import { confirmDialog, promptDialog } from '../components/dialogs'
 /**
  * ОБРАЗЕЦ страницы справочника: список + добавление + переименование + удаление.
  * Новые справочники делай по этому шаблону (тот же вид, те же состояния загрузки и ошибок).
@@ -42,14 +43,14 @@ export default function HowKnowsPage() {
   }
 
   const rename = async (item: HowKnow) => {
-    const next = prompt('Новое название', item.name)
+    const next = await promptDialog('Новое название', item.name)
     if (!next || next === item.name) return
     await api.put(`/how-knows/${item.id}`, { name: next })
     await load()
   }
 
   const remove = async (item: HowKnow) => {
-    if (!confirm(`Удалить «${item.name}»?`)) return
+    if (!(await confirmDialog(`Удалить «${item.name}»?`))) return
     await api.del(`/how-knows/${item.id}`)
     await load()
   }
@@ -66,7 +67,7 @@ export default function HowKnowsPage() {
             placeholder="Например, 2ГИС"
             className="flex-1 rounded-md border border-line bg-surface px-3 py-2"
           />
-          <button className="rounded-md bg-accent px-4 py-2 font-medium text-accent-ink">Добавить</button>
+          <button className="rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink">Добавить</button>
         </form>
       )}
 

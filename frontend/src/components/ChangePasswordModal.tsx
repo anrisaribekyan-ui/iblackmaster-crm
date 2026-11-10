@@ -37,7 +37,7 @@ export default function ChangePasswordModal({ onClose }: { onClose: () => void }
       {done ? (
         <div className="grid gap-4">
           <p role="status">Пароль изменён. На других устройствах войти нужно будет заново.</p>
-          <button className="justify-self-end rounded-md bg-accent px-4 py-2 text-accent-ink" onClick={onClose}>Готово</button>
+          <button className="justify-self-end rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink" onClick={onClose}>Готово</button>
         </div>
       ) : (
         <form onSubmit={(e) => void submit(e)} className="grid gap-3">
@@ -53,7 +53,7 @@ export default function ChangePasswordModal({ onClose }: { onClose: () => void }
           {error && <p role="alert" className="text-sm text-danger">{error}</p>}
           <div className="flex justify-end gap-2">
             <button type="button" className="rounded-md border border-line px-3 py-2" onClick={onClose}>Отмена</button>
-            <button disabled={busy} className="rounded-md bg-accent px-4 py-2 text-accent-ink disabled:opacity-60">{busy ? 'Сохраняю…' : 'Сменить пароль'}</button>
+            <button disabled={busy} className="rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink disabled:opacity-60">{busy ? 'Сохраняю…' : 'Сменить пароль'}</button>
           </div>
         </form>
       )}

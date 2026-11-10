@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { alertDialog, confirmDialog } from '../../components/dialogs'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
@@ -71,13 +72,13 @@ export default function DocumentsPage({ type }: { type: DocType }) {
   }, [params])
 
   const remove = async (doc: DocDetail) => {
-    if (!confirm(`Удалить документ ${doc.number}? Остатки и оплаты будут возвращены.`)) return
+    if (!(await confirmDialog(`Удалить документ ${doc.number}? Остатки и оплаты будут возвращены.`))) return
     try {
       await api.del(`/stock-documents/${doc.id}`)
       setViewing(null)
       await load()
     } catch (e) {
-      alert(e instanceof ApiError ? e.message : 'Не удалось удалить документ')
+      void alertDialog(e instanceof ApiError ? e.message : 'Не удалось удалить документ')
     }
   }
 
@@ -90,7 +91,7 @@ export default function DocumentsPage({ type }: { type: DocType }) {
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold">{t.list}</h2>
         {can(t.create) && (
-          <button className="rounded-md bg-accent px-4 py-2 font-medium text-accent-ink" onClick={() => setCreating(true)}>
+          <button className="rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink" onClick={() => setCreating(true)}>
             Создать
           </button>
         )}
@@ -103,7 +104,7 @@ export default function DocumentsPage({ type }: { type: DocType }) {
       ) : (
         <div className="overflow-x-auto rounded-xl border border-line bg-surface">
           <table className="w-full text-left text-sm">
-            <thead className="bg-canvas text-xs text-muted">
+            <thead className="bg-head">
               <tr>
                 <th className="px-3 py-2 font-medium">Документ</th>
                 <th className="px-3 py-2 font-medium">Дата</th>
@@ -115,7 +116,7 @@ export default function DocumentsPage({ type }: { type: DocType }) {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="cursor-pointer border-t border-line hover:bg-canvas" onClick={() => void open(r.id)}>
+                <tr key={r.id} className="cursor-pointer border-t border-line-soft hover:bg-canvas" onClick={() => void open(r.id)}>
                   <td className="px-3 py-2 font-medium text-accent">{r.number}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{formatDateTime(r.date)}</td>
                   <td className="px-3 py-2">{type === 'move' ? `${r.store ?? '—'} → ${r.to_store ?? '—'}` : r.store}</td>
@@ -139,7 +140,7 @@ export default function DocumentsPage({ type }: { type: DocType }) {
             <thead className="text-xs text-muted"><tr><th className="py-1 text-left font-medium">Товар</th><th className="py-1 text-right font-medium">Кол-во</th><th className="py-1 text-right font-medium">Цена</th></tr></thead>
             <tbody>
               {viewing.positions.map((p) => (
-                <tr key={p.id} className="border-t border-line">
+                <tr key={p.id} className="border-t border-line-soft">
                   <td className="py-1.5">{p.name}</td>
                   <td className="py-1.5 text-right num">{qty(p.quantity)}</td>
                   <td className="py-1.5 text-right num">{money(p.price)}</td>
@@ -288,7 +289,7 @@ function DocumentForm({ type, onDone, onCancel }: { type: DocType; onDone: () =>
             </thead>
             <tbody>
               {lines.map((line, i) => (
-                <tr key={line.item.id} className="border-t border-line">
+                <tr key={line.item.id} className="border-t border-line-soft">
                   <td className="py-1.5">{line.item.name}</td>
                   <td className="py-1.5 text-right num text-muted">{qty(line.item.stock_quantity)}</td>
                   <td className="py-1.5 text-right">
@@ -336,7 +337,7 @@ function DocumentForm({ type, onDone, onCancel }: { type: DocType; onDone: () =>
       {error && <p className="text-danger">{error}</p>}
       <div className="flex justify-end gap-2">
         <button type="button" className="rounded-md border border-line bg-surface px-4 py-2" onClick={onCancel}>Отмена</button>
-        <button disabled={busy} className="rounded-md bg-accent px-4 py-2 font-medium text-accent-ink disabled:opacity-60">{busy ? 'Сохраняем…' : 'Провести'}</button>
+        <button disabled={busy} className="rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink disabled:opacity-60">{busy ? 'Сохраняем…' : 'Провести'}</button>
       </div>
     </form>
   )

@@ -13,14 +13,14 @@ export default function StoreLayout() {
 
   return (
     <section>
-      <h1 className="mb-5 text-[22px] font-bold leading-tight md:text-[26px]">Склад</h1>
-      <nav aria-label="Склад" className="mb-5 flex gap-1 overflow-x-auto border-b border-line">
+      <h1 className="mb-4 text-[22px] font-bold leading-tight md:text-[26px]">Склад</h1>
+      <nav aria-label="Склад" className="mb-5 flex gap-1 overflow-x-auto tab-line">
         {links.map((link) => (
           <NavLink
             key={link.to}
             to={link.to}
             className={({ isActive }) =>
-              `whitespace-nowrap -mb-px flex h-10 items-center border-b-2 px-3 ${isActive ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`
+              `whitespace-nowrap flex h-10 items-center border-b-2 px-3 ${isActive ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`
             }
           >
             {link.label}

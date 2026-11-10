@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { confirmDialog } from './dialogs'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../auth'
 import Modal from './Modal'
@@ -77,7 +78,7 @@ export default function DictionaryPage({ config }: { config: DictionaryConfig })
   }
 
   const remove = async (item: Item) => {
-    if (!confirm(`Удалить «${item.name}»?`)) return
+    if (!(await confirmDialog(`Удалить «${item.name}»?`))) return
     setError('')
     try {
       await api.del(`${config.path}/${item.id}`)
@@ -91,13 +92,13 @@ export default function DictionaryPage({ config }: { config: DictionaryConfig })
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{config.title}</h2>
-        {canEdit && <button className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" onClick={() => setEditor(null)}>Добавить</button>}
+        {canEdit && <button className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink" onClick={() => setEditor(null)}>Добавить</button>}
       </div>
       <form className="mb-3 flex gap-2" onSubmit={(event) => { event.preventDefault(); void load(search) }}>
         <input className={`${inputClass} max-w-sm`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск" />
         <button className="rounded-md border border-line bg-surface px-3 py-2">Найти</button>
       </form>
-      {error && <p role="alert" className="mb-3 rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="mb-3 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
       {loading ? (
         <Skeleton />
       ) : items === null ? (
@@ -152,7 +153,7 @@ export default function DictionaryPage({ config }: { config: DictionaryConfig })
             {error && <p role="alert" className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
               <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => setEditor(undefined)}>Отмена</button>
-              <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
+              <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
             </div>
           </form>
         </Modal>

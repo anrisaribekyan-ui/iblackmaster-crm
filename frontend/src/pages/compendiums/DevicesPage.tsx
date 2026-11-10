@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { confirmDialog } from '../../components/dialogs'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
@@ -127,7 +128,7 @@ export default function DevicesPage() {
   }
 
   const remove = async (kind: Editor['kind'], item: DeviceType | Brand | DeviceModel) => {
-    if (!confirm(`Удалить «${item.name}»?`)) return
+    if (!(await confirmDialog(`Удалить «${item.name}»?`))) return
     const path = kind === 'type' ? 'device-types' : kind === 'brand' ? 'brands' : 'device-models'
     setError('')
     try {
@@ -144,7 +145,7 @@ export default function DevicesPage() {
   return (
     <section>
       <h2 className="mb-4 text-lg font-semibold">Устройства</h2>
-      {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="mb-4 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
       {loading ? (
         <Skeleton />
       ) : types === null ? (
@@ -222,7 +223,7 @@ export default function DevicesPage() {
             {error && <p role="alert" className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
               <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => setEditor(null)}>Отмена</button>
-              <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
+              <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
             </div>
           </form>
         </Modal>

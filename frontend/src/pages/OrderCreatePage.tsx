@@ -1,3 +1,4 @@
+import Skeleton from '../components/Skeleton'
 import { getCurrentLocation } from '../currentLocation'
 import { btn, PageHeader } from '../components/ui'
 import PhoneInput from '../components/PhoneInput'
@@ -491,7 +492,7 @@ export default function OrderCreatePage() {
             </div>
           )}
           {fieldsLoading ? (
-            <p className="text-muted">Загрузка формы…</p>
+            <Skeleton rows={4} />
           ) : fields.length === 0 ? (
             <p className="rounded-lg border border-line bg-surface p-4 text-muted">Для этого типа заказа не настроены поля формы.</p>
           ) : (

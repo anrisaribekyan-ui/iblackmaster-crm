@@ -276,7 +276,7 @@ export default function AnalyticsPage() {
 
   return (
     <section>
-      <h1 className="mb-5 text-[22px] font-bold leading-tight md:text-[26px]">Аналитика</h1>
+      <h1 className="mb-4 text-[22px] font-bold leading-tight md:text-[26px]">Аналитика</h1>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <label className="sr-only" htmlFor="an-location">Локация</label>
@@ -304,9 +304,9 @@ export default function AnalyticsPage() {
         )}
       </div>
 
-      <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-line">
+      <nav className="mb-4 flex gap-1 overflow-x-auto tab-line">
         {TABS.filter((t) => t.key !== 'profit' || canProfit).map((t) => (
-          <button key={t.key} className={`shrink-0 whitespace-nowrap -mb-px h-10 border-b-2 px-3 ${tab === t.key ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => changeTab(t.key)}>
+          <button key={t.key} className={`shrink-0 whitespace-nowrap h-10 border-b-2 px-3 ${tab === t.key ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => changeTab(t.key)}>
             {t.label}
           </button>
         ))}
@@ -348,12 +348,12 @@ export default function AnalyticsPage() {
         <ReportChart tab={tab} groupBy={groupBy} rows={rows} />
         <div className="overflow-x-auto rounded-xl border border-line bg-surface">
           <table className="w-full text-left text-sm">
-            <thead className="bg-canvas text-xs text-muted">
+            <thead className="bg-head">
               <tr>{columns.map((c) => <th key={c.field} className={`px-3 py-2 font-medium ${c.kind !== 'text' ? 'text-right' : ''}`}>{c.label}</th>)}</tr>
             </thead>
             <tbody>
               {rows.map((row, i) => (
-                <tr key={i} className="border-t border-line">
+                <tr key={i} className="border-t border-line-soft">
                   {columns.map((c) => (
                     <td key={c.field} className={`px-3 py-2 ${c.kind !== 'text' ? 'text-right num' : ''}`}>
                       {groupBy === 'day' && c.field === 'name' ? dayLong(String(row.key)) : formatCell(row[c.field], c.kind)}
@@ -363,7 +363,7 @@ export default function AnalyticsPage() {
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t border-line bg-canvas font-medium">
+              <tr className="border-t border-line-soft bg-canvas font-medium">
                 {columns.map((c) => (
                   <td key={c.field} className={`px-3 py-2 ${c.kind !== 'text' ? 'text-right num' : ''}`}>
                     {c.kind === 'text' ? 'Итого' : formatCell(totals[c.field], c.kind)}

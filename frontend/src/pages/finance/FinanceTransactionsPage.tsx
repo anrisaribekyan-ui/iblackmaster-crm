@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { confirmDialog } from '../../components/dialogs'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import { downloadCsv } from '../../csv'
@@ -160,7 +161,7 @@ export default function FinanceTransactionsPage() {
   return (
     <section>
       {!can('transactionAccess') ? (
-        <p role="alert" className="rounded-md border border-danger p-3 text-danger">Нет права просматривать журнал транзакций.</p>
+        <p role="alert" className="rounded-md border border-danger bg-danger-soft p-3 text-danger">Нет права просматривать журнал транзакций.</p>
       ) : (
         <>
           <button type="button" className="mb-3 rounded-md border border-line bg-surface px-3 py-2 text-sm md:hidden" onClick={() => setFiltersOpen((v) => !v)} aria-expanded={filtersOpen}>
@@ -189,7 +190,7 @@ export default function FinanceTransactionsPage() {
             )}
             <button className="rounded-md border border-ink bg-ink px-4 py-2 font-medium text-white hover:opacity-90 sm:col-span-2 xl:col-span-6 xl:justify-self-end">Показать</button>
           </form>
-          {error && <p role="alert" className="mb-3 rounded-md border border-danger p-3 text-danger">{error}</p>}
+          {error && <p role="alert" className="mb-3 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
           {loading ? (
             <Skeleton />
           ) : data === null ? (
@@ -232,7 +233,7 @@ export default function FinanceTransactionsPage() {
                                 </button>
                               ) : !linked ? (
                                 <button disabled={actionId === transaction.id} className="text-danger disabled:opacity-60" onClick={() => {
-                                  if (confirm('Удалить транзакцию?')) void updateTransaction(transaction, false)
+                                  void confirmDialog('Удалить транзакцию?').then((ok) => { if (ok) void updateTransaction(transaction, false) })
                                 }}>Удалить</button>
                               ) : <span className="text-muted">В документе</span>}
                             </td>

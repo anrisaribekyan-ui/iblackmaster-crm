@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { confirmDialog } from '../../components/dialogs'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import { formatDateTime, inputClass, qty, useLocationsAndRegisters } from '../shared'
@@ -79,7 +80,7 @@ export default function InventoryPage() {
   }
 
   const finish = () => run(async () => {
-    if (!doc || !confirm('Закончить инвентаризацию? Излишки будут оприходованы, недостача списана.')) return
+    if (!doc || !(await confirmDialog('Закончить инвентаризацию? Излишки будут оприходованы, недостача списана.'))) return
     await save()
     await api.post(`/stock-documents/${doc.id}/finish`)
     await open(doc.id)
@@ -99,7 +100,7 @@ export default function InventoryPage() {
         ) : (
           <div className="overflow-x-auto rounded-xl border border-line bg-surface">
             <table className="w-full text-sm">
-              <thead className="bg-canvas text-xs text-muted">
+              <thead className="bg-head">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium">Товар</th>
                   <th className="px-3 py-2 text-right font-medium">Учёт</th>
@@ -112,7 +113,7 @@ export default function InventoryPage() {
                   const fact = Number(facts[p.nomenclature_id] ?? p.quantity)
                   const diff = fact - Number(p.quantity_accounted ?? 0)
                   return (
-                    <tr key={p.id} className="border-t border-line">
+                    <tr key={p.id} className="border-t border-line-soft">
                       <td className="px-3 py-2">{p.name}</td>
                       <td className="px-3 py-2 text-right num">{qty(p.quantity_accounted)}</td>
                       <td className="px-3 py-2 text-right">
@@ -134,7 +135,7 @@ export default function InventoryPage() {
         {editable && doc.positions.length > 0 && (
           <div className="mt-4 flex justify-end gap-2">
             <button disabled={busy} className="rounded-md border border-line bg-surface px-4 py-2" onClick={() => void run(async () => { await save(); await open(doc.id) }, 'Не удалось сохранить')}>Сохранить</button>
-            <button disabled={busy} className="rounded-md bg-accent px-4 py-2 font-medium text-accent-ink disabled:opacity-60" onClick={() => void finish()}>Закончить инвентаризацию</button>
+            <button disabled={busy} className="rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink disabled:opacity-60" onClick={() => void finish()}>Закончить инвентаризацию</button>
           </div>
         )}
       </div>
@@ -159,7 +160,7 @@ export default function InventoryPage() {
               {stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </label>
-          <button disabled={busy} className="rounded-md bg-accent px-4 py-2 font-medium text-accent-ink disabled:opacity-60" onClick={() => void create()}>Начать инвентаризацию</button>
+          <button disabled={busy} className="rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink disabled:opacity-60" onClick={() => void create()}>Начать инвентаризацию</button>
         </div>
       )}
       {error && <p className="mb-3 text-danger">{error}</p>}

@@ -16,7 +16,7 @@ const links = [
 export default function CompendiumsLayout() {
   return (
     <div>
-      <h1 className="mb-5 text-[22px] font-bold leading-tight md:text-[26px]">Справочники</h1>
+      <h1 className="mb-4 text-[22px] font-bold leading-tight md:text-[26px]">Справочники</h1>
       <div className="flex flex-col gap-6 lg:flex-row">
         <nav aria-label="Справочники" className="flex shrink-0 gap-1 overflow-x-auto lg:w-52 lg:flex-col">
           {links.map((link) => (
@@ -24,7 +24,7 @@ export default function CompendiumsLayout() {
               key={link.to}
               to={link.to}
               className={({ isActive }) =>
-                `whitespace-nowrap rounded-md px-3 py-2 ${isActive ? 'bg-ink font-medium text-white' : 'text-ink hover:bg-surface'}`
+                `whitespace-nowrap flex min-h-9 items-center rounded-md px-3 text-sm ${isActive ? 'bg-surface font-semibold text-ink shadow-[var(--shadow-card)] ring-1 ring-line' : 'font-medium text-ink-2 hover:bg-line-soft hover:text-ink'}`
               }
             >
               {link.label}

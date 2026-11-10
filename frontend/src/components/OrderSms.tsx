@@ -117,7 +117,7 @@ export default function OrderSms({ orderId, hasPhone, disabled, partArrived = fa
             </p>
             {error && <p role="alert" className="text-sm text-danger">{error}</p>}
             <button onClick={send} disabled={sending || !text.trim()}
-              className="justify-self-end rounded-md bg-accent px-4 py-2 text-accent-ink disabled:opacity-50">
+              className="justify-self-end rounded-md bg-accent font-semibold px-4 py-2 text-accent-ink disabled:opacity-50">
               {sending ? 'Отправляю…' : 'Отправить'}
             </button>
           </div>

@@ -93,7 +93,7 @@ export default function StatusesPage() {
   return (
     <section>
       <h2 className="mb-4 text-lg font-semibold">Статусы заказа</h2>
-      {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="mb-4 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
       {loading ? (
         <Skeleton />
       ) : data === null ? (
@@ -210,7 +210,7 @@ function StatusEditor({
               <thead><tr><th className="py-2 text-left font-medium">Роль</th>{Object.entries(actionLabels).map(([key, label]) => <th key={key} className="px-2 py-2 font-medium">{label}</th>)}</tr></thead>
               <tbody>
                 {roles.map((role) => (
-                  <tr key={role.id} className="border-t border-line">
+                  <tr key={role.id} className="border-t border-line-soft">
                     <td className="py-2">{role.name}</td>
                     {(Object.keys(actionLabels) as (keyof typeof actionLabels)[]).map((action) => (
                       <td key={action} className="px-2 py-2 text-center">
@@ -231,7 +231,7 @@ function StatusEditor({
         {error && <p role="alert" className="text-sm text-danger">{error}</p>}
         <div className="flex justify-end gap-2">
           <button type="button" className="rounded-md border border-line px-3 py-2" onClick={onClose}>Отмена</button>
-          <button disabled={saving} className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink disabled:opacity-60">
+          <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">
             {saving ? 'Сохранение…' : 'Сохранить'}
           </button>
         </div>

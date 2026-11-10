@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { confirmDialog } from '../../components/dialogs'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
 import Modal from '../../components/Modal'
@@ -128,7 +129,7 @@ export default function NomenclaturePage({ isWork }: { isWork: boolean }) {
   }
 
   const remove = async (item: Item) => {
-    if (!confirm(`Удалить «${item.name}»?`)) return
+    if (!(await confirmDialog(`Удалить «${item.name}»?`))) return
     setError('')
     try {
       await api.del(`/nomenclature/${item.id}`)
@@ -147,13 +148,13 @@ export default function NomenclaturePage({ isWork }: { isWork: boolean }) {
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{title}</h2>
-        {canEdit && <button className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink" onClick={() => setEditing(null)}>Добавить {isWork ? 'работу' : 'товар'}</button>}
+        {canEdit && <button className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink" onClick={() => setEditing(null)}>Добавить {isWork ? 'работу' : 'товар'}</button>}
       </div>
       <form className="mb-3 flex gap-2" onSubmit={(event) => { event.preventDefault(); setPage(1); void loadItems(search, 1) }}>
         <input className={`${inputClass} max-w-sm`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по названию, артикулу или коду" />
         <button className="rounded-md border border-line bg-surface px-3 py-2">Найти</button>
       </form>
-      {error && <p role="alert" className="mb-3 rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="mb-3 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
       {loading ? (
         <Skeleton />
       ) : pageData === null ? (
@@ -164,7 +165,7 @@ export default function NomenclaturePage({ isWork }: { isWork: boolean }) {
         <>
           <div className="overflow-x-auto rounded-xl border border-line bg-surface">
             <table className="w-full text-left text-sm">
-              <thead className="bg-canvas text-muted">
+              <thead className="bg-head">
                 <tr>
                   <th className="px-3 py-2">Код</th>
                   <th className="hidden px-3 py-2 md:table-cell">Артикул</th>
@@ -177,7 +178,7 @@ export default function NomenclaturePage({ isWork }: { isWork: boolean }) {
               </thead>
               <tbody>
                 {pageData.items.map((item) => (
-                  <tr key={item.id} className={`border-t border-line ${canEdit ? 'cursor-pointer' : ''}`} onClick={(e) => { if (canEdit && !(e.target as HTMLElement).closest('button')) setEditing(item) }}>
+                  <tr key={item.id} className={`border-t border-line-soft ${canEdit ? 'cursor-pointer' : ''}`} onClick={(e) => { if (canEdit && !(e.target as HTMLElement).closest('button')) setEditing(item) }}>
                     <td className="px-3 py-2 num">{item.code}</td>
                     <td className="hidden px-3 py-2 md:table-cell">{item.article || '—'}</td>
                     <td className="min-w-[16rem] px-3 py-2 font-medium">{item.name}</td>
@@ -226,7 +227,7 @@ export default function NomenclaturePage({ isWork }: { isWork: boolean }) {
             {error && <p role="alert" className="text-sm text-danger sm:col-span-2">{error}</p>}
             <div className="flex justify-end gap-2 sm:col-span-2">
               <button type="button" className="rounded-md border border-line px-3 py-2" onClick={() => setEditing(undefined)}>Отмена</button>
-              <button disabled={saving} className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
+              <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
             </div>
           </form>
         </Modal>

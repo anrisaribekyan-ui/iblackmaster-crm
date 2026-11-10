@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { confirmDialog } from '../../components/dialogs'
 import { Link, useParams } from 'react-router-dom'
 import { api, ApiError } from '../../api/client'
 import { useAuth } from '../../auth'
@@ -115,7 +116,7 @@ export default function SalaryEmployeePage() {
   }
 
   const deleteEvent = async (event: EventItem) => {
-    if (!confirm('Удалить это начисление?')) return
+    if (!(await confirmDialog('Удалить это начисление?'))) return
     try {
       await api.del(`/salary/events/${event.id}`)
       await load()
@@ -188,16 +189,16 @@ export default function SalaryEmployeePage() {
         <div className="ml-auto flex gap-2">
           {canManual && <button className={buttonClass} onClick={() => setModal('bonus')}>Бонус</button>}
           {canManual && <button className={buttonClass} onClick={() => setModal('penalty')}>Штраф</button>}
-          {canPayout && <button className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-ink" onClick={() => setModal('payout')}>Выплатить</button>}
+          {canPayout && <button className="rounded-md bg-accent font-semibold px-3 py-2 text-sm text-accent-ink" onClick={() => setModal('payout')}>Выплатить</button>}
         </div>
       </div>
 
       <BalanceOnDate employeeId={id} />
 
-      <nav className="mb-4 flex gap-1 border-b border-line">
-        <button className={`-mb-px h-10 border-b-2 px-3 ${tab === 'accruals' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('accruals')}>Начисления</button>
-        <button className={`-mb-px h-10 border-b-2 px-3 ${tab === 'payouts' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('payouts')}>Выплаты</button>
-        {canSettings && <button className={`-mb-px h-10 border-b-2 px-3 ${tab === 'settings' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('settings')}>Настройки</button>}
+      <nav className="mb-4 flex gap-1 tab-line">
+        <button className={`h-10 border-b-2 px-3 ${tab === 'accruals' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('accruals')}>Начисления</button>
+        <button className={`h-10 border-b-2 px-3 ${tab === 'payouts' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('payouts')}>Выплаты</button>
+        {canSettings && <button className={`h-10 border-b-2 px-3 ${tab === 'settings' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('settings')}>Настройки</button>}
       </nav>
 
       {error && <p className="mb-3 text-danger">{error}</p>}
@@ -364,7 +365,7 @@ export default function SalaryEmployeePage() {
             {error && <p role="alert" className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
               <button type="button" className={buttonClass} onClick={() => setModal(null)}>Отмена</button>
-              <button disabled={saving} className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Выплатить'}</button>
+              <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Выплатить'}</button>
             </div>
           </form>
         </Modal>
@@ -391,7 +392,7 @@ export default function SalaryEmployeePage() {
             {error && <p role="alert" className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
               <button type="button" className={buttonClass} onClick={() => setModal(null)}>Отмена</button>
-              <button disabled={saving} className="rounded-md bg-accent px-3 py-2 font-medium text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
+              <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
             </div>
           </form>
         </Modal>
