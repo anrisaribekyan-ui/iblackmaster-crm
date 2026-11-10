@@ -18,7 +18,7 @@ export default function ThemeSwitch() {
     setMode(next, { x: r.left + r.width / 2, y: r.top + r.height / 2 })
   }
   return (
-    <div className="mx-3 mb-2 flex items-center gap-1 rounded-lg bg-rail-hover/60 p-1" role="radiogroup" aria-label="Оформление">
+    <div className="flex min-w-0 flex-1 items-center gap-0.5 rounded-lg bg-rail-hover/60 p-0.5" role="radiogroup" aria-label="Оформление">
       {MODES.map((m) => (
         <button
           key={m.mode}
@@ -27,7 +27,7 @@ export default function ThemeSwitch() {
           aria-checked={mode === m.mode}
           title={m.label}
           onClick={(e) => choose(m.mode, e)}
-          className={`grid h-8 flex-1 place-items-center rounded-md ${mode === m.mode ? 'bg-white/10 text-white' : 'text-rail-muted hover:text-white'}`}
+          className={`grid h-7 flex-1 place-items-center rounded-md ${mode === m.mode ? 'bg-white/10 text-white' : 'text-rail-muted hover:text-white'}`}
         >
           <Icon name={m.icon} className="h-4 w-4" />
           <span className="sr-only">{m.label}</span>

@@ -15,24 +15,32 @@ import Tour from './Tour'
 import { ALL_TIPS_OFF, TOUR_ID, tipFor } from '../tips'
 
 /** Меню как в LiveSklad. permission — право, без которого пункт скрыт (пусто — виден всем). */
-export const MENU: { to: string; label: string; icon: string; permission?: string }[] = [
-  { to: '/', icon: 'home', label: 'Главная' },
-  { to: '/orders', icon: 'orders', label: 'Заказы' },
-  { to: '/sales', icon: 'sales', label: 'Продажи' },
-  { to: '/day', icon: 'notes', label: 'Что сегодня было' },
+type MenuGroup = 'work' | 'money' | 'service' | 'system'
+/** Группы бокового меню (дизайн v2): всё меню помещается в экран без прокрутки. Порядок массива MENU прежний. */
+const GROUPS: { key: MenuGroup; title: string }[] = [
+  { key: 'work', title: 'Работа' },
+  { key: 'money', title: 'Деньги' },
+  { key: 'service', title: 'Сервис' },
+  { key: 'system', title: 'Система' },
+]
+export const MENU: { to: string; label: string; icon: string; permission?: string; group: MenuGroup }[] = [
+  { to: '/', icon: 'home', label: 'Главная', group: 'work' },
+  { to: '/orders', icon: 'orders', label: 'Заказы', group: 'work' },
+  { to: '/sales', icon: 'sales', label: 'Продажи', group: 'work' },
+  { to: '/day', icon: 'notes', label: 'Что сегодня было', group: 'money' },
   // Идеи сотрудников видит только владелец: такого права нет ни в одной роли, у владельца «можно всё»
-  { to: '/ideas', icon: 'idea', label: 'Идеи для Анри', permission: 'ideasAccess' },
-  { to: '/store/remains', icon: 'store', label: 'Склад', permission: 'remainAccess' },
-  { to: '/tasks', icon: 'tasks', label: 'Задачи' },
-  { to: '/zakupki', icon: 'cart', label: 'Закупки' },
-  { to: '/apps', icon: 'phone', label: 'Приложения', permission: 'appInstallAccess' },
-  { to: '/panic', icon: 'phone', label: 'Проверка паник лог', permission: 'panicAccess' },
-  { to: '/vpn', icon: 'phone', label: 'VPN', permission: 'vpnAccess' },
-  { to: '/transfer', icon: 'phone', label: 'Перенос данных' },
-  { to: '/finance/cashes', icon: 'finance', label: 'Финансы' },
-  { to: '/analytics', icon: 'analytics', label: 'Аналитика', permission: 'reportAccess' },
-  { to: '/compendiums/how-knows', icon: 'books', label: 'Справочники' },
-  { to: '/settings', icon: 'settings', label: 'Настройки', permission: 'settingAccess' },
+  { to: '/ideas', icon: 'idea', label: 'Идеи для Анри', permission: 'ideasAccess', group: 'system' },
+  { to: '/store/remains', icon: 'store', label: 'Склад', permission: 'remainAccess', group: 'work' },
+  { to: '/tasks', icon: 'tasks', label: 'Задачи', group: 'work' },
+  { to: '/zakupki', icon: 'cart', label: 'Закупки', group: 'work' },
+  { to: '/apps', icon: 'phone', label: 'Приложения', permission: 'appInstallAccess', group: 'service' },
+  { to: '/panic', icon: 'phone', label: 'Проверка паник лог', permission: 'panicAccess', group: 'service' },
+  { to: '/vpn', icon: 'phone', label: 'VPN', permission: 'vpnAccess', group: 'service' },
+  { to: '/transfer', icon: 'phone', label: 'Перенос данных', group: 'service' },
+  { to: '/finance/cashes', icon: 'finance', label: 'Финансы', group: 'money' },
+  { to: '/analytics', icon: 'analytics', label: 'Аналитика', permission: 'reportAccess', group: 'money' },
+  { to: '/compendiums/how-knows', icon: 'books', label: 'Справочники', group: 'system' },
+  { to: '/settings', icon: 'settings', label: 'Настройки', permission: 'settingAccess', group: 'system' },
 ]
 
 export default function Layout() {
@@ -130,49 +138,75 @@ export default function Layout() {
     <div className="md:flex md:h-full">
       {menuOpen && <div className="modal-backdrop fixed inset-0 z-[45] bg-black/40 md:hidden" onClick={() => setMenuOpen(false)} aria-hidden />}
       <aside
-        className={`fixed inset-y-0 left-0 z-[46] flex w-64 shrink-0 flex-col bg-rail pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] text-rail-ink transition-transform md:static md:w-56 md:translate-x-0 ${menuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-[46] flex w-64 shrink-0 flex-col bg-rail pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] text-rail-ink transition-transform md:static md:w-[220px] md:translate-x-0 ${menuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}
       >
-        <div className="flex items-center gap-2.5 px-5 pb-5 pt-5">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent text-[15px] font-bold text-white" aria-hidden>i</span>
-          <span className="text-[17px] font-semibold tracking-tight text-white">iBlack<span className="text-rail-ink">Master</span></span>
+        <div className="flex items-center gap-2.5 px-[18px] pb-3 pt-[18px]">
+          <span className="grid h-[30px] w-[30px] place-items-center rounded-[9px] bg-accent text-[15px] font-bold text-white" aria-hidden>i</span>
+          <span className="text-base font-semibold tracking-tight text-white">iBlack<span className="text-rail-muted">Master</span></span>
         </div>
-        <nav className="rail-scroll flex flex-1 flex-col gap-0.5 overflow-y-auto px-3">
-          {MENU.filter((m) => !m.permission || can(m.permission)).map((m) => (
-            <NavLink
-              key={m.to}
-              to={m.to}
-              end={m.to === '/'}
-              className={({ isActive }) =>
-                `relative flex items-center gap-3 rounded-lg px-3 py-2.5 md:py-2 ${
-                  isActive ? 'bg-rail-hover font-medium text-white before:absolute before:inset-y-2 before:-left-3 before:w-1 before:rounded-r-full before:bg-accent' : 'text-rail-ink hover:bg-rail-hover hover:text-white'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <Icon name={m.icon} className={`h-[18px] w-[18px] ${isActive ? 'text-accent' : 'text-rail-muted'}`} />
-                  {m.label}
-                </>
-              )}
-            </NavLink>
-          ))}
+        {/* Общий поиск заказа живёт в меню (на компьютере): «/» ставит сюда курсор с любой страницы */}
+        <form onSubmit={(event) => void submitSearch(event)} className="relative mx-3 mb-2.5 hidden md:block">
+          <Icon name="search" className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-rail-muted" />
+          <input
+            ref={searchRef}
+            type="search"
+            aria-label="Найти заказ: номер, телефон, имя, IMEI"
+            className="rail-search peer h-[34px] min-h-0 w-full rounded-lg border border-rail-line bg-rail-hover/60 pl-8 pr-8 text-[13px] text-white placeholder:text-rail-muted"
+            placeholder="Найти заказ"
+            title="Номер, телефон, имя, IMEI"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => event.key === 'Escape' && (setQuery(''), event.currentTarget.blur())}
+          />
+          <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-[5px] bg-rail-line px-1.5 text-[11px] leading-[18px] text-rail-ink peer-focus:hidden" title="Нажмите / чтобы искать">/</kbd>
+        </form>
+        <nav className="rail-scroll flex flex-1 flex-col overflow-y-auto px-2.5">
+          {GROUPS.map((group) => {
+            const items = MENU.filter((m) => m.group === group.key && (!m.permission || can(m.permission)))
+            if (items.length === 0) return null
+            return (
+              <div key={group.key} className="flex flex-col gap-px pb-2">
+                <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-rail-muted">{group.title}</p>
+                {items.map((m) => (
+                  <NavLink
+                    key={m.to}
+                    to={m.to}
+                    end={m.to === '/'}
+                    className={({ isActive }) =>
+                      `flex min-h-11 items-center gap-2.5 rounded-[7px] px-2.5 text-[15px] md:min-h-[30px] md:text-[13.5px] ${
+                        isActive ? 'bg-rail-hover font-semibold text-white' : 'text-rail-ink hover:bg-rail-hover/70 hover:text-white'
+                      }`
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <Icon name={m.icon} className={`h-[18px] w-[18px] md:h-4 md:w-4 ${isActive ? 'text-[#ff6a45]' : 'text-rail-muted'}`} />
+                        {m.label}
+                      </>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
+            )
+          })}
         </nav>
         <InstallApp />
-        <button type="button" onClick={() => { void resetTips().then(() => setTourOpen(true)) }} className="mx-3 mb-1 rounded-md px-3 py-1.5 text-left text-sm text-rail-muted hover:bg-rail-hover hover:text-white" title="Показать экскурсию и подсказки по страницам заново">
-          Экскурсия по CRM
-        </button>
-        <ThemeSwitch />
-        <div className="m-3 flex items-center gap-3 rounded-lg bg-rail-hover px-3 py-2.5">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#3a3f47] text-sm font-medium text-white" aria-hidden>
+        <div className="mx-2.5 mb-1.5 flex items-center gap-1">
+          <ThemeSwitch />
+          <button type="button" onClick={() => { void resetTips().then(() => setTourOpen(true)) }} className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-sm font-semibold text-rail-muted hover:bg-rail-hover hover:text-white" title="Экскурсия по CRM: показать подсказки по страницам заново" aria-label="Экскурсия по CRM">
+            ?
+          </button>
+        </div>
+        <div className="mx-2.5 mb-3 flex items-center gap-2.5 rounded-[10px] bg-rail-hover/70 px-2.5 py-2">
+          <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full bg-rail-line text-[13px] font-semibold text-white" aria-hidden>
             {(me?.short_name ?? '?').slice(0, 1)}
           </span>
-          <button type="button" onClick={() => setPasswordOpen(true)} className="min-w-0 flex-1 rounded-md text-left text-sm leading-tight hover:bg-rail" title="Сменить пароль">
-            <div className="truncate font-medium text-white">{me?.short_name}</div>
+          <button type="button" onClick={() => setPasswordOpen(true)} className="min-w-0 flex-1 rounded-md text-left leading-tight" title="Сменить пароль">
+            <div className="truncate text-[13px] font-medium text-white">{me?.short_name}</div>
             <div className="truncate text-xs text-rail-muted">{me?.role_name} · сменить пароль</div>
           </button>
-          <button onClick={logout} className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-rail-muted hover:bg-rail hover:text-white" title="Выйти из CRM на этом устройстве">
+          <button onClick={logout} className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-rail-muted hover:bg-rail hover:text-white" title="Выйти из CRM на этом устройстве" aria-label="Выйти">
             <Icon name="logout" className="h-[18px] w-[18px]" />
-            <span className="md:sr-only">Выйти</span>
           </button>
         </div>
       </aside>
@@ -180,22 +214,20 @@ export default function Layout() {
       {showTour && <Tour onClose={() => setTourOpen(false)} />}
       {/* На телефоне прокручивается вся страница (прячется адресная строка, работает «потянуть — обновить»),
           на компьютере — только рабочая область справа от меню */}
-      <main ref={mainRef} className="relative min-w-0 flex-1 px-3 pb-24 sm:px-8 md:overflow-auto md:py-6 md:pb-6">
-        <header className={`top-0 z-20 ${onOrders ? 'max-md:static md:hidden' : 'sticky'} -mx-3 mb-3 flex items-center gap-2 bg-canvas/95 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur sm:-mx-8 sm:px-8 md:static md:mx-0 md:mb-4 md:justify-end md:bg-transparent md:p-0 md:backdrop-blur-none`}>
+      <main ref={mainRef} className="relative min-w-0 flex-1 px-3 pb-24 sm:px-7 md:overflow-auto md:py-[18px] md:pb-6">
+        <header className={`top-0 z-20 ${onOrders ? 'max-md:static md:hidden' : 'sticky'} -mx-3 mb-3 flex items-center gap-2 bg-canvas/95 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur sm:-mx-7 sm:px-7 md:static md:mx-0 md:mb-3 md:justify-end md:bg-transparent md:p-0 md:backdrop-blur-none`}>
           <LocationSwitcher className="shrink-0 md:order-first md:mr-auto" />
-          <form onSubmit={(event) => void submitSearch(event)} className={`${onOrders ? 'max-md:hidden' : ''} relative min-w-0 flex-1 md:max-w-md md:flex-none md:basis-[28rem]`}>
+          <form onSubmit={(event) => void submitSearch(event)} className={`${onOrders ? 'hidden' : ''} relative min-w-0 flex-1 md:hidden`}>
             <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
-              ref={searchRef}
               type="search"
               enterKeyHint="search"
-              className="peer w-full rounded-md border border-line bg-surface py-2 pl-9 pr-3 md:pr-9"
+              className="w-full rounded-md border border-line bg-surface py-2 pl-9 pr-3"
               placeholder="Поиск: номер, телефон, имя, IMEI"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => event.key === 'Escape' && (setQuery(''), event.currentTarget.blur())}
             />
-            <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-line px-1.5 text-xs text-muted md:block peer-focus:md:hidden" title="Нажмите / чтобы искать">/</kbd>
           </form>
           <button
             type="button"
@@ -209,7 +241,9 @@ export default function Layout() {
         </header>
         {showTip && tip && <PageTip tip={tip} onClose={() => setForcedTip(null)} onTour={() => setTourOpen(true)} />}
         <Suspense fallback={<Skeleton className="py-6" />}>
-          <Outlet />
+          <div key={location.pathname.split('/').slice(0, 2).join('/')} className="ui-fade">
+            <Outlet />
+          </div>
         </Suspense>
         {/* Запас внизу страницы: плавающая кнопка «Идея для Анри» не должна закрывать последние кнопки формы */}
         <div className="h-24" aria-hidden />
