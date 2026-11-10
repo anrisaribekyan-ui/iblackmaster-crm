@@ -52,19 +52,23 @@ const tabs: { key: Tab; label: string }[] = [
 ]
 const filterInput = field
 
+// Форматтеры создаём один раз: new Intl.* на каждую строку списка — самое дорогое место отрисовки 50 заказов
+const DATE_TIME = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', dateStyle: 'short', timeStyle: 'short' })
+const DAY_KEY = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow' })
+const DAY_NAME = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', weekday: 'short' })
+const DAY_NAME_YEAR = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', weekday: 'short', year: 'numeric' })
+const TIME = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' })
+const MONEY = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 })
+
 function formatDate(value: string | null) {
   if (!value) return '—'
   const parsed = new Date(value)
   if (Number.isNaN(parsed.getTime())) return '—'
-  return new Intl.DateTimeFormat('ru-RU', {
-    timeZone: 'Europe/Moscow',
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(parsed)
+  return DATE_TIME.format(parsed)
 }
 
 function formatMoney(value: string) {
-  return `${Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`
+  return `${MONEY.format(Number(value))} ₽`
 }
 
 // Сколько просрочено по точке: одна лёгкая цифра для плитки над списком, обновляется вместе со списком
@@ -271,148 +275,30 @@ export default function OrdersPage() {
   const overdueOn = searchParams.get('overdue') === 'true'
   const goTab = (tab: Tab) => setSearchParams({ tab })
   // Заказы идут от новых к старым — между днями ставим тихий заголовок: «Сегодня», «Вчера», дата
-  const dayLabel = (value: string) => {
-    const date = new Date(value)
-    const key = (d: Date) => d.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })
-    if (key(date) === key(new Date())) return 'Сегодня'
-    if (key(date) === key(new Date(Date.now() - 86400000))) return 'Вчера'
-    return date.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', weekday: 'short', year: date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })
-  }
-  const grouped = (data?.items ?? []).map((order, index, list) => {
-    const label = dayLabel(order.created_at)
-    return { order, head: index === 0 || dayLabel(list[index - 1].created_at) !== label ? label : null }
-  })
+  const grouped = useMemo(() => {
+    const today = DAY_KEY.format(new Date())
+    const yesterday = DAY_KEY.format(new Date(Date.now() - 86400000))
+    const year = new Date().getFullYear()
+    let previous = ''
+    return (data?.items ?? []).map((order) => {
+      const date = new Date(order.created_at)
+      const key = DAY_KEY.format(date)
+      const head = key === previous ? null : key === today ? 'Сегодня' : key === yesterday ? 'Вчера' : (date.getFullYear() === year ? DAY_NAME : DAY_NAME_YEAR).format(date)
+      previous = key
+      return { order, head }
+    })
+  }, [data])
   const money = (order: OrderRow) => {
     const total = Number(order.total_price)
     const debt = total - Number(order.paid)
     return { total, debt, partial: debt > 0 && debt < total }
   }
 
-  return (
-    <section>
-      <PageHeader title="Заказы" aside={<LocationSwitcher className="max-md:hidden" />}>
-        <Link className={btn('ghost')} to="/orders/forgotten">Забытые</Link>
-        <button className={btn('ghost', 'md', 'max-sm:hidden')} onClick={() => void exportCsv()}>Скачать CSV</button>
-        {can('createOrderAccess') && <Link className={btn('primary', 'md', 'max-md:hidden')} to="/orders/new"><Icon name="plus" className="h-3.5 w-3.5" />Новый заказ</Link>}
-      </PageHeader>
-      {desktop && (
-        <div className="mb-3.5 grid grid-cols-4 gap-3">
-          <Stat label="Новые" value={data ? countOf('new').toLocaleString('ru-RU') : '—'} hint="ждут приёмки в работу" active={currentTab === 'new' && !overdueOn} onClick={() => goTab('new')} />
-          <Stat label="В работе" value={data ? countOf('inWork').toLocaleString('ru-RU') : '—'} hint={data ? `отложено ${countOf('wait').toLocaleString('ru-RU')}` : undefined} active={currentTab === 'inWork' && !overdueOn} onClick={() => goTab('inWork')} />
-          <Stat label="Готовы к выдаче" value={data ? countOf('finish').toLocaleString('ru-RU') : '—'} hint="позвонить и выдать" active={currentTab === 'finish' && !overdueOn} onClick={() => goTab('finish')} />
-          <Stat label="Просрочены" tone={overdueTotal ? 'danger' : 'neutral'} value={overdueTotal == null ? '—' : overdueTotal.toLocaleString('ru-RU')} hint="срок прошёл, не выданы" active={overdueOn} onClick={() => setSearchParams(overdueOn ? { tab: 'open' } : { tab: 'open', overdue: 'true' })} />
-        </div>
-      )}
-      <form onSubmit={submitSearch} className="mb-2 flex gap-2">
-        <label className="relative min-w-0 flex-1">
-          <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-          <input className={`${filterInput} w-full pl-9`} type="search" enterKeyHint="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Номер, телефон, имя, IMEI" aria-label="Поиск по заказам" />
-        </label>
-        <button className={btn('secondary')}>Найти</button>
-        <button type="button" aria-expanded={filtersOpen} className={btn('secondary')} onClick={() => setFiltersOpen((current) => !current)}>
-          {filtersOpen ? 'Скрыть' : 'Фильтры'}
-          {activeFilters > 0 && <span className="num grid h-[18px] min-w-[18px] place-items-center rounded-full bg-accent px-1 text-[11px] font-semibold text-white">{activeFilters}</span>}
-        </button>
-      </form>
-      {filtersOpen && (
-        <div className="mb-3 grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2 xl:grid-cols-4">
-          <label className="grid gap-1 text-[13px] text-muted">Статус
-            <select className={filterInput} value={searchParams.get('status_id') ?? ''} onChange={(event) => selectFilter('status_id', event.target.value)}>
-              <option value="">Любой</option>
-              {statusOptions.map((status) => <option key={status.id} value={status.id}>{status.groupTitle} · {status.name}</option>)}
-            </select>
-          </label>
-          <label className="grid gap-1 text-[13px] text-muted">Тип заказа
-            <select className={filterInput} value={searchParams.get('order_type_id') ?? ''} onChange={(event) => selectFilter('order_type_id', event.target.value)}>
-              <option value="">Любой</option>{orderTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
-            </select>
-          </label>
-          <label className="grid gap-1 text-[13px] text-muted">Мастер
-            <select className={filterInput} value={searchParams.get('master_id') ?? ''} onChange={(event) => selectFilter('master_id', event.target.value)}>
-              <option value="">Любой</option>{masters.map((employee) => <option key={employee.id} value={employee.id}>{employee.short_name}</option>)}
-            </select>
-          </label>
-          <label className="grid gap-1 text-[13px] text-muted">Менеджер
-            <select className={filterInput} value={searchParams.get('manager_id') ?? ''} onChange={(event) => selectFilter('manager_id', event.target.value)}>
-              <option value="">Любой</option>{managers.map((employee) => <option key={employee.id} value={employee.id}>{employee.short_name}</option>)}
-            </select>
-          </label>
-          <label className="grid gap-1 text-[13px] text-muted">Созданы с
-            <input className={filterInput} type="date" value={searchParams.get('date_from') ?? ''} onChange={(event) => selectFilter('date_from', event.target.value)} />
-          </label>
-          <label className="grid gap-1 text-[13px] text-muted">Созданы по
-            <input className={filterInput} type="date" value={searchParams.get('date_to') ?? ''} onChange={(event) => selectFilter('date_to', event.target.value)} />
-          </label>
-          <label className="grid gap-1 text-[13px] text-muted">Срочные
-            <select className={filterInput} value={searchParams.get('urgent') ?? ''} onChange={(event) => selectFilter('urgent', event.target.value)}>
-              <option value="">Любые</option><option value="true">Только срочные</option><option value="false">Без срочных</option>
-            </select>
-          </label>
-          <label className="grid gap-1 text-[13px] text-muted">Просроченные
-            <select className={filterInput} value={searchParams.get('overdue') ?? ''} onChange={(event) => selectFilter('overdue', event.target.value)}>
-              <option value="">Любые</option><option value="true">Только просроченные</option><option value="false">Не просроченные</option>
-            </select>
-          </label>
-          {searchParams.size > 0 && <button className="text-left text-sm text-danger sm:col-span-2 xl:col-span-4" onClick={() => setSearchParams({ tab: currentTab })}>Сбросить фильтры</button>}
-        </div>
-      )}
-      <div className="mb-3">
-        <Tabs
-          label="Группы заказов"
-          items={tabItems}
-          value={currentTab}
-          onChange={(key) => setParam('tab', key)}
-          after={<button aria-label="Добавить свою вкладку" title="Своя вкладка: выберите нужные статусы" className="grid h-10 w-9 shrink-0 place-items-center text-accent hover:text-accent-hover md:h-[38px]" onClick={() => setTabEditor({ id: `c_${Date.now()}`, name: '', statusIds: [] })}><Icon name="plus" className="h-4 w-4" /></button>}
-        />
-      </div>
-      {tabEditor && (
-        <Modal title={customTabs.some((t) => t.id === tabEditor.id) ? 'Своя вкладка' : 'Новая вкладка'} onClose={() => setTabEditor(null)}>
-          <div className="grid gap-3">
-            <label className="grid gap-1 text-sm text-muted">Название
-              <input className={filterInput} autoFocus maxLength={20} value={tabEditor.name} onChange={(e) => setTabEditor({ ...tabEditor, name: e.target.value })} placeholder="Например: Жду запчасть" />
-            </label>
-            <div className="max-h-72 overflow-auto rounded-md border border-line p-2">
-              {statusGroups.map((group) => (
-                <div key={group.group} className="mb-2">
-                  <p className="text-xs font-medium text-muted">{group.title}</p>
-                  {group.statuses.map((status) => (
-                    <label key={status.id} className="flex items-center gap-2 py-1 text-sm">
-                      <input type="checkbox" checked={tabEditor.statusIds.includes(status.id)}
-                        onChange={(e) => setTabEditor({ ...tabEditor, statusIds: e.target.checked ? [...tabEditor.statusIds, status.id] : tabEditor.statusIds.filter((i) => i !== status.id) })} />
-                      {status.name}
-                    </label>
-                  ))}
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-between gap-2">
-              {customTabs.some((t) => t.id === tabEditor.id)
-                ? <button className="text-danger" onClick={() => { saveCustomTabs(customTabs.filter((t) => t.id !== tabEditor.id)); if (currentTab === tabEditor.id) setParam('tab', 'open'); setTabEditor(null) }}>Удалить вкладку</button>
-                : <span />}
-              <button
-                disabled={!tabEditor.name.trim() || tabEditor.statusIds.length === 0}
-                className={btn('primary')}
-                onClick={() => {
-                  const item = { ...tabEditor, name: tabEditor.name.trim() }
-                  saveCustomTabs(customTabs.some((t) => t.id === item.id) ? customTabs.map((t) => (t.id === item.id ? item : t)) : [...customTabs, item])
-                  setParam('tab', item.id)
-                  setTabEditor(null)
-                }}
-              >Сохранить</button>
-            </div>
-          </div>
-        </Modal>
-      )}
-      {error && <p role="alert" className="mb-3 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
-      {loading && data === null ? (
-        <ListSkeleton rows={desktop ? 14 : 6} rowHeight={desktop ? 44 : 96} />
-      ) : data === null ? (
-        <Empty>Список заказов недоступен.</Empty>
-      ) : data.items.length === 0 ? (
-        <Empty>Заказов по выбранным условиям нет. Измените фильтры или создайте новый заказ.</Empty>
-      ) : (
-        <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
-          {!desktop ? (
+  // Список пересобирается только когда пришли новые данные или изменилась раскладка —
+  // набор текста в поиске и открытие фильтров не перерисовывают 50 строк
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const list = useMemo(() => (
+!desktop ? (
             /* Телефон: карточки вместо таблицы — всё главное видно без прокрутки вбок */
             <ul className="space-y-2">
               {grouped.map(({ order, head }) => {
@@ -539,7 +425,134 @@ export default function OrdersPage() {
                 </tbody>
               </table>
             </div>
-          )}
+          )
+  ), [grouped, statusGroups, orderTypes, desktop, columns, queryString])
+
+  return (
+    <section>
+      <PageHeader title="Заказы" aside={<LocationSwitcher className="max-md:hidden" />}>
+        <Link className={btn('ghost')} to="/orders/forgotten">Забытые</Link>
+        <button className={btn('ghost', 'md', 'max-sm:hidden')} onClick={() => void exportCsv()}>Скачать CSV</button>
+        {can('createOrderAccess') && <Link className={btn('primary', 'md', 'max-md:hidden')} to="/orders/new"><Icon name="plus" className="h-3.5 w-3.5" />Новый заказ</Link>}
+      </PageHeader>
+      {desktop && (
+        <div className="mb-3.5 grid grid-cols-4 gap-3">
+          <Stat label="Новые" value={data ? countOf('new').toLocaleString('ru-RU') : '—'} hint="ждут приёмки в работу" active={currentTab === 'new' && !overdueOn} onClick={() => goTab('new')} />
+          <Stat label="В работе" value={data ? countOf('inWork').toLocaleString('ru-RU') : '—'} hint={data ? `отложено ${countOf('wait').toLocaleString('ru-RU')}` : undefined} active={currentTab === 'inWork' && !overdueOn} onClick={() => goTab('inWork')} />
+          <Stat label="Готовы к выдаче" value={data ? countOf('finish').toLocaleString('ru-RU') : '—'} hint="позвонить и выдать" active={currentTab === 'finish' && !overdueOn} onClick={() => goTab('finish')} />
+          <Stat label="Просрочены" tone={overdueTotal ? 'danger' : 'neutral'} value={overdueTotal == null ? '—' : overdueTotal.toLocaleString('ru-RU')} hint="срок прошёл, не выданы" active={overdueOn} onClick={() => setSearchParams(overdueOn ? { tab: 'open' } : { tab: 'open', overdue: 'true' })} />
+        </div>
+      )}
+      <form onSubmit={submitSearch} className="mb-2 flex gap-2">
+        <label className="relative min-w-0 flex-1">
+          <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <input className={`${filterInput} w-full pl-9`} type="search" enterKeyHint="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Номер, телефон, имя, IMEI" aria-label="Поиск по заказам" />
+        </label>
+        <button className={btn('secondary')}>Найти</button>
+        <button type="button" aria-expanded={filtersOpen} className={btn('secondary')} onClick={() => setFiltersOpen((current) => !current)}>
+          {filtersOpen ? 'Скрыть' : 'Фильтры'}
+          {activeFilters > 0 && <span className="num grid h-[18px] min-w-[18px] place-items-center rounded-full bg-accent px-1 text-[11px] font-semibold text-white">{activeFilters}</span>}
+        </button>
+      </form>
+      {filtersOpen && (
+        <div className="mb-3 grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2 xl:grid-cols-4">
+          <label className="grid gap-1 text-[13px] text-muted">Статус
+            <select className={filterInput} value={searchParams.get('status_id') ?? ''} onChange={(event) => selectFilter('status_id', event.target.value)}>
+              <option value="">Любой</option>
+              {statusOptions.map((status) => <option key={status.id} value={status.id}>{status.groupTitle} · {status.name}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-[13px] text-muted">Тип заказа
+            <select className={filterInput} value={searchParams.get('order_type_id') ?? ''} onChange={(event) => selectFilter('order_type_id', event.target.value)}>
+              <option value="">Любой</option>{orderTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-[13px] text-muted">Мастер
+            <select className={filterInput} value={searchParams.get('master_id') ?? ''} onChange={(event) => selectFilter('master_id', event.target.value)}>
+              <option value="">Любой</option>{masters.map((employee) => <option key={employee.id} value={employee.id}>{employee.short_name}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-[13px] text-muted">Менеджер
+            <select className={filterInput} value={searchParams.get('manager_id') ?? ''} onChange={(event) => selectFilter('manager_id', event.target.value)}>
+              <option value="">Любой</option>{managers.map((employee) => <option key={employee.id} value={employee.id}>{employee.short_name}</option>)}
+            </select>
+          </label>
+          <label className="grid gap-1 text-[13px] text-muted">Созданы с
+            <input className={filterInput} type="date" value={searchParams.get('date_from') ?? ''} onChange={(event) => selectFilter('date_from', event.target.value)} />
+          </label>
+          <label className="grid gap-1 text-[13px] text-muted">Созданы по
+            <input className={filterInput} type="date" value={searchParams.get('date_to') ?? ''} onChange={(event) => selectFilter('date_to', event.target.value)} />
+          </label>
+          <label className="grid gap-1 text-[13px] text-muted">Срочные
+            <select className={filterInput} value={searchParams.get('urgent') ?? ''} onChange={(event) => selectFilter('urgent', event.target.value)}>
+              <option value="">Любые</option><option value="true">Только срочные</option><option value="false">Без срочных</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-[13px] text-muted">Просроченные
+            <select className={filterInput} value={searchParams.get('overdue') ?? ''} onChange={(event) => selectFilter('overdue', event.target.value)}>
+              <option value="">Любые</option><option value="true">Только просроченные</option><option value="false">Не просроченные</option>
+            </select>
+          </label>
+          {searchParams.size > 0 && <button className="text-left text-sm text-danger sm:col-span-2 xl:col-span-4" onClick={() => setSearchParams({ tab: currentTab })}>Сбросить фильтры</button>}
+        </div>
+      )}
+      <div className="mb-3">
+        <Tabs
+          label="Группы заказов"
+          items={tabItems}
+          value={currentTab}
+          onChange={(key) => setParam('tab', key)}
+          after={<button aria-label="Добавить свою вкладку" title="Своя вкладка: выберите нужные статусы" className="grid h-10 w-9 shrink-0 place-items-center text-accent hover:text-accent-hover md:h-[38px]" onClick={() => setTabEditor({ id: `c_${Date.now()}`, name: '', statusIds: [] })}><Icon name="plus" className="h-4 w-4" /></button>}
+        />
+      </div>
+      {tabEditor && (
+        <Modal title={customTabs.some((t) => t.id === tabEditor.id) ? 'Своя вкладка' : 'Новая вкладка'} onClose={() => setTabEditor(null)}>
+          <div className="grid gap-3">
+            <label className="grid gap-1 text-sm text-muted">Название
+              <input className={filterInput} autoFocus maxLength={20} value={tabEditor.name} onChange={(e) => setTabEditor({ ...tabEditor, name: e.target.value })} placeholder="Например: Жду запчасть" />
+            </label>
+            <div className="max-h-72 overflow-auto rounded-md border border-line p-2">
+              {statusGroups.map((group) => (
+                <div key={group.group} className="mb-2">
+                  <p className="text-xs font-medium text-muted">{group.title}</p>
+                  {group.statuses.map((status) => (
+                    <label key={status.id} className="flex items-center gap-2 py-1 text-sm">
+                      <input type="checkbox" checked={tabEditor.statusIds.includes(status.id)}
+                        onChange={(e) => setTabEditor({ ...tabEditor, statusIds: e.target.checked ? [...tabEditor.statusIds, status.id] : tabEditor.statusIds.filter((i) => i !== status.id) })} />
+                      {status.name}
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between gap-2">
+              {customTabs.some((t) => t.id === tabEditor.id)
+                ? <button className="text-danger" onClick={() => { saveCustomTabs(customTabs.filter((t) => t.id !== tabEditor.id)); if (currentTab === tabEditor.id) setParam('tab', 'open'); setTabEditor(null) }}>Удалить вкладку</button>
+                : <span />}
+              <button
+                disabled={!tabEditor.name.trim() || tabEditor.statusIds.length === 0}
+                className={btn('primary')}
+                onClick={() => {
+                  const item = { ...tabEditor, name: tabEditor.name.trim() }
+                  saveCustomTabs(customTabs.some((t) => t.id === item.id) ? customTabs.map((t) => (t.id === item.id ? item : t)) : [...customTabs, item])
+                  setParam('tab', item.id)
+                  setTabEditor(null)
+                }}
+              >Сохранить</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {error && <p role="alert" className="mb-3 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
+      {loading && data === null ? (
+        <ListSkeleton rows={desktop ? 14 : 6} rowHeight={desktop ? 44 : 96} />
+      ) : data === null ? (
+        <Empty>Список заказов недоступен.</Empty>
+      ) : data.items.length === 0 ? (
+        <Empty>Заказов по выбранным условиям нет. Измените фильтры или создайте новый заказ.</Empty>
+      ) : (
+        <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+          {list}
           <footer className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[13px] text-muted">
             <span className="num">Всего: {data.total.toLocaleString('ru-RU')}</span>
             <span className="flex items-center gap-2">
@@ -563,8 +576,8 @@ function ago(value: string): string | null {
   if (minutes < 1) return 'только что'
   if (minutes < 60) return `${minutes} мин назад`
   if (minutes < 12 * 60) return `${Math.round(minutes / 60)} ч назад`
-  const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Moscow' })
-  const day = (d: Date) => d.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })
+  const time = TIME.format(date)
+  const day = (d: Date) => DAY_KEY.format(d)
   if (day(date) === day(new Date())) return `сегодня, ${time}`
   if (day(date) === day(new Date(Date.now() - 86400000))) return `вчера, ${time}`
   return null
