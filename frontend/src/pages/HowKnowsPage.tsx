@@ -56,7 +56,7 @@ export default function HowKnowsPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="mb-4 text-xl font-semibold">Источники рекламы</h1>
+      <h1 className="mb-4 text-[22px] font-bold leading-tight md:text-[26px]">Источники рекламы</h1>
 
       {canEdit && (
         <form onSubmit={add} className="mb-4 flex gap-2">

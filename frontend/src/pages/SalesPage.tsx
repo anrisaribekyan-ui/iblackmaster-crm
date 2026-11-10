@@ -247,7 +247,7 @@ export default function SalesPage() {
   return (
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Продажи</h1>
+        <h1 className="text-[22px] font-bold leading-tight md:text-[26px]">Продажи</h1>
         <div className="flex flex-wrap items-center gap-2">
           <select aria-label="Точка" className="rounded-md border border-line bg-surface px-3 py-2 text-sm" value={locationId} onChange={(e) => {
             setLocationId(e.target.value)

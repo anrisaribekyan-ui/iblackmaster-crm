@@ -35,7 +35,7 @@ export default function DataTransferPage() {
   return (
     <div className="mx-auto grid max-w-4xl gap-5">
       <header>
-        <h1 className="text-xl font-semibold">Перенос данных</h1>
+        <h1 className="text-[22px] font-bold leading-tight md:text-[26px]">Перенос данных</h1>
         <p className="text-sm text-muted">Выберите, откуда и куда переносим, и отметьте нужные данные. CRM составит пошаговую инструкцию для мастера и для клиента.</p>
       </header>
 

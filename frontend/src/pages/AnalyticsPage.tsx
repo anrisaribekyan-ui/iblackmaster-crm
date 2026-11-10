@@ -271,12 +271,12 @@ export default function AnalyticsPage() {
   }
 
   if (!can('reportAccess')) {
-    return <section><h1 className="text-xl font-semibold">Аналитика</h1><p className="mt-4 text-muted">Нет доступа к отчётам.</p></section>
+    return <section><h1 className="text-[22px] font-bold leading-tight md:text-[26px]">Аналитика</h1><p className="mt-4 text-muted">Нет доступа к отчётам.</p></section>
   }
 
   return (
     <section>
-      <h1 className="mb-5 text-xl font-semibold">Аналитика</h1>
+      <h1 className="mb-5 text-[22px] font-bold leading-tight md:text-[26px]">Аналитика</h1>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <label className="sr-only" htmlFor="an-location">Локация</label>
@@ -306,7 +306,7 @@ export default function AnalyticsPage() {
 
       <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-line">
         {TABS.filter((t) => t.key !== 'profit' || canProfit).map((t) => (
-          <button key={t.key} className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-2 ${tab === t.key ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => changeTab(t.key)}>
+          <button key={t.key} className={`shrink-0 whitespace-nowrap -mb-px h-10 border-b-2 px-3 ${tab === t.key ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => changeTab(t.key)}>
             {t.label}
           </button>
         ))}

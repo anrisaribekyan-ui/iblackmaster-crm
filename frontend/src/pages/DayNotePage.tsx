@@ -131,7 +131,7 @@ export default function DayNotePage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="mb-1 text-xl font-semibold">Что сегодня было</h1>
+      <h1 className="mb-1 text-[22px] font-bold leading-tight md:text-[26px]">Что сегодня было</h1>
       <p className="mb-4 text-muted">Пишите как удобно: кто, что, сколько, нал или безнал. Потом нажмите «Разобрать» — CRM предложит, что внести в заказы и продажи.</p>
 
       {error && <p className="mb-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-red-700" role="alert">{error}</p>}

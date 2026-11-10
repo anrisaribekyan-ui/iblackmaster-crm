@@ -713,7 +713,7 @@ export default function AppInstallPage() {
   if (stations === null) {
     return (
       <div className="mx-auto grid max-w-5xl gap-4 p-4">
-        <h1 className="text-xl font-semibold">Установка приложений</h1>
+        <h1 className="text-[22px] font-bold leading-tight md:text-[26px]">Установка приложений</h1>
         {error ? <p role="alert" className="text-danger">{error}</p> : <Skeleton rows={4} />}
       </div>
     )
@@ -722,7 +722,7 @@ export default function AppInstallPage() {
   return (
     <div className="mx-auto grid max-w-5xl gap-5 p-4">
       <header className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold">Установка приложений</h1>
+        <h1 className="text-[22px] font-bold leading-tight md:text-[26px]">Установка приложений</h1>
         {manage && <button className={`${button} ml-auto`} onClick={() => setModal('station')}>Подключить компьютер</button>}
       </header>
 

@@ -62,7 +62,7 @@ export default function ForgottenPage() {
       <header className="mb-4 flex flex-wrap items-center gap-3">
         <div className="mr-auto">
           <Link to="/orders" className="text-sm text-muted">← Заказы</Link>
-          <h1 className="text-xl font-semibold">Забытые аппараты</h1>
+          <h1 className="text-[22px] font-bold leading-tight md:text-[26px]">Забытые аппараты</h1>
         </div>
         <select aria-label="Локация" className="rounded-md border border-line bg-surface px-3 py-2" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
           <option value="">Все локации</option>

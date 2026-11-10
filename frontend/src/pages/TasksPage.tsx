@@ -99,7 +99,7 @@ export default function TasksPage() {
   return (
     <section>
       <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Задачи</h1>
+        <h1 className="text-[22px] font-bold leading-tight md:text-[26px]">Задачи</h1>
         {canCreate && <button className="rounded-md bg-accent px-4 py-2 font-medium text-accent-ink" onClick={() => setCreating(true)}>Новая задача</button>}
       </header>
 

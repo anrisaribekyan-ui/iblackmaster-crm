@@ -14,7 +14,7 @@ const links = [
 export default function SettingsLayout() {
   return (
     <div>
-      <h1 className="mb-5 text-xl font-semibold">Настройки</h1>
+      <h1 className="mb-5 text-[22px] font-bold leading-tight md:text-[26px]">Настройки</h1>
       <div className="flex flex-col gap-6 lg:flex-row">
         <nav aria-label="Настройки" className="flex shrink-0 gap-1 overflow-x-auto lg:w-48 lg:flex-col">
           {links.map((link) => (

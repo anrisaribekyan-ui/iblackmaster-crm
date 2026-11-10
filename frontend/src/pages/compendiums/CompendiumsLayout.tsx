@@ -16,7 +16,7 @@ const links = [
 export default function CompendiumsLayout() {
   return (
     <div>
-      <h1 className="mb-5 text-xl font-semibold">Справочники</h1>
+      <h1 className="mb-5 text-[22px] font-bold leading-tight md:text-[26px]">Справочники</h1>
       <div className="flex flex-col gap-6 lg:flex-row">
         <nav aria-label="Справочники" className="flex shrink-0 gap-1 overflow-x-auto lg:w-52 lg:flex-col">
           {links.map((link) => (

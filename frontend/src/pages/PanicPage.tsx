@@ -71,7 +71,7 @@ export default function PanicPage() {
 
   return (
     <section className="max-w-3xl">
-      <h1 className="mb-1 text-xl font-semibold">Проверка паник лог</h1>
+      <h1 className="mb-1 text-[22px] font-bold leading-tight md:text-[26px]">Проверка паник лог</h1>
       <p className="mb-4 text-sm text-muted">Сфотографируйте экран с логом, приложите файл (.ips, .txt) или вставьте текст. Подскажем, что проверять в первую очередь.</p>
 
       <div className="rounded-xl border border-line bg-surface p-4">

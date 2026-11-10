@@ -64,7 +64,7 @@ export default function PurchasesPage() {
   return (
     <section>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h1 className="text-xl font-semibold">Закупки</h1>
+        <h1 className="text-[22px] font-bold leading-tight md:text-[26px]">Закупки</h1>
         {(
           <div className="flex rounded-full border border-line bg-surface p-0.5 text-sm" role="tablist" aria-label="Режим закупок">
             {([['board', 'Доска'], ['link', 'Зачем'], ...(canOrder ? [['order', 'Оформить']] : [])] as ['board' | 'link' | 'order', string][]).map(([id, label]) => (

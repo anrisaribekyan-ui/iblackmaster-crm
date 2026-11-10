@@ -184,7 +184,7 @@ export default function SalaryEmployeePage() {
     <div>
       <div className="mb-3 flex items-center gap-3">
         <Link to="/finance/salary" className="text-sm text-muted hover:text-ink">‹ К зарплате</Link>
-        <h1 className="text-xl font-semibold">{employeeName}</h1>
+        <h1 className="text-[22px] font-bold leading-tight md:text-[26px]">{employeeName}</h1>
         <div className="ml-auto flex gap-2">
           {canManual && <button className={buttonClass} onClick={() => setModal('bonus')}>Бонус</button>}
           {canManual && <button className={buttonClass} onClick={() => setModal('penalty')}>Штраф</button>}
@@ -195,9 +195,9 @@ export default function SalaryEmployeePage() {
       <BalanceOnDate employeeId={id} />
 
       <nav className="mb-4 flex gap-1 border-b border-line">
-        <button className={`border-b-2 px-3 py-2 ${tab === 'accruals' ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab('accruals')}>Начисления</button>
-        <button className={`border-b-2 px-3 py-2 ${tab === 'payouts' ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab('payouts')}>Выплаты</button>
-        {canSettings && <button className={`border-b-2 px-3 py-2 ${tab === 'settings' ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab('settings')}>Настройки</button>}
+        <button className={`-mb-px h-10 border-b-2 px-3 ${tab === 'accruals' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('accruals')}>Начисления</button>
+        <button className={`-mb-px h-10 border-b-2 px-3 ${tab === 'payouts' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('payouts')}>Выплаты</button>
+        {canSettings && <button className={`-mb-px h-10 border-b-2 px-3 ${tab === 'settings' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('settings')}>Настройки</button>}
       </nav>
 
       {error && <p className="mb-3 text-danger">{error}</p>}

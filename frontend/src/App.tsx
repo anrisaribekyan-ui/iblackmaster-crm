@@ -66,7 +66,7 @@ function Protected({ children }: { children: ReactNode }) {
 function Stub({ title, task }: { title: string; task: string }) {
   return (
     <div>
-      <h1 className="mb-2 text-xl font-semibold">{title}</h1>
+      <h1 className="mb-2 text-[22px] font-bold leading-tight md:text-[26px]">{title}</h1>
       <p className="text-muted">Раздел в разработке ({task}).</p>
     </div>
   )

@@ -134,7 +134,7 @@ export default function VpnPage() {
 
   return (
     <section className="mx-auto max-w-5xl">
-      <h1 className="mb-1 text-xl font-semibold">VPN iBM</h1>
+      <h1 className="mb-1 text-[22px] font-bold leading-tight md:text-[26px]">VPN iBM</h1>
       <p className="mb-4 text-sm text-muted">Клиент закрепляется за тем, кто выдал первый доступ: он получает {config?.commission_percent ?? 30}% с выдачи и каждого продления.</p>
       {config && !config.configured && <p className="mb-3 rounded-md border border-warning p-3 text-sm">Панель VPN не подключена. Владелец: внизу страницы «Настройки панели».</p>}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">

@@ -35,7 +35,7 @@ export default function IdeasPage() {
 
   return (
     <div className="max-w-3xl">
-      <h1 className="mb-1 text-xl font-semibold">Идеи для Анри</h1>
+      <h1 className="mb-1 text-[22px] font-bold leading-tight md:text-[26px]">Идеи для Анри</h1>
       <p className="mb-4 text-sm text-muted">Всё, что сотрудники написали кнопкой «Идея для Анри». Новых: {data?.new ?? '…'}</p>
       <div className="mb-4 flex flex-wrap gap-2" role="tablist">
         {FILTERS.map((f) => (

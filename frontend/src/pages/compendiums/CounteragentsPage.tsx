@@ -340,7 +340,7 @@ function CounteragentCard({ item, onClose }: { item: Counteragent; onClose: () =
 
           <nav className="mt-4 flex gap-1 border-b border-line">
             {([['orders', 'Заказы'], ['sales', 'Продажи'], ['transactions', 'Платежи']] as [HistoryTab, string][]).map(([key, label]) => (
-              <button key={key} className={`border-b-2 px-3 py-2 ${tab === key ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab(key)}>
+              <button key={key} className={`-mb-px h-10 border-b-2 px-3 ${tab === key ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab(key)}>
                 {label}
               </button>
             ))}
