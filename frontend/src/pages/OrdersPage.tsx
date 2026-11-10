@@ -10,6 +10,8 @@ import { downloadCsv } from '../csv'
 import Modal from '../components/Modal'
 import type { SmsMark } from '../components/StatusBadge'
 import QuickStatus from '../components/QuickStatus'
+import Icon from '../components/icons'
+import { btn, Empty, field, ListSkeleton, PageHeader, Stat, Tabs, Tag, useMedia, type TabItem } from '../components/ui'
 
 type Tab = 'new' | 'inWork' | 'wait' | 'finish' | 'closed' | 'all' | 'open'
 type CustomTab = { id: string; name: string; statusIds: number[] }
@@ -48,7 +50,7 @@ const tabs: { key: Tab; label: string }[] = [
   { key: 'open', label: 'Не выданные' },
   { key: 'all', label: 'Все' },
 ]
-const filterInput = 'rounded-md border border-line bg-surface px-2 py-1.5'
+const filterInput = field
 
 function formatDate(value: string | null) {
   if (!value) return '—'
@@ -64,6 +66,9 @@ function formatDate(value: string | null) {
 function formatMoney(value: string) {
   return `${Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 0 })} ₽`
 }
+
+// Сколько просрочено по точке: одна лёгкая цифра для плитки над списком, обновляется вместе со списком
+const overdueCache = new Map<string, number>()
 
 // Последние показанные списки (по фильтрам): вернулись из заказа — список на экране сразу, свежий подгружается следом
 const listCache = new Map<string, OrderList>()
@@ -82,6 +87,11 @@ export default function OrdersPage() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const desktop = useMedia('(min-width: 768px)')
+  const wide = useMedia('(min-width: 1280px)')
+  const wider = useMedia('(min-width: 1536px)')
+  const columns = 6 + (wide ? 1 : 0) + (wider ? 1 : 0)
+  const [overdueTotal, setOverdueTotal] = useState<number | null>(null)
 
   // Последняя открытая вкладка запоминается: «Заказы» в меню открывают то, где вы были
   const lastTab = (() => {
@@ -163,6 +173,20 @@ export default function OrdersPage() {
     void loadReferences()
   }, [loadReferences])
 
+  // Плитка «Просрочены»: тот же список заказов с готовым фильтром overdue, берём только total
+  useEffect(() => {
+    if (!desktop) return
+    const key = currentLocation ?? ''
+    setOverdueTotal(overdueCache.get(key) ?? null)
+    const params = new URLSearchParams({ tab: 'open', overdue: 'true' })
+    if (currentLocation) params.set('location_id', currentLocation)
+    let alive = true
+    api.get<OrderList>(`/orders?${params.toString()}`)
+      .then((result) => { overdueCache.set(key, result.total); if (alive) setOverdueTotal(result.total) })
+      .catch(() => undefined)
+    return () => { alive = false }
+  }, [currentLocation, desktop, data?.total])
+
   useEffect(() => {
     setSearch(searchParams.get('q') ?? '')
     void loadOrders()
@@ -233,61 +257,98 @@ export default function OrdersPage() {
   )
   const pageCount = data ? Math.max(1, Math.ceil(data.total / 50)) : 1
 
+  const counts: Record<string, number> = data?.counts ?? {}
+  const countOf = (key: Tab) => key === 'all'
+    ? Object.values(counts).reduce((sum, value) => sum + value, 0)
+    : key === 'open'
+      ? Object.entries(counts).reduce((sum, [group, value]) => sum + (group === 'closed' ? 0 : value), 0)
+      : counts[key] ?? 0
+  const tabItems: TabItem[] = [
+    ...tabs.map((tab) => ({ key: tab.key as string, label: tab.label, count: data ? countOf(tab.key) : null })),
+    ...customTabs.map((tab) => ({ key: tab.id, label: tab.name, onEdit: () => setTabEditor(tab) })),
+  ]
+  const activeFilters = ['status_id', 'order_type_id', 'master_id', 'manager_id', 'date_from', 'date_to', 'urgent', 'overdue'].filter((key) => searchParams.get(key)).length
+  const overdueOn = searchParams.get('overdue') === 'true'
+  const goTab = (tab: Tab) => setSearchParams({ tab })
+  // Заказы идут от новых к старым — между днями ставим тихий заголовок: «Сегодня», «Вчера», дата
+  const dayLabel = (value: string) => {
+    const date = new Date(value)
+    const key = (d: Date) => d.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow' })
+    if (key(date) === key(new Date())) return 'Сегодня'
+    if (key(date) === key(new Date(Date.now() - 86400000))) return 'Вчера'
+    return date.toLocaleDateString('ru-RU', { timeZone: 'Europe/Moscow', day: 'numeric', month: 'long', weekday: 'short', year: date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric' })
+  }
+  const grouped = (data?.items ?? []).map((order, index, list) => {
+    const label = dayLabel(order.created_at)
+    return { order, head: index === 0 || dayLabel(list[index - 1].created_at) !== label ? label : null }
+  })
+  const money = (order: OrderRow) => {
+    const total = Number(order.total_price)
+    const debt = total - Number(order.paid)
+    return { total, debt, partial: debt > 0 && debt < total }
+  }
+
   return (
     <section>
-      <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold">Заказы</h1>
-          <LocationSwitcher className="max-md:hidden" />
+      <PageHeader title="Заказы" aside={<LocationSwitcher className="max-md:hidden" />}>
+        <Link className={btn('ghost')} to="/orders/forgotten">Забытые</Link>
+        <button className={btn('ghost', 'md', 'max-sm:hidden')} onClick={() => void exportCsv()}>Скачать CSV</button>
+        {can('createOrderAccess') && <Link className={btn('primary', 'md', 'max-md:hidden')} to="/orders/new"><Icon name="plus" className="h-3.5 w-3.5" />Новый заказ</Link>}
+      </PageHeader>
+      {desktop && (
+        <div className="mb-3.5 grid grid-cols-4 gap-3">
+          <Stat label="Новые" value={data ? countOf('new').toLocaleString('ru-RU') : '—'} hint="ждут приёмки в работу" active={currentTab === 'new' && !overdueOn} onClick={() => goTab('new')} />
+          <Stat label="В работе" value={data ? countOf('inWork').toLocaleString('ru-RU') : '—'} hint={data ? `отложено ${countOf('wait').toLocaleString('ru-RU')}` : undefined} active={currentTab === 'inWork' && !overdueOn} onClick={() => goTab('inWork')} />
+          <Stat label="Готовы к выдаче" value={data ? countOf('finish').toLocaleString('ru-RU') : '—'} hint="позвонить и выдать" active={currentTab === 'finish' && !overdueOn} onClick={() => goTab('finish')} />
+          <Stat label="Просрочены" tone={overdueTotal ? 'danger' : 'neutral'} value={overdueTotal == null ? '—' : overdueTotal.toLocaleString('ru-RU')} hint="срок прошёл, не выданы" active={overdueOn} onClick={() => setSearchParams(overdueOn ? { tab: 'open' } : { tab: 'open', overdue: 'true' })} />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {can('createOrderAccess') && <Link className="hidden rounded-md bg-accent px-3 py-2 font-medium text-accent-ink md:inline-block" to="/orders/new">Создать</Link>}
-          <Link className="whitespace-nowrap rounded-md border border-line bg-surface px-3 py-2" to="/orders/forgotten">Забытые</Link>
-          <button className="hidden whitespace-nowrap rounded-md border border-line bg-surface px-3 py-2 sm:block" onClick={() => void exportCsv()}>Скачать CSV</button>
-        </div>
-      </header>
-      <form onSubmit={submitSearch} className="mb-3 flex gap-2">
-        <input className={`${filterInput} min-w-0 flex-1`} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Номер, телефон, имя, IMEI" />
-        <button className="rounded-md border border-line bg-surface px-3 py-2">Найти</button>
-        <button type="button" className="rounded-md border border-line bg-surface px-3 py-2" onClick={() => setFiltersOpen((current) => !current)}>
-          {filtersOpen ? 'Скрыть фильтры' : 'Фильтры'}
+      )}
+      <form onSubmit={submitSearch} className="mb-2 flex gap-2">
+        <label className="relative min-w-0 flex-1">
+          <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <input className={`${filterInput} w-full pl-9`} type="search" enterKeyHint="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Номер, телефон, имя, IMEI" aria-label="Поиск по заказам" />
+        </label>
+        <button className={btn('secondary')}>Найти</button>
+        <button type="button" aria-expanded={filtersOpen} className={btn('secondary')} onClick={() => setFiltersOpen((current) => !current)}>
+          {filtersOpen ? 'Скрыть' : 'Фильтры'}
+          {activeFilters > 0 && <span className="num grid h-[18px] min-w-[18px] place-items-center rounded-full bg-accent px-1 text-[11px] font-semibold text-white">{activeFilters}</span>}
         </button>
       </form>
       {filtersOpen && (
-        <div className="mb-4 grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2 xl:grid-cols-4">
-          <label className="grid gap-1 text-sm text-muted">Статус
+        <div className="mb-3 grid gap-3 rounded-xl border border-line bg-surface p-4 sm:grid-cols-2 xl:grid-cols-4">
+          <label className="grid gap-1 text-[13px] text-muted">Статус
             <select className={filterInput} value={searchParams.get('status_id') ?? ''} onChange={(event) => selectFilter('status_id', event.target.value)}>
               <option value="">Любой</option>
               {statusOptions.map((status) => <option key={status.id} value={status.id}>{status.groupTitle} · {status.name}</option>)}
             </select>
           </label>
-          <label className="grid gap-1 text-sm text-muted">Тип заказа
+          <label className="grid gap-1 text-[13px] text-muted">Тип заказа
             <select className={filterInput} value={searchParams.get('order_type_id') ?? ''} onChange={(event) => selectFilter('order_type_id', event.target.value)}>
               <option value="">Любой</option>{orderTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
             </select>
           </label>
-          <label className="grid gap-1 text-sm text-muted">Мастер
+          <label className="grid gap-1 text-[13px] text-muted">Мастер
             <select className={filterInput} value={searchParams.get('master_id') ?? ''} onChange={(event) => selectFilter('master_id', event.target.value)}>
               <option value="">Любой</option>{masters.map((employee) => <option key={employee.id} value={employee.id}>{employee.short_name}</option>)}
             </select>
           </label>
-          <label className="grid gap-1 text-sm text-muted">Менеджер
+          <label className="grid gap-1 text-[13px] text-muted">Менеджер
             <select className={filterInput} value={searchParams.get('manager_id') ?? ''} onChange={(event) => selectFilter('manager_id', event.target.value)}>
               <option value="">Любой</option>{managers.map((employee) => <option key={employee.id} value={employee.id}>{employee.short_name}</option>)}
             </select>
           </label>
-          <label className="grid gap-1 text-sm text-muted">Созданы с
+          <label className="grid gap-1 text-[13px] text-muted">Созданы с
             <input className={filterInput} type="date" value={searchParams.get('date_from') ?? ''} onChange={(event) => selectFilter('date_from', event.target.value)} />
           </label>
-          <label className="grid gap-1 text-sm text-muted">Созданы по
+          <label className="grid gap-1 text-[13px] text-muted">Созданы по
             <input className={filterInput} type="date" value={searchParams.get('date_to') ?? ''} onChange={(event) => selectFilter('date_to', event.target.value)} />
           </label>
-          <label className="grid gap-1 text-sm text-muted">Срочные
+          <label className="grid gap-1 text-[13px] text-muted">Срочные
             <select className={filterInput} value={searchParams.get('urgent') ?? ''} onChange={(event) => selectFilter('urgent', event.target.value)}>
               <option value="">Любые</option><option value="true">Только срочные</option><option value="false">Без срочных</option>
             </select>
           </label>
-          <label className="grid gap-1 text-sm text-muted">Просроченные
+          <label className="grid gap-1 text-[13px] text-muted">Просроченные
             <select className={filterInput} value={searchParams.get('overdue') ?? ''} onChange={(event) => selectFilter('overdue', event.target.value)}>
               <option value="">Любые</option><option value="true">Только просроченные</option><option value="false">Не просроченные</option>
             </select>
@@ -295,32 +356,15 @@ export default function OrdersPage() {
           {searchParams.size > 0 && <button className="text-left text-sm text-danger sm:col-span-2 xl:col-span-4" onClick={() => setSearchParams({ tab: currentTab })}>Сбросить фильтры</button>}
         </div>
       )}
-      <nav aria-label="Группы заказов" className="mb-3 flex gap-1 overflow-x-auto rounded-xl border border-line bg-surface p-1">
-        {tabs.map((tab) => {
-          const counts: Record<string, number> = data?.counts ?? {}
-          const count = tab.key === 'all'
-            ? Object.values(counts).reduce((sum, value) => sum + value, 0)
-            : tab.key === 'open'
-              ? Object.entries(counts).reduce((sum, [group, value]) => sum + (group === 'closed' ? 0 : value), 0)
-              : counts[tab.key] ?? 0
-          return (
-            <button
-              key={tab.key}
-              className={`flex-1 whitespace-nowrap rounded-lg px-3 py-1.5 transition-colors ${currentTab === tab.key ? 'bg-ink font-medium text-white shadow-sm' : 'text-muted hover:bg-canvas hover:text-ink'}`}
-              onClick={() => setParam('tab', tab.key)}
-            >
-              {tab.label} <span className={`num text-xs ${currentTab === tab.key ? 'text-white/60' : 'text-muted'}`}>{count.toLocaleString('ru-RU')}</span>
-            </button>
-          )
-        })}
-        {customTabs.map((tab) => (
-          <span key={tab.id} className={`group flex flex-1 items-center whitespace-nowrap rounded-lg transition-colors ${currentTab === tab.id ? 'bg-ink font-medium text-white shadow-sm' : 'text-muted hover:bg-canvas hover:text-ink'}`}>
-            <button className="flex-1 px-3 py-1.5" onClick={() => setParam('tab', tab.id)}>{tab.name}</button>
-            <button aria-label={`Изменить вкладку ${tab.name}`} title="Изменить" className="pr-2 text-xs opacity-60 hover:opacity-100" onClick={() => setTabEditor(tab)}>✎</button>
-          </span>
-        ))}
-        <button aria-label="Добавить свою вкладку" title="Своя вкладка: выберите нужные статусы" className="rounded-lg px-3 py-1.5 text-accent hover:bg-canvas" onClick={() => setTabEditor({ id: `c_${Date.now()}`, name: '', statusIds: [] })}>＋</button>
-      </nav>
+      <div className="mb-3">
+        <Tabs
+          label="Группы заказов"
+          items={tabItems}
+          value={currentTab}
+          onChange={(key) => setParam('tab', key)}
+          after={<button aria-label="Добавить свою вкладку" title="Своя вкладка: выберите нужные статусы" className="-mb-px grid h-10 w-9 shrink-0 place-items-center text-accent hover:text-accent-hover md:h-[38px]" onClick={() => setTabEditor({ id: `c_${Date.now()}`, name: '', statusIds: [] })}><Icon name="plus" className="h-4 w-4" /></button>}
+        />
+      </div>
       {tabEditor && (
         <Modal title={customTabs.some((t) => t.id === tabEditor.id) ? 'Своя вкладка' : 'Новая вкладка'} onClose={() => setTabEditor(null)}>
           <div className="grid gap-3">
@@ -347,7 +391,7 @@ export default function OrdersPage() {
                 : <span />}
               <button
                 disabled={!tabEditor.name.trim() || tabEditor.statusIds.length === 0}
-                className="rounded-md bg-accent px-3 py-2 text-accent-ink disabled:opacity-50"
+                className={btn('primary')}
                 onClick={() => {
                   const item = { ...tabEditor, name: tabEditor.name.trim() }
                   saveCustomTabs(customTabs.some((t) => t.id === item.id) ? customTabs.map((t) => (t.id === item.id ? item : t)) : [...customTabs, item])
@@ -359,131 +403,149 @@ export default function OrdersPage() {
           </div>
         </Modal>
       )}
-      {error && <p role="alert" className="mb-3 rounded-md border border-danger p-3 text-danger">{error}</p>}
+      {error && <p role="alert" className="mb-3 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}</p>}
       {loading && data === null ? (
-        <p className="py-6 text-muted">Загрузка заказов…</p>
+        <ListSkeleton rows={desktop ? 14 : 6} rowHeight={desktop ? 44 : 96} />
       ) : data === null ? (
-        <p className="py-6 text-muted">Список заказов недоступен.</p>
+        <Empty>Список заказов недоступен.</Empty>
       ) : data.items.length === 0 ? (
-        <p className="rounded-xl border border-line bg-surface p-5 text-muted">Заказов по выбранным условиям нет. Измените фильтры или создайте новый заказ.</p>
+        <Empty>Заказов по выбранным условиям нет. Измените фильтры или создайте новый заказ.</Empty>
       ) : (
         <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
-          {/* Телефон: карточки вместо таблицы — всё главное видно без прокрутки вбок */}
-          <ul className="space-y-2 md:hidden">
-            {data.items.map((order) => {
-              const overdue = order.deadline && new Date(order.deadline).getTime() < Date.now() && order.status.group !== 'closed'
-              const device = [order.brand, order.model].filter(Boolean).join(' ')
-              return (
-                <li key={order.id}>
-                  <Link
-                    to={`/orders/${order.id}`}
-                    className={`block rounded-xl border border-line bg-surface p-3 active:bg-canvas ${order.is_deleted ? 'opacity-60' : ''}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xl font-bold ${order.is_deleted ? 'text-muted line-through' : 'text-accent'}`}>
-                        {order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" className="mr-1 text-danger">●</span>}
-                        {order.number}
-                      </span>
-                      {order.is_deleted && <span className="rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger">удалён</span>}
-                      <span className="ml-auto"><QuickStatus status={order.status} groups={statusGroups} onPick={(next, comment) => void quickStatus(order, next, comment)} /></span>
-                    </div>
-                    <p className="mt-1.5 break-words font-medium">{device || 'Устройство не указано'}</p>
-                    {order.problems?.length > 0 && <p className="break-words text-base text-ink/80">{order.problems.join(', ')}</p>}
-                    <div className="mt-2 flex items-end justify-between gap-3 text-sm">
-                      <div className="min-w-0">
-                        <p className="break-words">{order.counteragent.name}</p>
-                        <p className={`text-xs ${overdue ? 'font-medium text-danger' : 'text-muted'}`}>
-                          {formatDate(order.created_at)}{order.deadline ? ` · срок ${formatDate(order.deadline)}` : ''}
-                        </p>
+          {!desktop ? (
+            /* Телефон: карточки вместо таблицы — всё главное видно без прокрутки вбок */
+            <ul className="space-y-2">
+              {grouped.map(({ order, head }) => {
+                const overdue = order.deadline && new Date(order.deadline).getTime() < Date.now() && order.status.group !== 'closed'
+                const device = [order.brand, order.model].filter(Boolean).join(' ')
+                const { total, debt } = money(order)
+                return (
+                  <li key={order.id}>
+                    {head && <p className="px-1 pb-1.5 pt-2 text-xs font-semibold text-ink-2">{head}</p>}
+                    <Link
+                      to={`/orders/${order.id}`}
+                      className={`block rounded-xl border border-line bg-surface p-3.5 active:bg-row-hover ${order.is_deleted ? 'opacity-60' : ''}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`num shrink-0 text-xl font-bold ${order.is_deleted ? 'text-muted line-through' : 'text-accent'}`}>
+                          {order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" className="mr-1 text-danger">●</span>}
+                          {order.number}
+                        </span>
+                        {order.is_deleted && <Tag tone="danger">удалён</Tag>}
+                        <span className="ml-auto flex min-w-0 justify-end"><QuickStatus status={order.status} groups={statusGroups} onPick={(next, comment) => void quickStatus(order, next, comment)} /></span>
                       </div>
-                      <div className="shrink-0 text-right">
-                        {Number(order.total_price) > 0 ? (
-                          <>
-                            <p className="font-semibold tabular-nums">{formatMoney(order.total_price)}</p>
-                            {Number(order.paid) < Number(order.total_price) && <p className="text-xs text-danger">долг {formatMoney(String(Number(order.total_price) - Number(order.paid)))}</p>}
-                          </>
-                        ) : (
-                          <p className="text-muted">{order.approximate_price ? `≈ ${order.approximate_price}` : '—'}</p>
-                        )}
-                        {order.device_password && <p className="num text-xs text-muted">пароль: {order.device_password}</p>}
+                      <p className="mt-2 break-words text-base font-semibold leading-snug">{device || 'Устройство не указано'}</p>
+                      {order.problems?.length > 0 && <p className="break-words text-[15px] text-ink-2">{order.problems.join(', ')}</p>}
+                      <div className="mt-2.5 flex items-end justify-between gap-3 text-sm">
+                        <div className="min-w-0">
+                          <p className="break-words">{order.counteragent.name}</p>
+                          <p className={`text-xs ${overdue ? 'font-semibold text-danger' : 'text-muted'}`}>
+                            {formatDate(order.created_at)}{order.deadline ? ` · срок ${formatDate(order.deadline)}` : ''}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          {total > 0 ? (
+                            <>
+                              <p className="num text-base font-semibold">{formatMoney(order.total_price)}</p>
+                              {debt > 0 && <p className="num text-xs font-medium text-danger">долг {formatMoney(String(debt))}</p>}
+                            </>
+                          ) : (
+                            <p className="text-muted">{order.approximate_price ? `≈ ${order.approximate_price}` : '—'}</p>
+                          )}
+                          {order.device_password && <p className="num text-xs text-muted">пароль: {order.device_password}</p>}
+                        </div>
                       </div>
-                    </div>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-          <div className="hidden overflow-x-auto rounded-xl border border-line bg-surface md:block">
-            {/* Строка — одна мысль: заказ, статус, что за аппарат и с чем пришёл, чей, сколько. Второстепенное — мелко под главным */}
-            <table className="w-full table-fixed text-left text-sm">
-              <colgroup>
-                <col className="w-[7.5rem]" />
-                <col className="w-[12.5rem]" />
-                <col />
-                <col className="w-[13rem]" />
-                <col className="hidden w-[8rem] xl:table-column" />
-                <col className="hidden w-[8.5rem] 2xl:table-column" />
-                <col className="w-[8rem]" />
-                <col className="w-[7rem]" />
-              </colgroup>
-              <thead className="bg-canvas text-xs text-muted">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Заказ</th>
-                  <th className="px-3 py-2 font-medium">Статус</th>
-                  <th className="px-3 py-2 font-medium">Устройство</th>
-                  <th className="px-3 py-2 font-medium">Клиент</th>
-                  <th className="hidden px-3 py-2 font-medium xl:table-cell">Срок</th>
-                  <th className="hidden px-3 py-2 font-medium 2xl:table-cell">Менеджер</th>
-                  <th className="px-3 py-2 text-right font-medium">Сумма</th>
-                  <th className="px-3 py-2 font-medium">Пароль</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.items.map((order) => {
-                  const overdue = order.deadline && new Date(order.deadline).getTime() < Date.now() && order.status.group !== 'closed'
-                  const device = [order.brand, order.model].filter(Boolean).join(' ')
-                  const type = orderTypes.find((t) => t.id === order.order_type_id)?.name
-                  return (
-                    <tr key={order.id} {...rowLink(`/orders/${order.id}`)} className={`cursor-pointer border-t border-line align-top hover:bg-canvas ${order.is_deleted ? 'text-muted line-through decoration-[#98a2b3] [&_td]:opacity-70' : ''}`}>
-                      <td className="px-3 py-2.5">
-                        <Link to={`/orders/${order.id}`} className={`num text-lg font-bold hover:underline ${order.is_deleted ? 'text-muted' : 'text-accent'}`}>{order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" title="Срочный" className="mr-1 text-danger">●</span>}{order.number}</Link>
-                        <small className="block whitespace-nowrap text-xs text-muted" title={formatDate(order.created_at)}>{ago(order.created_at) ?? formatDate(order.created_at).split(',')[0]}</small>
-                        {order.is_deleted && <span className="mt-1 inline-block rounded bg-danger/10 px-1.5 py-0.5 text-xs font-medium text-danger [text-decoration:none]">удалён</span>}
-                      </td>
-                      <td className="px-3 py-2.5"><QuickStatus status={order.status} groups={statusGroups} onPick={(next, comment) => void quickStatus(order, next, comment)} /></td>
-                      <td className="min-w-0 px-3 py-2.5">
-                        <p className="truncate text-base font-semibold" title={device}>{device || <span className="text-muted">Не указано</span>}</p>
-                        <p className="truncate text-sm text-ink/80" title={order.problems?.join(', ')}>
-                          {order.problems?.join(', ') || '—'}{type && type !== 'Негарантийный' && <span className="ml-1.5 rounded bg-accent-soft px-1 text-accent">{type}</span>}
-                        </p>
-                      </td>
-                      <td className="min-w-0 px-3 py-2.5">
-                        <p className="truncate" title={order.counteragent.name}>{order.counteragent.name}</p>
-                        <p className="truncate text-xs text-muted num">{formatPhone(order.counteragent.phones?.split(',')[0]) || '—'}</p>
-                      </td>
-                      <td className={`hidden whitespace-nowrap px-3 py-2.5 xl:table-cell ${overdue ? 'font-medium text-danger' : 'text-muted'}`}>{order.deadline ? formatDate(order.deadline).split(',')[0] : '—'}</td>
-                      <td className="hidden truncate px-3 py-2.5 text-muted 2xl:table-cell">{order.manager ?? '—'}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-right num">{Number(order.total_price) > 0
-                        ? <>
-                            <span className="font-medium">{formatMoney(order.total_price)}</span>
-                            {Number(order.paid) < Number(order.total_price)
-                              ? <small className="block text-xs text-danger">долг {formatMoney(String(Number(order.total_price) - Number(order.paid)))}</small>
-                              : <small className="block text-xs text-muted">оплачен</small>}
-                          </>
-                        : <span className="text-muted">{order.approximate_price ? `≈ ${order.approximate_price}` : '—'}</span>}</td>
-                      <td className="min-w-0 break-all px-3 py-2.5 num" title="Пароль на устройстве">{order.device_password || <span className="text-muted">—</span>}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-          <footer className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
-            <span>Всего: {data.total}</span>
-            <span className="flex items-center gap-3">
-              <button disabled={currentPage <= 1} className="text-ink disabled:opacity-40" onClick={() => setParam('page', String(currentPage - 1))}>Назад</button>
-              Страница {currentPage} из {pageCount}
-              <button disabled={currentPage >= pageCount} className="text-ink disabled:opacity-40" onClick={() => setParam('page', String(currentPage + 1))}>Далее</button>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-line bg-surface shadow-[var(--shadow-card)]">
+              {/* Строка — одна линия, 44 px: заказ, статус, аппарат и неисправность, клиент, срок, деньги. Подробности — в подсказке и в карточке */}
+              <table className="w-full table-fixed text-left text-sm">
+                <colgroup>
+                  <col className="w-[7.75rem]" />
+                  <col className="w-[13rem]" />
+                  <col />
+                  <col className="w-[11rem] xl:w-[16.5rem]" />
+                  <col className="hidden w-[6.5rem] xl:table-column" />
+                  <col className="hidden w-[8rem] 2xl:table-column" />
+                  <col className="w-[9.75rem]" />
+                  <col className="w-[5rem]" />
+                </colgroup>
+                <thead className="bg-head">
+                  <tr className="h-8">
+                    <th className="pl-5 pr-2 font-medium">Заказ</th>
+                    <th className="px-2 font-medium">Статус</th>
+                    <th className="truncate px-2 font-medium">Устройство и неисправность</th>
+                    <th className="px-2 font-medium">Клиент</th>
+                    <th className="hidden px-2 font-medium xl:table-cell">Срок</th>
+                    <th className="hidden px-2 font-medium 2xl:table-cell">Менеджер</th>
+                    <th className="px-2 text-right font-medium">Сумма</th>
+                    <th className="pl-2 pr-5 font-medium">Пароль</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {grouped.map(({ order, head }) => {
+                    const overdue = order.deadline && new Date(order.deadline).getTime() < Date.now() && order.status.group !== 'closed'
+                    const device = [order.brand, order.model].filter(Boolean).join(' ')
+                    const type = orderTypes.find((t) => t.id === order.order_type_id)?.name
+                    const problems = order.problems?.join(', ')
+                    const { total, debt, partial } = money(order)
+                    const phone = formatPhone(order.counteragent.phones?.split(',')[0])
+                    const created = ago(order.created_at)
+                    return [
+                      head && (
+                        <tr key={`h${order.id}`} className="ui-group-head hover:!bg-canvas">
+                          <td colSpan={columns} className="h-[30px] border-t border-line-soft pl-5 text-xs font-semibold">{head}</td>
+                        </tr>
+                      ),
+                      <tr key={order.id} {...rowLink(`/orders/${order.id}`)} className={`ui-row h-11 cursor-pointer border-t border-line-soft ${overdue && !order.is_deleted ? 'bg-danger-soft/50' : ''} ${order.is_deleted ? 'text-muted line-through decoration-placeholder [&_td]:opacity-70' : ''}`}>
+                        <td className="whitespace-nowrap pl-5 pr-2">
+                          <Link to={`/orders/${order.id}`} title={formatDate(order.created_at)} className={`num text-[15px] font-bold hover:underline ${order.is_deleted ? 'text-muted' : 'text-accent'}`}>{order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" title="Срочный" className="mr-1 text-danger">●</span>}{order.number}</Link>
+                          {order.is_deleted
+                            ? <Tag tone="danger" className="ml-1.5 [text-decoration:none]">удалён</Tag>
+                            : created && !created.includes(',') && <span className="ml-1.5 text-xs text-muted">{created.replace(' назад', '')}</span>}
+                        </td>
+                        <td className="px-2"><QuickStatus status={order.status} groups={statusGroups} onPick={(next, comment) => void quickStatus(order, next, comment)} /></td>
+                        <td className="min-w-0 px-2">
+                          <p className="truncate" title={[device, problems].filter(Boolean).join(' · ')}>
+                            <span className="font-semibold">{device || <span className="font-normal text-muted">Не указано</span>}</span>
+                            {problems && <span className="text-muted"> · {problems}</span>}
+                            {type && type !== 'Негарантийный' && <Tag tone="accent" className="ml-1.5">{type}</Tag>}
+                          </p>
+                        </td>
+                        <td className="min-w-0 px-2">
+                          <p className="flex min-w-0 items-baseline gap-1.5" title={[order.counteragent.name, phone].filter(Boolean).join(' · ')}>
+                            <span className="truncate">{order.counteragent.name}</span>
+                            {phone && <span className="num hidden shrink-0 text-[13px] text-muted xl:inline">{phone}</span>}
+                          </p>
+                        </td>
+                        <td className={`hidden whitespace-nowrap px-2 text-[13px] xl:table-cell ${overdue ? 'font-semibold text-danger' : 'text-ink-2'}`}>{order.deadline ? formatDate(order.deadline).split(',')[0] : <span className="text-muted">—</span>}</td>
+                        <td className="hidden truncate px-2 text-[13px] text-muted 2xl:table-cell">{order.manager ?? '—'}</td>
+                        <td className="whitespace-nowrap px-2 text-right num">{total > 0
+                          ? <>
+                              {debt > 0
+                                ? <Tag tone="danger" className="mr-2">{partial ? `долг ${formatMoney(String(debt))}` : 'долг'}</Tag>
+                                : <Tag tone="success" className="mr-2">оплачен</Tag>}
+                              <span className="font-semibold">{formatMoney(order.total_price)}</span>
+                            </>
+                          : <span className="text-muted">{order.approximate_price ? `≈ ${order.approximate_price}` : '—'}</span>}</td>
+                        <td className="min-w-0 truncate pl-2 pr-5 text-[13px] num" title={order.device_password ? `Пароль на устройстве: ${order.device_password}` : 'Пароль на устройстве'}>{order.device_password || <span className="text-muted">—</span>}</td>
+                      </tr>,
+                    ]
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <footer className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[13px] text-muted">
+            <span className="num">Всего: {data.total.toLocaleString('ru-RU')}</span>
+            <span className="flex items-center gap-2">
+              <button disabled={currentPage <= 1} className={btn('secondary', 'sm')} onClick={() => setParam('page', String(currentPage - 1))}>Назад</button>
+              <span className="num">Страница {currentPage} из {pageCount.toLocaleString('ru-RU')}</span>
+              <button disabled={currentPage >= pageCount} className={btn('secondary', 'sm')} onClick={() => setParam('page', String(currentPage + 1))}>Далее</button>
             </span>
           </footer>
         </div>

@@ -49,7 +49,7 @@ export default function QuickStatus({ status, groups, disabled, onPick }: Props)
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
-  if (!canChange) return <StatusBadge big group={status.group} name={status.name} color={status.color} sms={status.sms} />
+  if (!canChange) return <StatusBadge chip name={status.name} color={status.color} sms={status.sms} />
 
   const toggle = (event: MouseEvent) => {
     event.preventDefault() // внутри ссылки на заказ: не открываем карточку
@@ -83,15 +83,15 @@ export default function QuickStatus({ status, groups, disabled, onPick }: Props)
   return (
     <>
       <button ref={button} type="button" onClick={toggle} aria-haspopup="listbox" aria-expanded={open} aria-label={`Статус: ${status.name}. Изменить`}
-        className="-mx-1 -my-3.5 inline-flex max-w-full items-center rounded-full px-1 py-3.5 disabled:opacity-60" disabled={disabled}>
-        <StatusBadge big chevron group={status.group} name={status.name} color={status.color} sms={status.sms} />
+        className="-mx-1 -my-2.5 inline-flex max-w-full items-center rounded-[9px] px-1 py-2.5 disabled:opacity-60" disabled={disabled}>
+        <StatusBadge chip chevron name={status.name} color={status.color} sms={status.sms} />
       </button>
       {open && createPortal(
         <>
           <div className="fixed inset-0 z-40 bg-black/30 md:bg-transparent" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setOpen(false) }} aria-hidden />
           <ul role="listbox" aria-label="Выберите статус"
             style={pos && window.matchMedia('(min-width: 768px)').matches ? { top: pos.top, left: pos.left, width: 260 } : undefined}
-            className="quick-menu fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overflow-y-auto rounded-t-2xl border border-line bg-surface p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-xl md:inset-x-auto md:bottom-auto md:max-h-[360px] md:rounded-xl">
+            className="quick-menu fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overflow-y-auto rounded-t-2xl border border-line bg-surface p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-[var(--shadow-pop)] md:inset-x-auto md:bottom-auto md:max-h-[360px] md:rounded-xl">
             {options.map((item, index) => (
               <li key={item.id} className={item.group === 'closed' && options[index - 1]?.group !== 'closed' ? 'mt-1 border-t border-line pt-1' : undefined}>
                 <button type="button" role="option" aria-selected={item.id === status.id} onClick={(event) => pick(event, item)}
