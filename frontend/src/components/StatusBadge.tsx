@@ -111,11 +111,12 @@ export default function StatusBadge({ name, color, sms, className = '', big = fa
     return (
       <span
         title={name}
-        className={`status-badge inline-flex h-[26px] max-w-full items-center gap-[7px] rounded-[7px] px-[9px] text-[12.5px] font-semibold ${className}`}
+        className={`status-badge inline-flex min-h-[26px] max-w-full items-center gap-[7px] rounded-[7px] px-[9px] py-1 text-left text-[12.5px] font-semibold leading-[1.2] ${className}`}
         style={{ '--sb-text': c.text, '--sb-bg': c.bg, '--sb-dot': c.dot } as React.CSSProperties}
       >
         <span className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ backgroundColor: c.dot }} aria-hidden />
-        <span className="truncate">{name}</span>
+        {/* Название статуса показываем целиком: длинное переносится на вторую строку, а не обрезается */}
+        <span className="min-w-0 [overflow-wrap:anywhere]">{name}</span>
         <SmsTicks state={sms} />
         {chevron && (
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0 opacity-70"><path d="m6 9 6 6 6-6" /></svg>

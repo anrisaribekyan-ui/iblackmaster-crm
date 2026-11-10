@@ -71,9 +71,6 @@ function formatMoney(value: string) {
   return `${MONEY.format(Number(value))} ₽`
 }
 
-// Сколько просрочено по точке: одна лёгкая цифра для плитки над списком, обновляется вместе со списком
-const overdueCache = new Map<string, number>()
-
 // Последние показанные списки (по фильтрам): вернулись из заказа — список на экране сразу, свежий подгружается следом
 const listCache = new Map<string, OrderList>()
 
@@ -180,13 +177,11 @@ export default function OrdersPage() {
   // Плитка «Просрочены»: тот же список заказов с готовым фильтром overdue, берём только total
   useEffect(() => {
     if (!desktop) return
-    const key = currentLocation ?? ''
-    setOverdueTotal(overdueCache.get(key) ?? null)
     const params = new URLSearchParams({ tab: 'open', overdue: 'true' })
     if (currentLocation) params.set('location_id', currentLocation)
     let alive = true
     api.get<OrderList>(`/orders?${params.toString()}`)
-      .then((result) => { overdueCache.set(key, result.total); if (alive) setOverdueTotal(result.total) })
+      .then((result) => { if (alive) setOverdueTotal(result.total) })
       .catch(() => undefined)
     return () => { alive = false }
   }, [currentLocation, desktop, data?.total])
@@ -318,7 +313,7 @@ export default function OrdersPage() {
                           {order.number}
                         </span>
                         {order.is_deleted && <Tag tone="danger">удалён</Tag>}
-                        <span className="ml-auto flex min-w-0 justify-end"><QuickStatus status={order.status} groups={statusGroups} onPick={(next, comment) => void quickStatus(order, next, comment)} /></span>
+                        <span className="flex min-w-0 flex-1 justify-end"><QuickStatus status={order.status} groups={statusGroups} onPick={(next, comment) => void quickStatus(order, next, comment)} /></span>
                       </div>
                       <p className="mt-2 break-words text-base font-semibold leading-snug">{device || 'Устройство не указано'}</p>
                       {order.problems?.length > 0 && <p className="break-words text-[15px] text-ink-2">{order.problems.join(', ')}</p>}
