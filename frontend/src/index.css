@@ -505,3 +505,10 @@ html[data-theme="glass"] .sms-bubble { background: color-mix(in srgb, var(--colo
 .rail-search:hover { border-color: var(--color-rail-muted) !important; }
 .rail-search:focus { border-color: var(--color-accent) !important; box-shadow: 0 0 0 3px rgb(230 72 35 / 0.25) !important; }
 .rail-search::-webkit-search-cancel-button { display: none; }
+/* Поля в строках таблицы позиций: тихие, рамка и фон проявляются при наведении и в фокусе */
+.cell-input { min-height: 0 !important; border-color: transparent !important; background-color: var(--color-line-soft) !important; }
+.cell-input:hover:not(:disabled) { border-color: var(--color-line-strong) !important; }
+.cell-input:focus { border-color: var(--color-accent) !important; background-color: var(--color-surface) !important; }
+.cell-input:disabled { opacity: 0.6; }
+.cell-input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.cell-input[type="number"]::-webkit-outer-spin-button, .cell-input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }

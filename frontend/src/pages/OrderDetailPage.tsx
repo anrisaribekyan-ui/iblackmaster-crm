@@ -4,6 +4,7 @@ import { api, ApiError } from '../api/client'
 import { formatPhone, isoToLocalInput, localInputToIso } from '../format'
 import { useAuth } from '../auth'
 import Modal from '../components/Modal'
+import { btn, ListSkeleton } from '../components/ui'
 import TaskForm, { type TaskEmployee, type TaskFormValues } from '../components/TaskForm'
 import { openPrint } from '../print'
 import { actHtml, checklistHtml as checkSheetHtml, FORMS_STYLE, labelHtml, LABEL_STYLE, receiptHtml, refusalHtml, saleCheckHtml, warrantyHtml, type FormData } from '../printForms'
@@ -110,6 +111,8 @@ type TaskRow = { id: number; title: string; text: string | null; assignee_name: 
 type LocationInfo = { id: number; name: string; address: string | null; phones: string | null }
 
 const inputClass = 'w-full rounded-md border border-line bg-surface px-3 py-2'
+// Поле в строке позиции: компактное, рамка проявляется при наведении — таблица читается как таблица, а не как форма
+const cellInput = 'cell-input h-8 rounded-md border px-2 text-right text-sm num'
 const aliasMap: Record<string, string> = {
   deviceType: 'device_type',
   sn: 'serial',
@@ -663,7 +666,15 @@ export default function OrderDetailPage() {
     await run(() => api.del(`/orders/${detail.order.id}/positions/${position.id}`), 'Не удалось удалить позицию')
   }
 
-  if (loading) return <p className="text-muted">Загрузка заказа…</p>
+  if (loading) return (
+    <section role="status" aria-label="Загрузка заказа">
+      <div className="mb-4 h-[156px] rounded-2xl bg-rail" />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <ListSkeleton rows={5} rowHeight={48} />
+        <div className="hidden h-64 rounded-xl border border-line bg-surface xl:block" />
+      </div>
+    </section>
+  )
   if (!detail) {
     return <section>{error && <p role="alert" className="text-danger">{error}</p>}<Link className="text-accent" to="/orders">← К списку заказов</Link></section>
   }
@@ -720,7 +731,7 @@ export default function OrderDetailPage() {
         <div className="grid gap-4 px-4 pb-4 pt-2 sm:px-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className={`num text-[34px] font-semibold leading-none tracking-tight ${isDeleted ? 'text-white/40 line-through decoration-[#ff8a72] decoration-2' : ''}`}>{detail.order.number}</h1>
+              <h1 className={`num text-[32px] font-bold leading-none tracking-tight ${isDeleted ? 'text-white/40 line-through decoration-[#ff8a72] decoration-2' : ''}`}>{detail.order.number}</h1>
               <span className="relative inline-flex items-center">
                 <span className="pointer-events-none absolute left-3 h-2 w-2 rounded-full" style={{ backgroundColor: statusColors(detail.status.color).dot }} aria-hidden />
                 <select
@@ -765,7 +776,7 @@ export default function OrderDetailPage() {
               </div>
             )}
             {!isDeleted && detail.status.group !== 'closed' && (
-              <button className="ml-auto rounded-lg bg-accent px-4 py-2.5 font-semibold text-accent-ink transition-transform active:scale-[0.97] md:ml-2" onClick={giveOrder}>Выдать</button>
+              <button className="ml-auto h-11 rounded-[10px] bg-accent px-6 text-[15px] font-semibold text-accent-ink md:ml-2" onClick={giveOrder}>Выдать</button>
             )}
           </div>
         </div>
@@ -805,9 +816,9 @@ export default function OrderDetailPage() {
       {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}</p>}
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0">
-          <nav className="mb-3 flex gap-1 border-b border-line">
-            <button className={`border-b-2 px-3 py-2 ${tab === 'positions' ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab('positions')}>Работы и материалы</button>
-            <button className={`border-b-2 px-3 py-2 ${tab === 'info' ? 'border-accent font-medium' : 'border-transparent text-muted'}`} onClick={() => setTab('info')}>Информация</button>
+          <nav className="mb-3 flex gap-0.5 border-b border-line">
+            <button aria-current={tab === 'positions' ? 'page' : undefined} className={`-mb-px h-10 border-b-2 px-3 ${tab === 'positions' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('positions')}>Работы и материалы</button>
+            <button aria-current={tab === 'info' ? 'page' : undefined} className={`-mb-px h-10 border-b-2 px-3 ${tab === 'info' ? 'border-accent font-semibold text-ink' : 'border-transparent font-medium text-ink-2 hover:text-ink'}`} onClick={() => setTab('info')}>Информация</button>
           </nav>
           {tab === 'info' ? (
             <section className="rounded-xl border border-line bg-surface p-4">
@@ -870,14 +881,13 @@ export default function OrderDetailPage() {
               {(!isClosed || (can('operationCashRegisterAccess') && !detail.order.is_deleted)) && (
                 <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
                   {!isClosed && (
-                    <button type="button" onClick={() => setPartOpen(true)}
-                      className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink shadow-sm transition-transform active:scale-[0.98]">
+                    <button type="button" onClick={() => setPartOpen(true)} className={btn('soft')}>
                       Заказать запчасть
                     </button>
                   )}
                   {can('operationCashRegisterAccess') && !detail.order.is_deleted && (
                     <button type="button" title="Чаевые мастеру: половина идёт ему в зарплату, половина остаётся в кассе" onClick={() => openPayment('tip')}
-                      className="rounded-lg border border-line px-4 py-2 text-sm font-medium">
+                      className={btn('secondary')}>
                       + Чаевые
                     </button>
                   )}
@@ -921,9 +931,9 @@ export default function OrderDetailPage() {
                     />
                   ))}
                 </ul>
-                <div className="mb-4 hidden overflow-x-auto md:block">
-                  <table className="w-full min-w-[960px] text-left text-sm">
-                    <thead className="bg-canvas text-muted"><tr>{['Позиция', 'Тип', 'Исполнитель', 'Кол-во', 'Цена', 'Скидка, ₽', ...(canSeeCost ? ['Себестоимость'] : []), 'Гарантия, дн.', ...(can('changeSalaryAccess') ? ['ЗП, %'] : []), 'Итого', ...(can('marginPriceAccess') ? ['Прибыль'] : []), ''].map((item) => <th key={item} className="px-2 py-2 font-medium">{item}</th>)}</tr></thead>
+                <div className="-mx-4 mb-4 hidden overflow-x-auto border-y border-line-soft md:block">
+                  <table className="w-full min-w-[720px] text-left text-sm">
+                    <thead className="bg-head"><tr className="h-8">{[['Исполнитель', 'pl-4 text-left'], ['Кол-во', 'text-right'], ['Цена', 'text-right'], ['Скидка, ₽', 'text-right'], ...(canSeeCost ? [['Себест.', 'text-right']] : []), ['Гарантия', 'text-right'], ...(can('changeSalaryAccess') ? [['ЗП, %', 'text-right']] : []), ['Итого', 'text-right'], ...(can('marginPriceAccess') ? [['Прибыль', 'text-right']] : []), ['', 'pr-2']].map(([item, cls]) => <th key={item} className={`px-1 font-medium ${cls}`}>{item}</th>)}</tr></thead>
                     <tbody>
                       {detail.positions.map((position) => (
                         <PositionRow
@@ -1302,32 +1312,39 @@ function PositionRow({
   const [guarantee, setGuarantee] = useState(String(position.guarantee_days))
   useEffect(() => setGuarantee(String(position.guarantee_days)), [position.guarantee_days])
   return (
-    <tr className="border-t border-line">
-      <td className="px-2 py-2"><button type="button" className="text-left underline-offset-2 hover:underline" onClick={onOpen}>{position.name}</button></td>
-      <td className="px-2 py-2">{position.is_work ? 'Работа' : 'Материал'}</td>
-      <td className="px-2 py-2"><PerformerSelect position={position} staff={staff} disabled={!canPerformer} onChange={onSavePerformer} /></td>
-      <td className="px-2 py-2 num">{Number(position.quantity).toLocaleString('ru-RU')}</td>
-      <td className="px-2 py-2">{canEdit ? <input className={`${inputClass} w-28 text-right num`} type="number" min="0" step="1" value={price} onChange={(event) => setPrice(event.target.value)} onBlur={() => { if (price !== position.price) onSavePrice(price) }} /> : <span className="num">{formatMoney(position.sold_price)}</span>}</td>
-      <td className="px-2 py-2">{canEdit ? <input className={`${inputClass} w-24 text-right num`} type="number" min="0" step="1" value={discount} title="Скидка на всю позицию, ₽" onChange={(event) => setDiscount(event.target.value)} onBlur={() => { if (discount !== discountNow) onSaveDiscount(discount) }} /> : <span className="num">{discountNow === '0' ? '—' : formatMoney(discountNow)}</span>}</td>
+    <>
+    {/* Позиция — две строки: название во всю ширину, под ним поля. Так длинное название не сжимает таблицу */}
+    <tr className="border-t border-line-soft">
+      <td colSpan={6 + (canViewCost ? 1 : 0) + (showSalary ? 1 : 0) + (canViewMargin ? 1 : 0)} className="pb-0 pl-4 pr-2 pt-2.5">
+        <button type="button" className="text-left font-medium underline-offset-2 [overflow-wrap:anywhere] hover:underline" onClick={onOpen}>{position.name}</button>
+        <span className="ml-2 text-xs text-muted">{position.is_work ? 'работа' : 'материал'}</span>
+      </td>
+    </tr>
+    <tr>
+      <td className="py-1.5 pl-4 pr-1"><PerformerSelect compact position={position} staff={staff} disabled={!canPerformer} onChange={onSavePerformer} /></td>
+      <td className="px-1 py-1.5 text-right num">{Number(position.quantity).toLocaleString('ru-RU')}</td>
+      <td className="px-1 py-1.5 text-right">{canEdit ? <input aria-label={`Цена: ${position.name}`} className={`${cellInput} w-[6rem]`} type="number" min="0" step="1" value={price} onChange={(event) => setPrice(event.target.value)} onBlur={() => { if (price !== position.price) onSavePrice(price) }} /> : <span className="num">{formatMoney(position.sold_price)}</span>}</td>
+      <td className="px-1 py-1.5 text-right">{canEdit ? <input aria-label={`Скидка: ${position.name}`} className={`${cellInput} w-[4.5rem]`} type="number" min="0" step="1" value={discount} title="Скидка на всю позицию, ₽" onChange={(event) => setDiscount(event.target.value)} onBlur={() => { if (discount !== discountNow) onSaveDiscount(discount) }} /> : <span className="num">{discountNow === '0' ? '—' : formatMoney(discountNow)}</span>}</td>
       {canViewCost && (
-        <td className="px-2 py-2">{canEditCost
-          ? <input className={`${inputClass} w-28 text-right num`} type="number" min="0" step="1" value={cost} title="Себестоимость за единицу" onChange={(event) => setCost(event.target.value)} onBlur={() => { if (cost !== (position.purchase_price ?? '')) onSaveCost(cost) }} />
+        <td className="px-1 py-1.5 text-right">{canEditCost
+          ? <input aria-label={`Себестоимость: ${position.name}`} className={`${cellInput} w-[5.5rem]`} type="number" min="0" step="1" value={cost} title="Себестоимость за единицу" onChange={(event) => setCost(event.target.value)} onBlur={() => { if (cost !== (position.purchase_price ?? '')) onSaveCost(cost) }} />
           : <span className="num">{position.purchase_price === null ? '—' : formatMoney(position.purchase_price)}</span>}</td>
       )}
-      <td className="px-2 py-2">{canEdit ? <input className={`${inputClass} w-20 text-right num`} type="number" min="0" step="1" value={guarantee} title="Гарантия на позицию, дней" onChange={(event) => setGuarantee(event.target.value)} onBlur={() => { if (guarantee !== String(position.guarantee_days)) onSaveGuarantee(guarantee) }} /> : <span className="num">{position.guarantee_days}</span>}</td>
-      {showSalary && <td className="px-2 py-2"><input className={`${inputClass} w-20 text-right num`} inputMode="decimal" disabled={!canSalary} placeholder="по правилу" title="Свой процент зарплаты исполнителю за эту позицию. Пусто — по общему правилу" value={salary} onChange={(event) => setSalary(event.target.value.replace(/[^\d.,]/g, ''))} onBlur={() => { if (salary !== salaryNow) onSaveSalary(salary) }} /></td>}
-      <td className="px-2 py-2 num">{formatMoney(position.total)}</td>
-      {canViewMargin && <td className="px-2 py-2 num">{position.margin === null ? '—' : formatMoney(position.margin)}</td>}
-      <td className="px-2 py-2">{canEdit && <button className="text-danger" onClick={onDelete}>Удалить</button>}</td>
+      <td className="px-1 py-1.5 text-right">{canEdit ? <input aria-label={`Гарантия, дней: ${position.name}`} className={`${cellInput} w-[3.75rem]`} type="number" min="0" step="1" value={guarantee} title="Гарантия на позицию, дней" onChange={(event) => setGuarantee(event.target.value)} onBlur={() => { if (guarantee !== String(position.guarantee_days)) onSaveGuarantee(guarantee) }} /> : <span className="num">{position.guarantee_days}</span>}</td>
+      {showSalary && <td className="px-1 py-1.5 text-right"><input aria-label={`Процент зарплаты: ${position.name}`} className={`${cellInput} w-[4.25rem]`} inputMode="decimal" disabled={!canSalary} placeholder="авто" title="Свой процент зарплаты исполнителю за эту позицию. Пусто — по общему правилу" value={salary} onChange={(event) => setSalary(event.target.value.replace(/[^\d.,]/g, ''))} onBlur={() => { if (salary !== salaryNow) onSaveSalary(salary) }} /></td>}
+      <td className="whitespace-nowrap px-1 py-1.5 text-right font-semibold num">{formatMoney(position.total)}</td>
+      {canViewMargin && <td className={`whitespace-nowrap px-1 py-1.5 text-right num ${position.margin !== null && Number(position.margin) > 0 ? 'text-success' : 'text-muted'}`}>{position.margin === null ? '—' : formatMoney(position.margin)}</td>}
+      <td className="py-1.5 pl-0 pr-2 text-right">{canEdit && <button className="grid h-8 w-8 place-items-center rounded-md text-lg leading-none text-muted hover:bg-danger-soft hover:text-danger" onClick={onDelete} aria-label={`Удалить ${position.name}`} title="Удалить позицию">×</button>}</td>
     </tr>
+    </>
   )
 }
 
-function PerformerSelect({ position, staff, disabled, onChange }: { position: Position; staff: Employee[]; disabled: boolean; onChange: (id: string) => void }) {
+function PerformerSelect({ position, staff, disabled, onChange, compact = false }: { position: Position; staff: Employee[]; disabled: boolean; onChange: (id: string) => void; compact?: boolean }) {
   const current = position.performer_id ?? ''
   const known = staff.some((item) => item.id === position.performer_id)
   return (
-    <select className={`${inputClass} h-9 min-w-36 max-w-52 text-sm`} disabled={disabled} value={current} title="Кому пойдёт зарплата за эту позицию. Менять можно и после выдачи заказа" onChange={(event) => onChange(event.target.value)}>
+    <select aria-label={`Исполнитель: ${position.name}`} className={compact ? 'cell-input h-8 w-[9rem] rounded-md border px-2 text-sm' : `${inputClass} h-9 min-w-36 max-w-52 text-sm`} disabled={disabled} value={current} title="Кому пойдёт зарплата за эту позицию. Менять можно и после выдачи заказа" onChange={(event) => onChange(event.target.value)}>
       {!position.performer_id && <option value="">не назначен</option>}
       {position.performer_id && !known && <option value={position.performer_id}>{position.performer_name ?? `№${position.performer_id}`}</option>}
       {staff.map((item) => <option key={item.id} value={item.id}>{item.short_name}</option>)}
