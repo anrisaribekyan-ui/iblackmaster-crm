@@ -1,4 +1,5 @@
 import { getCurrentLocation } from '../currentLocation'
+import { btn, PageHeader } from '../components/ui'
 import PhoneInput from '../components/PhoneInput'
 import PhoneReader from '../components/PhoneReader'
 import { ClientCard, useIntakeHints, WarrantyAlert } from '../components/IntakeHints'
@@ -430,12 +431,21 @@ export default function OrderCreatePage() {
     })
   }
 
-  if (loading) return <p className="text-muted">Загрузка формы заказа…</p>
+  if (loading) return (
+    <section className="max-w-6xl" role="status" aria-label="Загрузка формы заказа">
+      <PageHeader title="Новый заказ" />
+      <div className="grid gap-4">
+        <div className="h-[86px] rounded-xl border border-line bg-surface" />
+        <div className="h-[200px] rounded-xl border border-line bg-surface" />
+        <div className="h-[280px] rounded-xl border border-line bg-surface" />
+      </div>
+    </section>
+  )
   return (
     <section className="max-w-6xl">
-      <h1 className="mb-4 text-xl font-semibold">Новый заказ</h1>
-      {prefillNote && <p role="status" className="mb-3 rounded-lg bg-accent/10 p-3 text-sm">{prefillNote}</p>}
-      {error && <p role="alert" className="mb-4 rounded-md border border-danger p-3 text-danger">{error}{createdId && <> <Link className="underline" to={`/orders/${createdId}`}>Открыть заказ</Link></>}</p>}
+      <PageHeader title="Новый заказ" />
+      {prefillNote && <p role="status" className="mb-3 rounded-lg border border-accent-line bg-accent-soft p-3 text-sm">{prefillNote}</p>}
+      {error && <p role="alert" className="mb-4 rounded-md border border-danger bg-danger-soft p-3 text-danger">{error}{createdId && <> <Link className="underline" to={`/orders/${createdId}`}>Открыть заказ</Link></>}</p>}
       {orderTypes.length === 0 ? (
         <p className="rounded-lg border border-line bg-surface p-5 text-muted">Нет активных типов заказов. Добавьте тип в настройках перед созданием заказа.</p>
       ) : (
@@ -609,9 +619,10 @@ export default function OrderCreatePage() {
             </section>
           )}
           {fields.length > 0 && (
-            <div className="flex justify-end gap-2">
-              <button type="button" className="rounded-md border border-line bg-surface px-4 py-2.5" onClick={() => navigate('/orders')}>Отмена</button>
-              <button disabled={saving || fieldsLoading} className="flex-1 rounded-md bg-accent px-4 py-2.5 font-medium text-accent-ink disabled:opacity-60 sm:flex-none">
+            /* Кнопки прилипают к низу окна: «Создать заказ» всегда под рукой, как бы длинна ни была форма */
+            <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] z-10 -mx-1 flex justify-end gap-2 rounded-xl border border-line bg-surface/95 p-2 shadow-[var(--shadow-pop)] backdrop-blur md:bottom-3 md:pr-48">
+              <button type="button" className={btn('ghost', 'md', 'h-11 px-4')} onClick={() => navigate('/orders')}>Отмена</button>
+              <button disabled={saving || fieldsLoading} className={btn('primary', 'md', 'h-11 flex-1 px-6 text-[15px] sm:flex-none')}>
                 {saving ? 'Создание…' : 'Создать заказ'}
               </button>
             </div>
