@@ -7,7 +7,7 @@ from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids, require
 from app.errors import BusinessError, Forbidden, NotFound
-from app.models import CashItem, CashRegister, Transaction
+from app.models import CashItem, CashRegister, Order, Sale, Transaction
 from app.services import money
 
 router = APIRouter(tags=["Финансы"])
@@ -66,6 +66,8 @@ def validate_register(db: DbSession, me: CurrentEmployee, register_id: int) -> C
 def transaction_dict(db: DbSession, transaction: Transaction) -> dict:
     register = db.get(CashRegister, transaction.cash_register_id)
     item = db.get(CashItem, transaction.cash_item_id)
+    order = db.get(Order, transaction.order_id) if transaction.order_id else None
+    sale = db.get(Sale, transaction.sale_id) if transaction.sale_id else None
     return {
         "id": transaction.id,
         "date": transaction.date,
@@ -82,6 +84,8 @@ def transaction_dict(db: DbSession, transaction: Transaction) -> dict:
         "employee_id": transaction.employee_id,
         "created_by_id": transaction.created_by_id,
         "order_id": transaction.order_id,
+        "order_number": order.number if order else None,
+        "sale_number": sale.number if sale else None,
         "sale_id": transaction.sale_id,
         "stock_document_id": transaction.stock_document_id,
         "pair_id": transaction.pair_id,
