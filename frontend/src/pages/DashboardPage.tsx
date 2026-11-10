@@ -156,14 +156,14 @@ export default function DashboardPage() {
             {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
         {canPeriod && (
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="flex h-9 items-center rounded-md border border-line bg-surface p-0.5" role="group" aria-label="Период">
+          <div className="flex max-w-full flex-wrap items-end gap-2">
+            <div className="flex h-9 max-w-full items-center overflow-x-auto rounded-md border border-line bg-surface p-0.5" role="group" aria-label="Период">
               {(Object.keys(PERIOD_NAMES) as Period[]).map((p) => (
                 <button
                   key={p}
                   type="button"
                   aria-pressed={period === p}
-                  className={`h-8 rounded-[6px] px-2.5 text-[13px] ${period === p ? 'bg-ink font-semibold text-white' : 'font-medium text-ink-2 hover:bg-line-soft hover:text-ink'}`}
+                  className={`h-8 shrink-0 whitespace-nowrap rounded-[6px] px-2.5 text-[13px] ${period === p ? 'bg-ink font-semibold text-white' : 'font-medium text-ink-2 hover:bg-line-soft hover:text-ink'}`}
                   onClick={() => setPeriod(p)}
                 >
                   {PERIOD_LABELS[p]}
@@ -357,7 +357,7 @@ function QuickActions({ canCreate }: { canCreate: boolean }) {
   return (
     <div className="mb-4 hidden gap-3 md:grid md:grid-cols-3">
       {canCreate && (
-        <Link to="/orders/new" className="lift group flex items-center gap-3 rounded-xl bg-ink p-3 text-white active:scale-[0.99]">
+        <Link to="/orders/new" className="lift group flex items-center gap-3 rounded-xl bg-rail p-3 text-white active:scale-[0.99]">
           <span className="grid h-10 w-10 place-items-center rounded-lg bg-accent text-xl">+</span>
           <span><b className="block font-semibold">Новый заказ</b><small className="text-white/60">принять устройство · N</small></span>
         </Link>

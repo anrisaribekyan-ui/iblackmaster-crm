@@ -138,7 +138,7 @@ export default function Layout() {
     <div className="md:flex md:h-full">
       {menuOpen && <div className="modal-backdrop fixed inset-0 z-[45] bg-black/40 md:hidden" onClick={() => setMenuOpen(false)} aria-hidden />}
       <aside
-        className={`fixed inset-y-0 left-0 z-[46] flex w-64 shrink-0 flex-col bg-rail pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] text-rail-ink transition-transform md:static md:w-[220px] md:translate-x-0 ${menuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}
+        className={`fixed inset-y-0 left-0 z-[46] flex w-64 shrink-0 flex-col bg-rail pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] text-rail-ink transition-transform motion-reduce:transition-none md:static md:w-[220px] md:translate-x-0 ${menuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}
       >
         <div className="flex items-center gap-2.5 px-[18px] pb-3 pt-[18px]">
           <span className="grid h-[30px] w-[30px] place-items-center rounded-[9px] bg-accent text-[15px] font-bold text-white" aria-hidden>i</span>
@@ -173,7 +173,7 @@ export default function Layout() {
                     to={m.to}
                     end={m.to === '/'}
                     className={({ isActive }) =>
-                      `flex min-h-11 items-center gap-2.5 rounded-[7px] px-2.5 text-[15px] md:min-h-[30px] md:text-[13.5px] ${
+                      `flex min-h-11 items-center gap-2.5 rounded-[7px] px-2.5 text-[15px] md:min-h-[30px] md:text-sm ${
                         isActive ? 'bg-rail-hover font-semibold text-white' : 'text-rail-ink hover:bg-rail-hover/70 hover:text-white'
                       }`
                     }
@@ -193,7 +193,7 @@ export default function Layout() {
         <InstallApp />
         <div className="mx-2.5 mb-1.5 flex items-center gap-1">
           <ThemeSwitch />
-          <button type="button" onClick={() => { void resetTips().then(() => setTourOpen(true)) }} className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-sm font-semibold text-rail-muted hover:bg-rail-hover hover:text-white" title="Экскурсия по CRM: показать подсказки по страницам заново" aria-label="Экскурсия по CRM">
+          <button type="button" onClick={() => { void resetTips().then(() => setTourOpen(true)) }} className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-sm font-semibold text-rail-muted hover:bg-rail-hover hover:text-white max-md:h-11 max-md:w-11" title="Экскурсия по CRM: показать подсказки по страницам заново" aria-label="Экскурсия по CRM">
             ?
           </button>
         </div>
@@ -203,9 +203,9 @@ export default function Layout() {
           </span>
           <button type="button" onClick={() => setPasswordOpen(true)} className="min-w-0 flex-1 rounded-md text-left leading-tight" title="Сменить пароль">
             <div className="truncate text-[13px] font-medium text-white">{me?.short_name}</div>
-            <div className="truncate text-xs text-rail-muted">{me?.role_name} · сменить пароль</div>
+            <div className="truncate text-xs text-rail-muted" title={`${me?.role_name ?? ''} · сменить пароль`}>{me?.role_name} · пароль</div>
           </button>
-          <button onClick={logout} className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-rail-muted hover:bg-rail hover:text-white" title="Выйти из CRM на этом устройстве" aria-label="Выйти">
+          <button onClick={logout} className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-rail-muted hover:bg-rail hover:text-white max-md:h-11 max-md:w-11" title="Выйти из CRM на этом устройстве" aria-label="Выйти">
             <Icon name="logout" className="h-[18px] w-[18px]" />
           </button>
         </div>
@@ -223,7 +223,8 @@ export default function Layout() {
               type="search"
               enterKeyHint="search"
               className="w-full rounded-md border border-line bg-surface py-2 pl-9 pr-3"
-              placeholder="Поиск: номер, телефон, имя, IMEI"
+              placeholder="Поиск заказа"
+              aria-label="Найти заказ: номер, телефон, имя, IMEI"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => event.key === 'Escape' && (setQuery(''), event.currentTarget.blur())}
@@ -232,7 +233,7 @@ export default function Layout() {
           <button
             type="button"
             onClick={() => (tipAllowed && tip ? setForcedTip(tip.id) : setTourOpen(true))}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-surface font-semibold text-muted hover:text-ink"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line bg-surface font-semibold text-muted hover:text-ink max-md:h-11 max-md:w-11"
             title="Что на этой странице"
             aria-label="Подсказка по этой странице"
           >

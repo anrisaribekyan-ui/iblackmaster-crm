@@ -57,7 +57,7 @@ export default function MonthCompare({ locationId }: { locationId?: string }) {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="text-xs text-muted">
-              <tr><th className="py-1 font-medium"></th><th className="py-1 text-right font-medium">{title(lastStart)}</th><th className="py-1 text-right font-medium">{title(prevStart)}</th><th className="py-1 text-right font-medium">Изменение</th></tr>
+              <tr><th className="py-1 font-medium"></th><th className="py-1 pl-3 text-right font-medium">{title(lastStart)}</th><th className="py-1 pl-3 text-right font-medium">{title(prevStart)}</th><th className="py-1 pl-3 text-right font-medium">Изменение</th></tr>
             </thead>
             <tbody>
               {METRICS.map((mt) => {

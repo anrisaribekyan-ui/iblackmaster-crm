@@ -690,9 +690,9 @@ export default function OrderDetailPage() {
     <section>
       {/* Шапка заказа — как бирка, которую вешают на аппарат: номер крупно, что за устройство, чьё и сколько должны */}
       <header className="mb-4 overflow-hidden rounded-2xl bg-rail text-white">
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 sm:px-5">
-          <Link className="text-sm text-white/50 transition-colors hover:text-white" to="/orders">← Заказы</Link>
-          <span className="flex flex-wrap justify-end gap-1.5 max-md:-mx-2 max-md:w-full max-md:justify-start">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 max-md:flex-col max-md:items-stretch max-md:gap-0 sm:px-5">
+          <Link className="text-sm text-white/50 transition-colors hover:text-white max-md:py-1" to="/orders">← Заказы</Link>
+          <span className="flex flex-wrap justify-end gap-1.5 max-md:-mx-2 max-md:flex-nowrap max-md:justify-start max-md:overflow-x-auto">
             <HeaderMenu label="Печать">{(close) => (<>
                 <button role="menuitem" className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => { close(); printForm('receipt') }}>Квитанция о приёме</button>
                 <button role="menuitem" className="rounded-md px-3 py-2 text-left hover:bg-canvas" onClick={() => { close(); printForm('checklist') }}>Проверка неисправностей</button>
@@ -706,7 +706,7 @@ export default function OrderDetailPage() {
               <select
                 aria-label="Передать в локацию"
                 title="Передать в другую локацию"
-                className="max-w-[10.5rem] truncate rounded-lg bg-transparent px-2 py-1.5 text-sm text-white/80 hover:bg-white/10"
+                className="max-w-[10.5rem] shrink-0 truncate rounded-lg bg-transparent px-2 py-1.5 text-sm text-white/80 hover:bg-white/10"
                 value={detail.order.location_id}
                 onChange={(event) => {
                   const target = locations.find((location) => location.id === Number(event.target.value))
@@ -720,12 +720,12 @@ export default function OrderDetailPage() {
             )}
             {!isDeleted && (
               <HeaderMenu label="Новый заказ" width={272}>{(close) => (<>
-                  <Link onClick={close} className="rounded-md px-3 py-2 hover:bg-canvas" to={`/orders/new?repeat=${detail.order.id}`}>Повторить заказ<small className="block text-muted">Тот же клиент и устройство</small></Link>
-                  <Link onClick={close} className="rounded-md px-3 py-2 hover:bg-canvas" to={`/orders/new?client=${detail.counteragent.id}`}>Принять ещё от клиента<small className="block text-muted">Устройство вводится заново</small></Link>
+                  <Link role="menuitem" onClick={close} className="rounded-md px-3 py-2 hover:bg-canvas" to={`/orders/new?repeat=${detail.order.id}`}>Повторить заказ<small className="block text-muted">Тот же клиент и устройство</small></Link>
+                  <Link role="menuitem" onClick={close} className="rounded-md px-3 py-2 hover:bg-canvas" to={`/orders/new?client=${detail.counteragent.id}`}>Принять ещё от клиента<small className="block text-muted">Устройство вводится заново</small></Link>
               </>)}</HeaderMenu>
             )}
             {!isDeleted && can('deleteOrderAccess') && (
-              <button className="rounded-lg px-3 py-1.5 text-sm text-white/60 transition-colors hover:bg-white/10 hover:text-[#ff8a72]" onClick={() => setDeleting(true)}>Удалить</button>
+              <button className="rounded-lg px-3 py-1.5 text-sm text-white/60 transition-colors hover:bg-white/10 hover:text-[#ff8a72] max-md:ml-auto max-md:min-h-11 max-md:shrink-0" onClick={() => setDeleting(true)}>Удалить</button>
             )}
           </span>
         </div>
@@ -934,7 +934,7 @@ export default function OrderDetailPage() {
                 </ul>
                 <div className="-mx-4 mb-4 hidden overflow-x-auto border-y border-line-soft md:block">
                   <table className="w-full min-w-[720px] text-left text-sm">
-                    <thead className="bg-head"><tr className="h-8">{[['Исполнитель', 'pl-4 text-left'], ['Кол-во', 'text-right'], ['Цена', 'text-right'], ['Скидка, ₽', 'text-right'], ...(canSeeCost ? [['Себест.', 'text-right']] : []), ['Гарантия', 'text-right'], ...(can('changeSalaryAccess') ? [['ЗП, %', 'text-right']] : []), ['Итого', 'text-right'], ...(can('marginPriceAccess') ? [['Прибыль', 'text-right']] : []), ['', 'pr-2']].map(([item, cls]) => <th key={item} className={`px-1 font-medium ${cls}`}>{item}</th>)}</tr></thead>
+                    <thead className="bg-head"><tr className="h-8">{[['Исполнитель', 'pl-4 text-left'], ['Кол-во', 'text-right'], ['Цена', 'text-right'], ['Скидка, ₽', 'text-right'], ...(canSeeCost ? [['Себест.', 'text-right']] : []), ['Гарантия', 'text-right'], ...(can('changeSalaryAccess') ? [['ЗП, %', 'text-right']] : []), ['Итого', 'text-right'], ...(can('marginPriceAccess') ? [['Прибыль', 'text-right']] : []), ['', 'pr-2']].map(([item, cls]) => <th key={item} scope="col" className={`px-1 font-medium ${cls}`}>{item}</th>)}</tr></thead>
                     <tbody>
                       {detail.positions.map((position) => (
                         <PositionRow
@@ -1393,7 +1393,7 @@ function PositionCard({ staff, canPerformer, onSavePerformer, position, canEdit,
           </p>
         </div>
         <p className="num whitespace-nowrap font-semibold">{formatMoney(position.total)}</p>
-        {canEdit && <button className="-mr-1 grid h-8 w-8 place-items-center rounded-md text-lg text-muted hover:text-danger" onClick={onDelete} aria-label={`Удалить ${position.name}`}>×</button>}
+        {canEdit && <button className="-mr-2.5 -mt-1.5 grid h-11 w-11 shrink-0 place-items-center rounded-md text-lg text-muted hover:text-danger" onClick={onDelete} aria-label={`Удалить ${position.name}`}>×</button>}
       </div>
       <div className="mt-2 flex items-center gap-2 text-xs text-muted">Исполнитель
         <PerformerSelect position={position} staff={staff} disabled={!canPerformer} onChange={onSavePerformer} />

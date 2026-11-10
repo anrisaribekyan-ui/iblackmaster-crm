@@ -8,6 +8,8 @@ import Modal from './Modal'
 export default function IdeaButton() {
   const location = useLocation()
   const [open, setOpen] = useState(false)
+  // На форме нового заказа внизу прилипает панель с кнопкой «Создать заказ» — на телефоне поднимаем лампочку над ней
+  const raised = location.pathname === '/orders/new'
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -42,7 +44,7 @@ export default function IdeaButton() {
         onClick={() => setOpen(true)}
         title="Что неудобно или чего не хватает? Напишите — Анри увидит"
         aria-label="Идея для Анри"
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] right-3 z-30 flex items-center gap-2 rounded-full bg-ink/80 p-2.5 md:px-4 md:py-2.5 text-sm font-medium text-white shadow-lg hover:opacity-90 md:bottom-5 md:right-5"
+        className={`fixed right-3 z-30 flex h-11 min-w-11 items-center justify-center gap-2 rounded-full bg-rail text-sm font-medium text-white shadow-lg ring-1 ring-white/10 hover:opacity-90 md:bottom-5 md:right-5 md:h-10 md:px-4 ${raised ? 'bottom-[calc(env(safe-area-inset-bottom)+9.75rem)]' : 'bottom-[calc(env(safe-area-inset-bottom)+4.75rem)]'}`}
       >
         <Icon name="idea" className="h-[18px] w-[18px]" />
         <span className="hidden md:inline">Идея для Анри</span>

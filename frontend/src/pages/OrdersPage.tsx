@@ -302,18 +302,16 @@ export default function OrdersPage() {
                 const { total, debt } = money(order)
                 return (
                   <li key={order.id}>
-                    {head && <p className="px-1 pb-1.5 pt-2 text-xs font-semibold text-ink-2">{head}</p>}
-                    <Link
-                      to={`/orders/${order.id}`}
-                      className={`block rounded-xl border border-line bg-surface p-3.5 active:bg-row-hover ${order.is_deleted ? 'opacity-60' : ''}`}
-                    >
+                    {head && <h2 className="px-1 pb-1.5 pt-2 text-xs font-semibold text-ink-2">{head}</h2>}
+                    {/* Карточка — не ссылка целиком (внутри кнопка статуса): ссылка на номере растянута на всю карточку */}
+                    <div className={`relative rounded-xl border border-line bg-surface p-3.5 active:bg-row-hover ${order.is_deleted ? 'opacity-60' : ''}`}>
                       <div className="flex items-center gap-2">
-                        <span className={`num shrink-0 text-xl font-bold ${order.is_deleted ? 'text-muted line-through' : 'text-accent'}`}>
+                        <Link to={`/orders/${order.id}`} className={`shrink-0 text-xl font-bold after:absolute after:inset-0 after:rounded-xl ${order.is_deleted ? 'text-muted line-through' : 'text-accent'}`}>
                           {order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" className="mr-1 text-danger">●</span>}
                           {order.number}
-                        </span>
+                        </Link>
                         {order.is_deleted && <Tag tone="danger">удалён</Tag>}
-                        <span className="flex min-w-0 flex-1 justify-end"><QuickStatus status={order.status} groups={statusGroups} onPick={(next, comment) => void quickStatus(order, next, comment)} /></span>
+                        <span className="relative z-10 flex min-w-0 flex-1 justify-end"><QuickStatus status={order.status} groups={statusGroups} onPick={(next, comment) => void quickStatus(order, next, comment)} /></span>
                       </div>
                       <p className="mt-2 break-words text-base font-semibold leading-snug">{device || 'Устройство не указано'}</p>
                       {order.problems?.length > 0 && <p className="break-words text-[15px] text-ink-2">{order.problems.join(', ')}</p>}
@@ -336,7 +334,7 @@ export default function OrdersPage() {
                           {order.device_password && <p className="num text-xs text-muted">пароль: {order.device_password}</p>}
                         </div>
                       </div>
-                    </Link>
+                    </div>
                   </li>
                 )
               })}
@@ -347,7 +345,7 @@ export default function OrdersPage() {
               <table className="w-full table-fixed text-left text-sm">
                 <colgroup>
                   <col className="w-[7.75rem]" />
-                  <col className="w-[13rem]" />
+                  <col className="w-[14.5rem]" />
                   <col />
                   <col className="w-[11rem] xl:w-[16.5rem]" />
                   <col className="hidden w-[6.5rem] xl:table-column" />
@@ -357,14 +355,14 @@ export default function OrdersPage() {
                 </colgroup>
                 <thead className="bg-head">
                   <tr className="h-8">
-                    <th className="pl-5 pr-2 font-medium">Заказ</th>
-                    <th className="px-2 font-medium">Статус</th>
-                    <th className="truncate px-2 font-medium">Устройство и неисправность</th>
-                    <th className="px-2 font-medium">Клиент</th>
-                    <th className="hidden px-2 font-medium xl:table-cell">Срок</th>
-                    <th className="hidden px-2 font-medium 2xl:table-cell">Менеджер</th>
-                    <th className="px-2 text-right font-medium">Сумма</th>
-                    <th className="pl-2 pr-5 font-medium">Пароль</th>
+                    <th scope="col" className="pl-5 pr-2 font-medium">Заказ</th>
+                    <th scope="col" className="px-2 font-medium">Статус</th>
+                    <th scope="col" className="truncate px-2 font-medium">Устройство и неисправность</th>
+                    <th scope="col" className="px-2 font-medium">Клиент</th>
+                    <th scope="col" className="hidden px-2 font-medium xl:table-cell">Срок</th>
+                    <th scope="col" className="hidden px-2 font-medium 2xl:table-cell">Менеджер</th>
+                    <th scope="col" className="px-2 text-right font-medium">Сумма</th>
+                    <th scope="col" className="pl-2 pr-5 font-medium">Пароль</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -379,12 +377,12 @@ export default function OrdersPage() {
                     return [
                       head && (
                         <tr key={`h${order.id}`} className="ui-group-head hover:!bg-canvas">
-                          <td colSpan={columns} className="h-[30px] border-t border-line-soft pl-5 text-xs font-semibold">{head}</td>
+                          <th scope="rowgroup" colSpan={columns} className="h-[30px] border-t border-line-soft pl-5 text-left !text-xs !font-semibold !text-ink-2">{head}</th>
                         </tr>
                       ),
                       <tr key={order.id} {...rowLink(`/orders/${order.id}`)} className={`ui-row h-11 cursor-pointer border-t border-line-soft ${overdue && !order.is_deleted ? 'bg-danger-soft/50' : ''} ${order.is_deleted ? 'text-muted line-through decoration-placeholder [&_td]:opacity-70' : ''}`}>
                         <td className="whitespace-nowrap pl-5 pr-2">
-                          <Link to={`/orders/${order.id}`} title={formatDate(order.created_at)} className={`num text-[15px] font-bold hover:underline ${order.is_deleted ? 'text-muted' : 'text-accent'}`}>{order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" title="Срочный" className="mr-1 text-danger">●</span>}{order.number}</Link>
+                          <Link to={`/orders/${order.id}`} title={formatDate(order.created_at)} className={`text-[15px] font-bold hover:underline ${order.is_deleted ? 'text-muted' : 'text-accent'}`}>{order.is_urgent && !order.is_deleted && <span aria-label="Срочный заказ" title="Срочный" className="mr-1 text-danger">●</span>}{order.number}</Link>
                           {order.is_deleted
                             ? <Tag tone="danger" className="ml-1.5 [text-decoration:none]">удалён</Tag>
                             : created && !created.includes(',') && <span className="ml-1.5 text-xs text-muted">{created.replace(' назад', '')}</span>}
@@ -400,7 +398,7 @@ export default function OrdersPage() {
                         <td className="min-w-0 px-2">
                           <p className="flex min-w-0 items-baseline gap-1.5" title={[order.counteragent.name, phone].filter(Boolean).join(' · ')}>
                             <span className="truncate">{order.counteragent.name}</span>
-                            {phone && <span className="num hidden shrink-0 text-[13px] text-muted xl:inline">{phone}</span>}
+                            {phone && <span className="hidden shrink-0 text-[13px] text-muted xl:inline">{phone}</span>}
                           </p>
                         </td>
                         <td className={`hidden whitespace-nowrap px-2 text-[13px] xl:table-cell ${overdue ? 'font-semibold text-danger' : 'text-ink-2'}`}>{order.deadline ? formatDate(order.deadline).split(',')[0] : <span className="text-muted">—</span>}</td>
@@ -413,7 +411,7 @@ export default function OrdersPage() {
                               <span className="font-semibold">{formatMoney(order.total_price)}</span>
                             </>
                           : <span className="text-muted">{order.approximate_price ? `≈ ${order.approximate_price}` : '—'}</span>}</td>
-                        <td className="min-w-0 truncate pl-2 pr-5 text-[13px] num" title={order.device_password ? `Пароль на устройстве: ${order.device_password}` : 'Пароль на устройстве'}>{order.device_password || <span className="text-muted">—</span>}</td>
+                        <td className="min-w-0 truncate pl-2 pr-5 text-[13px]" title={order.device_password ? `Пароль на устройстве: ${order.device_password}` : 'Пароль на устройстве'}>{order.device_password || <span className="text-muted">—</span>}</td>
                       </tr>,
                     ]
                   })}

@@ -12,8 +12,8 @@ export default function PageTip({ tip, onClose, onTour }: { tip: Tip; onClose: (
   return (
     <section className="mb-4 rounded-xl border border-accent-line bg-accent-soft px-4 py-3" aria-label={`Подсказка: ${tip.title}`}>
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold">Что здесь: {tip.title}</h2>
-        <button type="button" onClick={done} aria-label="Закрыть подсказку" className="-mr-1.5 grid h-8 w-8 shrink-0 place-items-center rounded-md text-xl leading-none text-ink-2 hover:bg-surface hover:text-ink">×</button>
+        <p className="text-sm font-semibold">Что здесь: {tip.title}</p>
+        <button type="button" onClick={done} aria-label="Закрыть подсказку" className="-mr-1.5 grid h-8 w-8 shrink-0 max-md:h-11 max-md:w-11 place-items-center rounded-md text-xl leading-none text-ink-2 hover:bg-surface hover:text-ink">×</button>
       </div>
       <ul className="mt-1 grid list-disc gap-x-8 gap-y-1 pl-5 text-[13px] leading-relaxed text-ink md:grid-cols-2">
         {tip.items.map((item) => <li key={item}>{item}</li>)}

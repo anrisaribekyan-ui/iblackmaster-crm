@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { btn, field } from './ui'
+import { btn, field, trapTab } from './ui'
 
 type Request =
   | { kind: 'confirm'; text: string; ok?: string; danger?: boolean; resolve: (value: boolean) => void }
@@ -68,6 +68,7 @@ function Dialog({ request, onDone }: { request: Request; onDone: () => void }) {
   const [value, setValue] = useState(request.kind === 'prompt' ? request.initial : '')
   const okRef = useRef<HTMLButtonElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const formRef = useRef<HTMLFormElement>(null)
 
   const finish = (accepted: boolean) => {
     if (request.kind === 'confirm') request.resolve(accepted)
@@ -82,6 +83,7 @@ function Dialog({ request, onDone }: { request: Request; onDone: () => void }) {
     inputRef.current?.select()
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.stopPropagation(); finish(false) }
+      if (event.key === 'Tab') { event.stopPropagation(); trapTab(event, formRef.current) }
     }
     window.addEventListener('keydown', onKey, true)
     return () => {
@@ -93,8 +95,8 @@ function Dialog({ request, onDone }: { request: Request; onDone: () => void }) {
 
   const blocked = request.kind === 'prompt' && request.required && !value.trim()
   const okClass = request.kind === 'confirm' && request.danger
-    ? 'inline-flex h-10 items-center justify-center rounded-md bg-danger px-4 text-sm font-semibold text-white disabled:opacity-50 sm:h-9'
-    : btn('primary', 'md', 'h-10 px-4 sm:h-9')
+    ? 'inline-flex h-11 items-center justify-center rounded-md bg-danger px-4 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-50 sm:h-9'
+    : btn('primary', 'md', 'h-11 px-4 sm:h-9')
 
   return (
     <div
@@ -103,6 +105,7 @@ function Dialog({ request, onDone }: { request: Request; onDone: () => void }) {
       onMouseDown={(event) => { if (event.target === event.currentTarget) finish(false) }}
     >
       <form
+        ref={formRef}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="ui-dialog-text"
@@ -111,10 +114,10 @@ function Dialog({ request, onDone }: { request: Request; onDone: () => void }) {
       >
         <p id="ui-dialog-text" className="whitespace-pre-line text-[15px] font-medium leading-snug [overflow-wrap:anywhere]">{request.text}</p>
         {request.kind === 'prompt' && (
-          <input ref={inputRef} className={`${field} mt-3 h-10 w-full`} value={value} onChange={(event) => setValue(event.target.value)} aria-labelledby="ui-dialog-text" />
+          <input ref={inputRef} className={`${field} mt-3 h-11 w-full sm:h-10`} value={value} onChange={(event) => setValue(event.target.value)} aria-labelledby="ui-dialog-text" />
         )}
         <div className="mt-5 flex justify-end gap-2">
-          {request.kind !== 'alert' && <button type="button" className={btn('secondary', 'md', 'h-10 px-4 sm:h-9')} onClick={() => finish(false)}>Отмена</button>}
+          {request.kind !== 'alert' && <button type="button" className={btn('secondary', 'md', 'h-11 px-4 sm:h-9')} onClick={() => finish(false)}>Отмена</button>}
           <button ref={okRef} type="submit" disabled={blocked} className={okClass}>{request.kind === 'confirm' ? request.ok : request.kind === 'prompt' ? 'Готово' : 'Понятно'}</button>
         </div>
       </form>

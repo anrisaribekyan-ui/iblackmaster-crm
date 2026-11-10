@@ -127,7 +127,7 @@ body {
   textarea:focus {
     outline: none;
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 16%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 40%, transparent);
   }
   input[type="checkbox"],
   input[type="radio"] {
@@ -188,6 +188,7 @@ button.border-line:not(:disabled):hover {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
   button:active {
@@ -250,7 +251,7 @@ input[list]::-webkit-calendar-picker-indicator {
 .modal-backdrop { animation: backdrop-in 200ms ease-out; }
 .modal-panel { animation: dialog-in 200ms var(--ease-out); }
 @media (max-width: 639px) {
-  .modal-panel { animation: sheet-in 320ms var(--ease-drawer); }
+  .modal-panel { animation: sheet-in 200ms var(--ease-drawer); }
 }
 
 /* Выпадающее меню растёт из своей кнопки (правый верхний угол), а не из центра */
@@ -261,12 +262,12 @@ details[open] > .pop {
 
 /* Меню «+» на телефоне: пункты поднимаются друг за другом */
 @keyframes rise-in { from { opacity: 0; transform: translateY(12px); } }
-.rise > * { animation: rise-in 260ms var(--ease-out) both; }
+.rise > * { animation: rise-in 200ms var(--ease-out) both; }
 .rise > *:nth-child(2) { animation-delay: 40ms; }
 .rise > *:nth-child(3) { animation-delay: 80ms; }
 
 /* Подтверждение (чек пробит, сохранено): короткий подъём — видно, что изменилось */
-.pop-in { animation: rise-in 220ms var(--ease-out); }
+.pop-in { animation: rise-in 200ms var(--ease-out); }
 
 /* ── Поверхности браузера тоже часть дизайна */
 ::selection {
@@ -424,7 +425,7 @@ html[data-theme="glass"] header.bg-canvas\/95 { background-color: transparent; }
 .status-badge { color: var(--sb-text); background-color: var(--sb-bg); }
 html[data-theme="dark"] .status-badge,
 html[data-theme="glass"] .status-badge {
-  color: color-mix(in srgb, var(--sb-dot) 62%, white);
+  color: color-mix(in srgb, var(--sb-dot) 42%, white);
   background-color: color-mix(in srgb, var(--sb-dot) 20%, transparent);
 }
 
@@ -517,7 +518,7 @@ html[data-theme="glass"] .sms-bubble { background: color-mix(in srgb, var(--colo
 /* Поля в строках таблицы позиций: тихие, рамка и фон проявляются при наведении и в фокусе */
 .cell-input { min-height: 0 !important; border-color: transparent !important; background-color: var(--color-line-soft) !important; }
 .cell-input:hover:not(:disabled) { border-color: var(--color-line-strong) !important; }
-.cell-input:focus { border-color: var(--color-accent) !important; background-color: var(--color-surface) !important; }
+.cell-input:focus { border-color: var(--color-accent) !important; background-color: var(--color-surface) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 40%, transparent); }
 .cell-input:disabled { opacity: 0.6; }
 .cell-input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 .cell-input[type="number"]::-webkit-outer-spin-button, .cell-input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
@@ -525,3 +526,7 @@ html[data-theme="glass"] .sms-bubble { background: color-mix(in srgb, var(--colo
 .tab-line { box-shadow: inset 0 -1px 0 var(--color-line); }
 /* Оранжевый текст берёт более тёмный оттенок фирменного цвета — читается на белом и сером (WCAG AA) */
 .text-accent { color: var(--color-accent-text); }
+/* Тёмная тема: кнопки заливаются фирменным #e64823 (белый текст на нём читается лучше, чем на ярком #ff5a33);
+   яркий оранжевый остаётся для текста, рамок и фокуса */
+html[data-theme="dark"] .bg-accent, html[data-theme="glass"] .bg-accent { background-color: #e64823; }
+html[data-theme="dark"] .bg-accent:not(:disabled):hover, html[data-theme="glass"] .bg-accent:not(:disabled):hover { background-color: #f05a33; }

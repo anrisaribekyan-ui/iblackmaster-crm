@@ -790,7 +790,7 @@ function MultiValueInput({
         <ul className="mb-1 flex flex-wrap gap-1">
           {value.map((item) => (
             <li key={item} className="flex items-center gap-1 rounded-full bg-canvas px-2 py-1 text-xs text-ink">
-              {item}<button type="button" aria-label={`Убрать ${item}`} className="text-danger" onClick={() => onChange(value.filter((valueItem) => valueItem !== item))}>×</button>
+              {item}<button type="button" aria-label={`Убрать ${item}`} className="-my-1.5 -mr-1.5 grid h-8 w-8 place-items-center rounded-md text-base leading-none text-danger hover:bg-danger-soft" onClick={() => onChange(value.filter((valueItem) => valueItem !== item))}>×</button>
             </li>
           ))}
         </ul>
@@ -811,7 +811,7 @@ function MultiValueInput({
           }}
           autoComplete="off"
         />
-        <button type="button" className="rounded-md border border-line px-2" aria-label="Добавить" onMouseDown={(e) => e.preventDefault()} onClick={() => add(draft)}>+</button>
+        <button type="button" className="grid h-11 w-11 shrink-0 place-items-center rounded-md border border-line text-lg leading-none md:h-9 md:w-9" aria-label="Добавить" onMouseDown={(e) => e.preventDefault()} onClick={() => add(draft)}>+</button>
         {draft && matching.length > 0 && (
           <ul className="absolute left-0 top-full z-10 mt-1 max-h-40 w-full overflow-auto rounded-md border border-line bg-surface shadow-lg">
             {matching.map((item) => <li key={item}><button type="button" className="w-full px-3 py-2 text-left hover:bg-canvas" onMouseDown={(e) => e.preventDefault()} onClick={() => add(item)}>{item}</button></li>)}

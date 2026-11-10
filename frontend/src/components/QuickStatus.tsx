@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../auth'
 import StatusBadge, { type SmsMark } from './StatusBadge'
+import { arrowNav } from './ui'
 
 export type QuickStatusItem = {
   id: number
@@ -31,6 +32,7 @@ export default function QuickStatus({ status, groups, disabled, onPick }: Props)
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const button = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
 
   const all = groups.flatMap((g) => g.statuses.map((s) => ({ ...s, group: g.group })))
   const current = all.find((s) => s.id === status.id)
@@ -45,7 +47,13 @@ export default function QuickStatus({ status, groups, disabled, onPick }: Props)
 
   useEffect(() => {
     if (!open) return
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false)
+    // Список нарисован в конце страницы — переводим в него фокус; Esc и Tab закрывают и возвращают фокус на плашку
+    const list = listRef.current
+    ;(list?.querySelector<HTMLElement>('[aria-selected="true"]') ?? list?.querySelector<HTMLElement>('[role="option"]'))?.focus()
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' || event.key === 'Tab') { event.preventDefault(); setOpen(false); button.current?.focus() }
+      else arrowNav(event, listRef.current, '[role="option"]')
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
@@ -90,11 +98,11 @@ export default function QuickStatus({ status, groups, disabled, onPick }: Props)
       {open && createPortal(
         <>
           <div className="fixed inset-0 z-40 bg-black/30 md:bg-transparent" onClick={(event) => { event.preventDefault(); event.stopPropagation(); setOpen(false) }} aria-hidden />
-          <ul role="listbox" aria-label="Выберите статус"
+          <ul ref={listRef} role="listbox" aria-label="Выберите статус"
             style={pos && window.matchMedia('(min-width: 768px)').matches ? { top: pos.top, left: pos.left, width: 260 } : undefined}
             className="quick-menu fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overflow-y-auto rounded-t-2xl border border-line bg-surface p-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] shadow-[var(--shadow-pop)] md:inset-x-auto md:bottom-auto md:max-h-[360px] md:rounded-xl">
             {options.map((item, index) => (
-              <li key={item.id} className={item.group === 'closed' && options[index - 1]?.group !== 'closed' ? 'mt-1 border-t border-line pt-1' : undefined}>
+              <li key={item.id} role="presentation" className={item.group === 'closed' && options[index - 1]?.group !== 'closed' ? 'mt-1 border-t border-line pt-1' : undefined}>
                 <button type="button" role="option" aria-selected={item.id === status.id} onClick={(event) => void pick(event, item)}
                   className={`flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-canvas ${item.id === status.id ? 'bg-accent-soft font-medium' : ''}`}>
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} aria-hidden />

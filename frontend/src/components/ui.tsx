@@ -7,7 +7,7 @@
  *   высоты   26 плашка · 32 малая кнопка · 36 кнопка и поле · 44 строка списка и касание на телефоне
  *   отступы  4 · 8 · 12 · 16 · 24 · 32
  */
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode, type RefObject } from 'react'
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'dark' | 'soft'
 type ButtonSize = 'sm' | 'md'
@@ -57,19 +57,19 @@ const TONE: Record<Tone, string> = {
 
 /** Маленькая метка: «долг», «оплачен», «срочный». */
 export function Tag({ tone = 'neutral', className = '', children }: { tone?: Tone; className?: string; children: ReactNode }) {
-  return <span className={`inline-flex items-center rounded-[6px] px-1.5 py-px text-[11.5px] font-semibold leading-[18px] ${TONE[tone]} ${className}`}>{children}</span>
+  return <span className={`inline-flex items-center rounded-[6px] px-1.5 py-0.5 text-xs font-semibold leading-none ${TONE[tone]} ${className}`}>{children}</span>
 }
 
 /** Плитка с цифрой над списком. Кликабельная — работает как быстрый фильтр. */
 export function Stat({ label, value, hint, tone = 'neutral', active = false, onClick }: { label: string; value: ReactNode; hint?: ReactNode; tone?: 'neutral' | 'danger'; active?: boolean; onClick?: () => void }) {
   const danger = tone === 'danger'
-  const box = `flex min-w-0 flex-col gap-0.5 rounded-xl border px-4 py-3 text-left ${danger ? 'border-accent-line bg-danger-soft' : 'border-line bg-surface'} ${active ? 'ring-2 ring-ink/80' : ''}`
+  const box = `flex min-w-0 flex-col gap-0.5 rounded-xl border px-4 py-3 text-left ${danger ? 'border-danger/30 bg-danger-soft' : 'border-line bg-surface'} ${active ? 'ring-2 ring-ink/80' : ''}`
   const body = (
     <>
-      <span className={`truncate text-xs font-medium ${danger ? 'text-accent-strong' : 'text-muted'}`}>{label}</span>
+      <span className={`truncate text-xs font-medium ${danger ? 'text-danger' : 'text-muted'}`}>{label}</span>
       <span className="flex items-baseline gap-2">
-        <span className={`num text-2xl font-bold leading-7 tracking-tight ${danger ? 'text-accent-strong' : 'text-ink'}`}>{value}</span>
-        {hint != null && <span className={`truncate text-xs ${danger ? 'text-accent-strong' : 'text-muted'}`}>{hint}</span>}
+        <span className={`num text-2xl font-bold leading-7 tracking-tight ${danger ? 'text-danger' : 'text-ink'}`}>{value}</span>
+        {hint != null && <span title={typeof hint === 'string' ? hint : undefined} className={`truncate text-xs ${danger ? 'text-danger' : 'text-muted'}`}>{hint}</span>}
       </span>
     </>
   )
@@ -92,15 +92,15 @@ export function Tabs({ items, value, onChange, label, after }: { items: TabItem[
               type="button"
               aria-current={on ? 'page' : undefined}
               onClick={() => onChange(item.key)}
-              className={`flex h-10 items-center gap-1.5 whitespace-nowrap px-3 text-sm md:h-[38px] ${on ? 'font-semibold text-ink' : 'font-medium text-ink-2 hover:text-ink'}`}
+              className={`flex h-11 items-center gap-1.5 whitespace-nowrap px-3 text-sm md:h-[38px] ${on ? 'font-semibold text-ink' : 'font-medium text-ink-2 hover:text-ink'}`}
             >
               {item.label}
               {item.count != null && (
-                <span className={`num rounded-full px-1.5 text-xs font-medium leading-[18px] ${on ? 'bg-accent-soft text-accent-strong' : 'bg-line-soft text-ink-2'}`}>{item.count.toLocaleString('ru-RU')}</span>
+                <span className={`num rounded-full px-1.5 py-0.5 text-xs font-medium leading-none ${on ? 'bg-accent-soft text-accent-strong' : 'bg-line-soft text-ink-2'}`}>{item.count.toLocaleString('ru-RU')}</span>
               )}
             </button>
             {item.onEdit && (
-              <button type="button" aria-label={`Изменить вкладку ${item.label}`} title="Изменить" onClick={item.onEdit} className="-ml-1.5 grid h-8 w-6 place-items-center text-xs text-muted hover:text-ink">✎</button>
+              <button type="button" aria-label={`Изменить вкладку ${item.label}`} title="Изменить" onClick={item.onEdit} className="-ml-1.5 grid h-10 w-8 place-items-center text-xs text-muted hover:text-ink">✎</button>
             )}
           </span>
         )
@@ -131,6 +131,47 @@ export function ListSkeleton({ rows = 12, rowHeight = 44 }: { rows?: number; row
 /** Пустое состояние списка. */
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="rounded-xl border border-dashed border-line-strong bg-surface px-5 py-8 text-center text-muted">{children}</p>
+}
+
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/** Tab не выходит за пределы окна: с последнего элемента переходит на первый и наоборот. */
+export function trapTab(event: KeyboardEvent, container: HTMLElement | null) {
+  if (event.key !== 'Tab' || !container) return
+  const items = [...container.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) => el.offsetParent !== null)
+  if (items.length === 0) { event.preventDefault(); return }
+  const first = items[0]
+  const last = items[items.length - 1]
+  const active = document.activeElement
+  if (event.shiftKey && (active === first || !container.contains(active))) { event.preventDefault(); last.focus() }
+  else if (!event.shiftKey && (active === last || !container.contains(active))) { event.preventDefault(); first.focus() }
+}
+
+/** Окно забирает фокус при открытии, держит Tab внутри и возвращает фокус туда, где он был. */
+export function useDialogFocus(ref: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const before = document.activeElement as HTMLElement | null
+    const panel = ref.current
+    if (panel && !panel.contains(document.activeElement)) panel.focus()
+    const onKey = (event: KeyboardEvent) => trapTab(event, ref.current)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      before?.focus?.()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+}
+
+/** Стрелки вверх/вниз, Home и End переводят фокус по пунктам меню или списка. */
+export function arrowNav(event: { key: string; preventDefault: () => void }, container: HTMLElement | null, selector: string) {
+  if (!container || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+  const items = [...container.querySelectorAll<HTMLElement>(selector)]
+  if (items.length === 0) return
+  event.preventDefault()
+  const index = items.indexOf(document.activeElement as HTMLElement)
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : event.key === 'ArrowDown' ? (index + 1) % items.length : (index - 1 + items.length) % items.length
+  items[next].focus()
 }
 
 /** Срабатывает ли медиазапрос. Нужен, чтобы рисовать только одну раскладку (телефон или компьютер), а не обе. */
