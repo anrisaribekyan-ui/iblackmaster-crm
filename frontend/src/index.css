@@ -3,28 +3,47 @@
 /* Цвета задаём токенами, чтобы потом легко сменить тему. В компонентах используй классы
    вида bg-surface, text-muted, border-line (они объявлены ниже через @theme). */
 @theme {
+  /* ── Дизайн-система v2 («новое поколение»). Всё в интерфейсе берёт цвета, радиусы и тени отсюда.
+     Тема = другие значения этих же токенов (см. html[data-theme] ниже). */
   --color-surface: #ffffff;
-  --color-canvas: #eef0f3; /* рабочая область: холодный светло-серый, глаз не устаёт за смену */
-  --color-ink: #16181d;
-  --color-muted: #667085;
-  --color-line: #e2e5ea;
+  --color-canvas: #f5f6f8; /* рабочая область: холодный светло-серый, глаз не устаёт за смену */
+  --color-ink: #14161a;
+  --color-ink-2: #4a505a; /* вторичный текст: подписи действий, неактивные вкладки */
+  --color-muted: #5f6672;
+  --color-line: #e1e4e9;
+  --color-line-soft: #eef0f3; /* разделители строк внутри карточки */
   --color-accent: #e64823; /* фирменный оранжевый iBlackMaster — только главные действия и активный раздел */
   --color-accent-hover: #cf3d1b;
   --color-accent-soft: #fdeee9;
+  --color-accent-line: #f3c5b8;
+  --color-accent-strong: #b3311a; /* оранжевый текст на светлой подложке (контраст ≥ 4.5) */
   --color-accent-ink: #ffffff;
-  --color-danger: #d92d20;
-  --color-success: #12a150;
-  --color-warning: #b54708;
+  --color-danger: #c2291c;
+  --color-danger-soft: #fff1ee;
+  --color-success: #17703a;
+  --color-success-soft: #e6f6ea;
+  --color-warning: #8a4b06;
+  --color-warning-soft: #fff4dc;
   /* Графитовая боковая панель — «Black» из названия */
-  --color-rail: #1c1f24;
-  --color-rail-ink: #c9ced6;
-  --color-rail-muted: #7d8590;
-  --color-rail-hover: #272b31;
-  --color-placeholder: #98a2b3;
-  --color-line-strong: #c5cad3;
-  --color-row-hover: #f6f7f9;
+  --color-rail: #131518;
+  --color-rail-ink: #c3c8d0;
+  --color-rail-muted: #8b929d;
+  --color-rail-hover: #24272d;
+  --color-rail-line: #2a2e35;
+  --color-placeholder: #8b929d;
+  --color-line-strong: #c9ced6;
+  --color-row-hover: #f7f8fa;
+  --color-head: #fafbfc; /* шапка таблицы */
   --font-sans: "Onest Variable", "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Радиусы: 7 — плашки, 8 — кнопки и поля, 12 — карточки, 16 — окна */
+  --radius-sm: 0.4375rem;
   --radius-md: 0.5rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  /* Тени: одна «приподнятая» для карточек и одна для всплывающих окон */
+  --shadow-card: 0 1px 2px rgb(20 22 26 / 0.04);
+  --shadow-pop: 0 12px 32px -8px rgb(20 22 26 / 0.22), 0 2px 6px rgb(20 22 26 / 0.06);
 }
 
 /* На компьютере — каркас во всю высоту окна с прокруткой внутри; на телефоне прокручивается сама страница */
@@ -100,7 +119,7 @@ body {
   textarea:focus {
     outline: none;
     border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px rgb(230 72 35 / 0.15);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 16%, transparent);
   }
   input[type="checkbox"],
   input[type="radio"] {
@@ -135,7 +154,10 @@ body {
     background-color: var(--color-row-hover);
   }
   h1 {
-    letter-spacing: -0.015em;
+    letter-spacing: -0.022em;
+  }
+  h2, h3 {
+    letter-spacing: -0.01em;
   }
 }
 
@@ -150,7 +172,7 @@ button.border-line:not(:disabled):hover {
 }
 /* Карточки-блоки: едва заметная тень, чтобы белое читалось на сером */
 .rounded-xl.border-line.bg-surface {
-  box-shadow: 0 1px 2px rgb(16 24 40 / 0.04);
+  box-shadow: var(--shadow-card);
 }
 
 /* Меньше движения = без перемещений, но цвет и прозрачность остаются: состояние всё равно видно */
@@ -249,7 +271,7 @@ input, textarea {
 @media (min-width: 768px) {
   * {
     scrollbar-width: thin;
-    scrollbar-color: #c9ced6 transparent;
+    scrollbar-color: var(--color-line-strong) transparent;
   }
 }
 
@@ -270,22 +292,33 @@ input, textarea {
 html[data-theme="dark"],
 html[data-theme="glass"] {
   color-scheme: dark;
-  --color-surface: #17191d;
-  --color-canvas: #0e1013;
+  --color-surface: #16181c;
+  --color-canvas: #0d0f12;
   --color-ink: #eceef1;
+  --color-ink-2: #b9bfc9;
   --color-muted: #9aa3b2;
-  --color-line: #2a2e35;
+  --color-line: #272b32;
+  --color-line-soft: #1f2228;
   --color-line-strong: #3d424b;
-  --color-row-hover: #1e2126;
-  --color-placeholder: #5f6773;
+  --color-row-hover: #1c1f24;
+  --color-head: #131518;
+  --color-placeholder: #6b7380;
   --color-accent: #ff5a33;
   --color-accent-hover: #ff7350;
   --color-accent-soft: #3a1c13;
+  --color-accent-line: #5a2a1c;
+  --color-accent-strong: #ff8a6b;
   --color-danger: #f97066;
+  --color-danger-soft: #3a1714;
   --color-success: #32d583;
+  --color-success-soft: #11301f;
   --color-warning: #fdb022;
-  --color-rail: #0a0b0d;
+  --color-warning-soft: #33270c;
+  --color-rail: #08090b;
   --color-rail-hover: #1b1e23;
+  --color-rail-line: #22262c;
+  --shadow-card: none;
+  --shadow-pop: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.06);
   --viz-1: #c9ced6;
   --viz-2: #ff5a33;
   --viz-1-wash: rgba(201, 206, 214, 0.08);
@@ -455,3 +488,20 @@ html[data-theme="glass"] .sms-bubble { background: color-mix(in srgb, var(--colo
   .rail-scroll:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
   .rail-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.38); }
 }
+
+/* ══ Дизайн-система v2: базовые компоненты (см. components/ui.tsx) ══ */
+/* Заголовок группы в списке («Сегодня», «Вчера») и шапка таблицы прилипают при прокрутке */
+.ui-group-head { background: var(--color-canvas); color: var(--color-ink-2); }
+/* Скелетон: мягкая «волна» только прозрачностью — без перерисовки вёрстки */
+@keyframes ui-pulse { 50% { opacity: 0.45; } }
+.ui-skel { background: var(--color-line-soft); border-radius: 6px; animation: ui-pulse 1.2s ease-in-out infinite; }
+/* Появление содержимого страницы: 140 мс, только opacity — без белых вспышек между экранами */
+@keyframes ui-fade { from { opacity: 0; } }
+.ui-fade { animation: ui-fade 140ms ease-out; }
+/* Строка-ссылка в плотном списке */
+.ui-row { transition: background-color 80ms; }
+.ui-row:hover { background-color: var(--color-row-hover); }
+/* Поиск в графитовом меню: без светлой рамки фокуса и системного крестика */
+.rail-search:hover { border-color: var(--color-rail-muted) !important; }
+.rail-search:focus { border-color: var(--color-accent) !important; box-shadow: 0 0 0 3px rgb(230 72 35 / 0.25) !important; }
+.rail-search::-webkit-search-cancel-button { display: none; }

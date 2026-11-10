@@ -103,9 +103,26 @@ function BigBadge({ name, color, group, sms, chevron = false }: { name: string; 
   )
 }
 
-export default function StatusBadge({ name, color, sms, className = '', big = false, group, chevron = false }: { name: string; color: string | null | undefined; sms?: SmsMark; className?: string; big?: boolean; group?: string; chevron?: boolean }) {
+export default function StatusBadge({ name, color, sms, className = '', big = false, chip = false, group, chevron = false }: { name: string; color: string | null | undefined; sms?: SmsMark; className?: string; big?: boolean; chip?: boolean; group?: string; chevron?: boolean }) {
   if (big) return <BigBadge name={name} color={color} group={group} sms={sms} chevron={chevron} />
   const c = statusColors(color)
+  // Плашка для плотного списка (дизайн v2): спокойный тон статуса, цветная точка, высота 26 — номер заказа остаётся главным в строке
+  if (chip) {
+    return (
+      <span
+        title={name}
+        className={`status-badge inline-flex h-[26px] max-w-full items-center gap-[7px] rounded-[7px] px-[9px] text-[12.5px] font-semibold ${className}`}
+        style={{ '--sb-text': c.text, '--sb-bg': c.bg, '--sb-dot': c.dot } as React.CSSProperties}
+      >
+        <span className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ backgroundColor: c.dot }} aria-hidden />
+        <span className="truncate">{name}</span>
+        <SmsTicks state={sms} />
+        {chevron && (
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0 opacity-70"><path d="m6 9 6 6 6-6" /></svg>
+        )}
+      </span>
+    )
+  }
   // Цвета через переменные: в тёмных темах CSS берёт светлый текст и полупрозрачный фон того же оттенка
   return (
     <span
