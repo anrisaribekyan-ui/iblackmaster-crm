@@ -55,7 +55,7 @@ export default function LocationSwitcher({ className = '' }: { className?: strin
         type="button"
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label="Локация"
+        aria-label={`Локация: ${active ? shortLocation(active.name) : 'Все локации'}`}
         onClick={() => setOpen((v) => !v)}
         className="flex max-w-full items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-semibold"
         style={{ borderColor: `color-mix(in srgb, ${color} 55%, transparent)`, background: `color-mix(in srgb, ${color} 12%, transparent)` }}

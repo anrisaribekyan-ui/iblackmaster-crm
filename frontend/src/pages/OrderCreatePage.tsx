@@ -621,7 +621,7 @@ export default function OrderCreatePage() {
           )}
           {fields.length > 0 && (
             /* Кнопки прилипают к низу окна: «Создать заказ» всегда под рукой, как бы длинна ни была форма */
-            <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] z-10 -mx-1 flex justify-end gap-2 rounded-xl border border-line bg-surface/95 p-2 shadow-[var(--shadow-pop)] backdrop-blur md:bottom-3 md:pr-48">
+            <div className="sticky bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] z-10 -mx-1 flex justify-end gap-2 rounded-xl border border-line bg-surface/95 p-2 shadow-[var(--shadow-pop)] backdrop-blur max-md:pr-[4.5rem] md:bottom-3 md:pr-48">
               <button type="button" className={btn('ghost', 'md', 'h-11 px-4')} onClick={() => navigate('/orders')}>Отмена</button>
               <button disabled={saving || fieldsLoading} className={btn('primary', 'md', 'h-11 flex-1 px-6 text-[15px] sm:flex-none')}>
                 {saving ? 'Создание…' : 'Создать заказ'}

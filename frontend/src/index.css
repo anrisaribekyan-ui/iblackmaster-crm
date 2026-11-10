@@ -30,8 +30,9 @@
   --color-rail-muted: #8b929d;
   --color-rail-hover: #24272d;
   --color-rail-line: #2a2e35;
-  --color-placeholder: #8b929d;
+  --color-placeholder: #6f7683; /* контраст 4.6 на белом */
   --color-line-strong: #c9ced6;
+  --color-accent-text: #cc3a18; /* оранжевый как ТЕКСТ (номер заказа, ссылки): контраст 5.0 на белом; заливка кнопок остаётся фирменной */
   --color-row-hover: #f7f8fa;
   --color-head: #fafbfc; /* шапка таблицы */
   --font-sans: "Onest Variable", "Onest", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -309,7 +310,8 @@ html[data-theme="glass"] {
   --color-line-strong: #3d424b;
   --color-row-hover: #1c1f24;
   --color-head: #131518;
-  --color-placeholder: #6b7380;
+  --color-placeholder: #7d8592;
+  --color-accent-text: #ff6a45;
   --color-accent: #ff5a33;
   --color-accent-hover: #ff7350;
   --color-accent-soft: #3a1c13;
@@ -521,3 +523,5 @@ html[data-theme="glass"] .sms-bubble { background: color-mix(in srgb, var(--colo
 .cell-input[type="number"]::-webkit-outer-spin-button, .cell-input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 /* Линия под вкладками рисуется тенью внутри, чтобы оранжевое подчёркивание активной вкладки ложилось поверх неё целиком */
 .tab-line { box-shadow: inset 0 -1px 0 var(--color-line); }
+/* Оранжевый текст берёт более тёмный оттенок фирменного цвета — читается на белом и сером (WCAG AA) */
+.text-accent { color: var(--color-accent-text); }
