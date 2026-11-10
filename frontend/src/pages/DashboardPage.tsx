@@ -14,7 +14,6 @@ import TimeChart from '../components/charts/TimeChart'
 import { compact, count, dayShort, rub } from '../components/charts/format'
 import StatusBadge from '../components/StatusBadge'
 import MonthCompare from '../components/MonthCompare'
-import Skeleton from '../components/Skeleton'
 
 type Dashboard = {
   orders: { created: number; in_work: number; ready: number; closed: number | null }
@@ -128,7 +127,15 @@ export default function DashboardPage() {
     return registers.reduce((sum, r) => sum + Number(r.cash_balance) + Number(r.bank_balance), 0)
   }, [data])
 
-  if (loading && !data) return <Skeleton />
+  // Скелетон повторяет раскладку главной: когда придут цифры, блоки встают на те же места — страница не прыгает
+  if (loading && !data) return (
+    <section role="status" aria-label="Загрузка главной">
+      <div className="mb-5 h-9 w-64 max-w-full rounded-md bg-line-soft" />
+      <div className="mb-4 grid gap-3 md:grid-cols-3">{[0, 1, 2].map((i) => <div key={i} className="h-[68px] rounded-xl border border-line bg-surface" />)}</div>
+      <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-40 rounded-xl border border-line bg-surface" />)}</div>
+      <div className="grid gap-4 xl:grid-cols-2">{[0, 1].map((i) => <div key={i} className="h-80 rounded-xl border border-line bg-surface" />)}</div>
+    </section>
+  )
   if (!data) return <section>{error && <p role="alert" className="text-danger">{error}</p>}</section>
 
   const { orders, trend, previous } = data
@@ -142,20 +149,21 @@ export default function DashboardPage() {
   return (
     <section className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
       <header className="mb-5 flex flex-wrap items-center gap-3">
-        <h1 className="mr-auto text-xl font-semibold">{greeting()}{me?.short_name ? `, ${me.short_name.split(' ').slice(-1)[0]}` : ''}</h1>
+        <h1 className="mr-auto text-[22px] font-bold leading-tight md:text-[26px]">{greeting()}{me?.short_name ? `, ${me.short_name.split(' ').slice(-1)[0]}` : ''}</h1>
         <label className="sr-only" htmlFor="dash-location">Локация</label>
-          <select id="dash-location" className="rounded-md border border-line bg-surface px-3 py-2" value={locationId} onChange={(e) => setCurrentLocation(e.target.value)}>
+          <select id="dash-location" className="h-9 rounded-md border border-line bg-surface px-3" value={locationId} onChange={(e) => setCurrentLocation(e.target.value)}>
             <option value="">Все локации</option>
             {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
         {canPeriod && (
           <div className="flex flex-wrap items-end gap-2">
-            <div className="flex rounded-md border border-line bg-surface p-0.5" role="group" aria-label="Период">
+            <div className="flex h-9 items-center rounded-md border border-line bg-surface p-0.5" role="group" aria-label="Период">
               {(Object.keys(PERIOD_NAMES) as Period[]).map((p) => (
                 <button
                   key={p}
                   type="button"
-                  className={`rounded px-2.5 py-1.5 text-sm ${period === p ? 'bg-ink text-white' : 'text-muted hover:bg-canvas'}`}
+                  aria-pressed={period === p}
+                  className={`h-8 rounded-[6px] px-2.5 text-[13px] ${period === p ? 'bg-ink font-semibold text-white' : 'font-medium text-ink-2 hover:bg-line-soft hover:text-ink'}`}
                   onClick={() => setPeriod(p)}
                 >
                   {PERIOD_LABELS[p]}

@@ -53,7 +53,7 @@ export default function MonthCompare({ locationId }: { locationId?: string }) {
   return (
     <div className="mb-4 rounded-xl border border-line bg-surface p-4">
       <h2 className="mb-3 font-medium">Сравнение: {title(lastStart)} и {title(prevStart)}</h2>
-      {rows === null ? <p className="text-sm text-muted">Загрузка…</p> : (
+      {rows === null ? <div role="status" aria-label="Загрузка сравнения" className="grid gap-2 pt-1">{[0, 1, 2, 3, 4, 5].map((i) => <div key={i} className="ui-skel h-[25px]" />)}</div> : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead className="text-xs text-muted">
