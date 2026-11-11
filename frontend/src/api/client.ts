@@ -36,6 +36,9 @@ export function setToken(token: string | null) {
 }
 
 const REQUEST_TIMEOUT_MS = 40000
+// Чтение безопасно повторять: «залипшее» соединение после сна телефона или смены сети не ждёт 40 секунд, а через 6 с пробуется заново (новым соединением)
+const READ_TIMEOUTS_MS = [6000, 8000, 15000, 30000]
+const aborted = (e: unknown) => (e as { name?: string })?.name === 'AbortError'
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /** Запрос с ограничением по времени: раньше «зависший» запрос крутил «Загрузка…» вечно.
@@ -45,7 +48,7 @@ async function fetchWithRetry(url: string, init: RequestInit): Promise<Response>
   const attempts = canRetry ? 4 : 1
   for (let attempt = 1; ; attempt++) {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    const timer = setTimeout(() => controller.abort(), canRetry ? READ_TIMEOUTS_MS[attempt - 1] : REQUEST_TIMEOUT_MS)
     try {
       const res = await fetch(url, { ...init, signal: controller.signal })
       if (attempt < attempts && [502, 503, 504].includes(res.status)) {
@@ -55,11 +58,11 @@ async function fetchWithRetry(url: string, init: RequestInit): Promise<Response>
       return res
     } catch (e) {
       if (attempt < attempts) {
-        await sleep(attempt * 1500)
+        await sleep(aborted(e) ? 0 : attempt * 1500)
         continue
       }
-      const aborted = (e as { name?: string })?.name === 'AbortError'
-      throw new ApiError(0, 'network', aborted ? 'Сервер не отвечает. Проверьте интернет и повторите.' : 'Нет связи с сервером. Проверьте интернет и повторите.')
+      const wasAborted = aborted(e)
+      throw new ApiError(0, 'network', wasAborted ? 'Сервер не отвечает. Проверьте интернет и повторите.' : 'Нет связи с сервером. Проверьте интернет и повторите.')
     } finally {
       clearTimeout(timer)
     }
