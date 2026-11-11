@@ -469,9 +469,10 @@ def list_orders(
         normalized = normalize_phone(q)
         raw_digits = "".join(char for char in q if char.isdecimal())
         def word_match(word: str):
+            # Короткое число («15» из «iphone 15 pro») — это модель, а не номер заказа: иначе находит A15994, A15991…
+            short_number = word.isdecimal() and len(word) <= 3
             checks = [
-                Order.number.icontains(word, autoescape=True),
-                Order.serial.icontains(word, autoescape=True),
+                *([] if short_number else [Order.number.icontains(word, autoescape=True), Order.serial.icontains(word, autoescape=True)]),
                 Order.model.icontains(word, autoescape=True),
                 Order.brand.icontains(word, autoescape=True),
                 Counteragent.name.icontains(word, autoescape=True),

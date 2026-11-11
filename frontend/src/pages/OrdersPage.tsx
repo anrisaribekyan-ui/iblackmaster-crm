@@ -74,6 +74,14 @@ function formatMoney(value: string) {
 // Последние показанные списки (по фильтрам): вернулись из заказа — список на экране сразу, свежий подгружается следом
 const listCache = new Map<string, OrderList>()
 
+/** Подсвечивает в тексте найденные слова — совпадение с поиском видно сразу. */
+function Mark({ text, words }: { text: string; words: string[] }) {
+  if (!words.length) return <>{text}</>
+  const escaped = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const parts = text.split(new RegExp(`(${escaped.join('|')})`, 'gi'))
+  return <>{parts.map((part, i) => (i % 2 ? <mark key={i} className="rounded-[3px] bg-accent-soft px-0.5 text-accent-strong">{part}</mark> : part))}</>
+}
+
 export default function OrdersPage() {
   const rowLink = useRowLink()
   const currentLocation = useCurrentLocation()
@@ -119,6 +127,7 @@ export default function OrdersPage() {
     if (!params.has('location_id') && currentLocation) params.set('location_id', currentLocation)
     return params.toString()
   }, [searchParams, lastTab, currentLocation, customTabs])
+  const words = (searchParams.get('q') ?? '').split(/\s+/).filter((w) => w.length > 0 && !(/^\d+$/.test(w) && w.length > 3))
   const currentTab = (searchParams.get('tab') ?? lastTab) as string
   useEffect(() => {
     try { localStorage.setItem('orders:tab', currentTab) } catch { /* приватный режим */ }
@@ -313,7 +322,7 @@ export default function OrdersPage() {
                         {order.is_deleted && <Tag tone="danger">удалён</Tag>}
                         <span className="relative z-10 flex min-w-0 flex-1 justify-end"><QuickStatus status={order.status} groups={statusGroups} onPick={(next, comment) => void quickStatus(order, next, comment)} /></span>
                       </div>
-                      <p className="mt-2 break-words text-base font-semibold leading-snug">{device || 'Устройство не указано'}</p>
+                      <p className="mt-2 break-words text-base font-semibold leading-snug">{device ? <Mark text={device} words={words} /> : 'Устройство не указано'}</p>
                       {order.problems?.length > 0 && <p className="break-words text-[15px] text-ink-2">{order.problems.join(', ')}</p>}
                       <div className="mt-2.5 flex items-end justify-between gap-3 text-sm">
                         <div className="min-w-0">
@@ -390,7 +399,7 @@ export default function OrdersPage() {
                         <td className="px-2"><QuickStatus status={order.status} groups={statusGroups} onPick={(next, comment) => void quickStatus(order, next, comment)} /></td>
                         <td className="min-w-0 px-2">
                           <p className="truncate" title={[device, problems].filter(Boolean).join(' · ')}>
-                            <span className="font-semibold">{device || <span className="font-normal text-muted">Не указано</span>}</span>
+                            <span className="font-semibold">{device ? <Mark text={device} words={words} /> : <span className="font-normal text-muted">Не указано</span>}</span>
                             {problems && <span className="text-muted"> · {problems}</span>}
                             {type && type !== 'Негарантийный' && <Tag tone="accent" className="ml-1.5">{type}</Tag>}
                           </p>
