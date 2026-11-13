@@ -234,3 +234,34 @@ def test_sale_detail_shows_payment_method(client, auth_headers, db):
     assert len(detail["payments"]) == 1
     assert detail["payments"][0]["method"] == "cash" and Decimal(str(detail["payments"][0]["amount"])) == 500
     assert detail["payments"][0]["register"] == register.name
+
+
+def test_sale_change_payment_method(client, auth_headers, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    store = db.scalars(select(Store).where(Store.location_id == location.id)).first()
+    register = db.scalars(select(CashRegister).where(CashRegister.location_id == location.id, CashRegister.is_active.is_(True))).first()
+    register.accepts_cash = register.accepts_bank = True
+    product = Nomenclature(code=660077, name="Товар для смены оплаты", is_work=False)
+    db.add(product)
+    db.flush()
+    stock.receive(db, store.id, product.id, Decimal("3"), Decimal("40.00"))
+    db.commit()
+    cash0, bank0 = register.cash_balance, register.bank_balance
+    created = client.post("/api/sales", headers=auth_headers, json={
+        "location_id": location.id, "store_id": store.id,
+        "positions": [{"nomenclature_id": product.id, "quantity": "1", "price": "500.00"}],
+        "payments": [{"cash_register_id": register.id, "amount": "500.00", "is_bank": False}],
+    })
+    assert created.status_code == 200, created.text
+    sale_id = created.json()["id"]
+    pay = client.get(f"/api/sales/{sale_id}", headers=auth_headers).json()["payments"][0]
+    r = client.post(f"/api/sales/{sale_id}/payments/{pay['id']}/change-method", json={"is_bank": True}, headers=auth_headers)
+    assert r.status_code == 200, r.text
+    db.expire_all()
+    register = db.get(CashRegister, register.id)
+    assert register.cash_balance == cash0 and register.bank_balance > bank0
+    assert db.get(Sale, sale_id).paid == Decimal("500.00")
+    shown = client.get(f"/api/sales/{sale_id}", headers=auth_headers).json()["payments"]
+    assert len(shown) == 1 and shown[0]["method"] == "bank"
+    again = client.post(f"/api/sales/{sale_id}/payments/{shown[0]['id']}/change-method", json={"is_bank": True}, headers=auth_headers)
+    assert again.status_code == 422 or again.status_code == 400

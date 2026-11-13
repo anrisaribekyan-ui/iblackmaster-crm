@@ -200,3 +200,27 @@ def refund_sale(
     document.paid = transaction.amount
     salary.recalc_sale(db, sale)
     return document, refund_total
+
+def change_payment_method(db, sale, tx, employee_id: int, *, is_bank: bool, cash_register_id: int | None = None):
+    """Меняет способ уже пробитой оплаты чека (наличные ↔ безнал): старая проводка (и комиссия эквайринга)
+    удаляется, вместо неё создаётся новая с той же суммой, датой и примечанием. «Оплачено» в чеке не меняется."""
+    item = tx.cash_item or db.get(CashItem, tx.cash_item_id)
+    if tx.sale_id != sale.id or tx.is_deleted or item.type != CashItemType.SALE:
+        raise BusinessError("Сменить способ можно только у оплаты этого чека")
+    register_id = cash_register_id or tx.cash_register_id
+    if register_id == tx.cash_register_id and is_bank == tx.is_bank:
+        raise BusinessError("Способ оплаты уже такой")
+    amount, date, note, agent_id = tx.amount, tx.date, tx.note, tx.counteragent_id
+    money.delete_transaction(db, tx)
+    return money.create_transaction(
+        db,
+        cash_register_id=register_id,
+        cash_item=item,
+        amount=amount,
+        is_bank=is_bank,
+        date=date,
+        counteragent_id=agent_id,
+        created_by_id=employee_id,
+        sale_id=sale.id,
+        note=note,
+    )

@@ -5,6 +5,7 @@ import { api, ApiError } from '../api/client'
 import { useAuth } from '../auth'
 import CatalogPicker from '../components/CatalogPicker'
 import Modal from '../components/Modal'
+import { confirmDialog } from '../components/dialogs'
 import { escapeHtml, openPrint } from '../print'
 import { formatDateTime, inputClass, money, qty, retailPrice, useLocationsAndRegisters, type CashRegisterRef, type CatalogItem } from './shared'
 import Skeleton from '../components/Skeleton'
@@ -27,7 +28,7 @@ type Payment = { cash_register_id: string; amount: string; is_bank: boolean }
 type SaleRow = { id: number; number: string; date: string; total_price: string; paid: string; counteragent: string | null; seller: string | null }
 type SaleDetail = SaleRow & {
   positions: { id: number; name: string; is_work: boolean; quantity: string; sold_price: string; returned_quantity: string }[]
-  payments?: { amount: string; method: 'cash' | 'bank'; register: string }[]
+  payments?: { id?: number; amount: string; method: 'cash' | 'bank'; register: string; register_id?: number }[]
 }
 const payMethod = (method: string) => (method === 'bank' ? 'Безнал' : 'Наличные')
 
@@ -540,7 +541,7 @@ export default function SalesPage() {
         />
       )}
       {viewing && (
-        <SaleModal sale={viewing} registers={localRegisters} canReturn={can('saleReturnAccess')}
+        <SaleModal sale={viewing} registers={localRegisters} canReturn={can('saleReturnAccess')} canChangePay={can('changeTransactionAccess') && can('operationCashRegisterAccess')}
           onClose={() => setViewing(null)} onReturned={() => { setViewing(null); void loadHistory() }} />
       )}
     </section>
@@ -671,10 +672,11 @@ function QuickItemModal({ suggestions, canSeeCost, onClose, onAdd }: {
   )
 }
 
-function SaleModal({ sale, registers, canReturn, onClose, onReturned }: {
+function SaleModal({ sale, registers, canReturn, canChangePay, onClose, onReturned }: {
   sale: SaleDetail
   registers: { id: number; name: string; accepts_cash: boolean; accepts_bank: boolean }[]
   canReturn: boolean
+  canChangePay: boolean
   onClose: () => void
   onReturned: () => void
 }) {
@@ -688,6 +690,26 @@ function SaleModal({ sale, registers, canReturn, onClose, onReturned }: {
   const [tipping, setTipping] = useState(false)
   const [tipAmount, setTipAmount] = useState('')
   const [tipDone, setTipDone] = useState('')
+
+  const [switching, setSwitching] = useState<number | null>(null)
+  /** Меняет способ уже пробитой оплаты: наличные ↔ безнал (в той же кассе, если она принимает такой способ). */
+  const switchPay = async (pay: NonNullable<SaleDetail['payments']>[number]) => {
+    if (pay.id == null) return
+    const toBank = pay.method !== 'bank'
+    const reg = registers.find((r) => r.id === pay.register_id && (toBank ? r.accepts_bank : r.accepts_cash)) ?? registers.find((r) => (toBank ? r.accepts_bank : r.accepts_cash))
+    if (!reg) { setError(toBank ? 'Нет кассы, принимающей безнал' : 'Нет кассы, принимающей наличные'); return }
+    if (!(await confirmDialog(`Сменить оплату ${money(pay.amount)} на «${toBank ? 'безнал' : 'наличные'}» (${reg.name})? Старая проводка удалится, появится новая.`, { ok: 'Сменить' }))) return
+    setSwitching(pay.id)
+    setError('')
+    try {
+      await api.post(`/sales/${sale.id}/payments/${pay.id}/change-method`, { is_bank: toBank, cash_register_id: reg.id })
+      onReturned()
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Не удалось сменить способ оплаты')
+    } finally {
+      setSwitching(null)
+    }
+  }
 
   const submitTip = async () => {
     if (!(Number(tipAmount) > 0)) {
@@ -773,14 +795,22 @@ function SaleModal({ sale, registers, canReturn, onClose, onReturned }: {
       </table>
       <p className="mb-1 text-right">Итого {money(sale.total_price)} · оплачено {money(sale.paid)}</p>
       {(sale.payments ?? []).length > 0 && (
-        <ul className="mb-4 text-right text-sm text-muted">
+        <ul className="mb-4 grid justify-items-end gap-1.5 text-sm text-muted">
           {(sale.payments ?? []).map((pay, i) => (
-            <li key={i}>{payMethod(pay.method)} · {pay.register}: <span className="num">{money(pay.amount)}</span></li>
+            <li key={i} className="flex flex-wrap items-center justify-end gap-2">
+              <span>{payMethod(pay.method)} · {pay.register}: <span className="num">{money(pay.amount)}</span></span>
+              {canChangePay && pay.id != null && (
+                <button type="button" disabled={switching === pay.id} onClick={() => void switchPay(pay)} className="switch-pay-btn inline-flex h-8 items-center rounded-md px-2.5 text-[13px] font-semibold disabled:opacity-50">
+                  Сменить на {pay.method === 'bank' ? 'наличные' : 'безнал'}
+                </button>
+              )}
+            </li>
           ))}
         </ul>
       )}
       {(sale.payments ?? []).length === 0 && <p className="mb-4 text-right text-sm text-muted">Способ оплаты не указан{Number(sale.paid) > 0 ? '' : ' (в долг)'}</p>}
       {tipDone && <p className="mb-3 text-sm text-success">{tipDone}</p>}
+      {error && !tipping && !returning && <p role="alert" className="mb-3 text-right text-sm text-danger">{error}</p>}
       {tipping ? (
         <div className="grid gap-2">
           <label className="grid gap-1 text-xs text-muted">Сумма чаевых, ₽

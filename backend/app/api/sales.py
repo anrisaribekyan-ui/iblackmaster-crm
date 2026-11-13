@@ -167,6 +167,32 @@ def return_sale(sale_id: int, data: SaleReturnIn, db: DbSession, me: CurrentEmpl
     db.commit()
     return {"document_id": document.id, "amount": amount, "paid": sale.paid}
 
+class ChangePaymentMethodIn(BaseModel):
+    is_bank: bool
+    cash_register_id: int | None = None
+
+
+@router.post(
+    "/{sale_id}/payments/{tx_id}/change-method",
+    dependencies=[Depends(require("changeTransactionAccess")), Depends(require("operationCashRegisterAccess"))],
+)
+def change_sale_payment_method(sale_id: int, tx_id: int, data: ChangePaymentMethodIn, db: DbSession, me: CurrentEmployee):
+    sale = db.get(Sale, sale_id)
+    if sale is None or sale.is_deleted:
+        raise NotFound("Чек")
+    check_location(me, sale.location_id)
+    transaction = db.get(Transaction, tx_id)
+    if transaction is None or transaction.is_deleted or transaction.sale_id != sale.id:
+        raise NotFound("Оплата чека")
+    if data.cash_register_id:
+        register = validate_cash_register(db, me, data.cash_register_id)
+        if register.location_id is not None and register.location_id != sale.location_id:
+            raise BusinessError("Касса должна быть глобальной или находиться в локации продажи")
+    new_tx = sales_service.change_payment_method(db, sale, transaction, me.id, is_bank=data.is_bank, cash_register_id=data.cash_register_id)
+    db.commit()
+    return {"id": new_tx.id, "amount": new_tx.amount}
+
+
 # --- Просмотр чеков --------------------------------------------------------------------
 
 
@@ -297,7 +323,7 @@ def get_sale(sale_id: int, db: DbSession, me: CurrentEmployee):
         "total_price": sale.total_price,
         "paid": sale.paid,
         "payments": [
-            {"amount": t.amount, "method": "bank" if t.is_bank else "cash", "register": r.name}
+            {"id": t.id, "amount": t.amount, "method": "bank" if t.is_bank else "cash", "register": r.name, "register_id": r.id}
             for t, r in pay_rows
         ],
         "discount_percent": sale.discount_percent,
