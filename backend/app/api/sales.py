@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, require
 from app.db import Rubles
 from app.errors import BusinessError, Forbidden, NotFound
-from app.models import CashRegister, Counteragent, Employee, Location, Nomenclature, Sale, SalePosition, Store, Transaction
+from app.models import SalaryEvent, CashRegister, Counteragent, Employee, Location, Nomenclature, Sale, SalePosition, Store, Transaction
 from app.services import sales as sales_service
 
 router = APIRouter(prefix="/sales", tags=["Продажи"])
@@ -314,10 +314,23 @@ def get_sale(sale_id: int, db: DbSession, me: CurrentEmployee):
         .where(Transaction.sale_id == sale.id, Transaction.is_income.is_(True), Transaction.is_deleted.is_(False), Transaction.pair_id.is_(None))
         .order_by(Transaction.id)
     ).all()
+    # Зарплата по чеку: кому и сколько начислено. Суммы видят те, кто управляет начислениями/выплатами, и сам получатель
+    can_all = has_permission(me, "changeSalaryAccess") or has_permission(me, "cashSalaryAccess")
+    salary_rows = db.execute(
+        select(SalaryEvent, Employee)
+        .join(Employee, Employee.id == SalaryEvent.employee_id)
+        .where(SalaryEvent.sale_id == sale.id)
+        .order_by(SalaryEvent.id)
+    ).all()
     return {
         "id": sale.id,
         "number": sale.number,
         "date": sale.date,
+        "salary": [
+            {"employee": e.short_name, "kind": ev.kind, "amount": ev.amount, "details": ev.details}
+            for ev, e in salary_rows
+            if can_all or e.id == me.id
+        ],
         "location_id": sale.location_id,
         "store_id": sale.store_id,
         "total_price": sale.total_price,

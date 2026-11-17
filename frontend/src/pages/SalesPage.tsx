@@ -27,6 +27,7 @@ type PayOption = { id: string; registerId: number; isBank: boolean; label: strin
 type Payment = { cash_register_id: string; amount: string; is_bank: boolean }
 type SaleRow = { id: number; number: string; date: string; total_price: string; paid: string; counteragent: string | null; seller: string | null }
 type SaleDetail = SaleRow & {
+  salary?: { employee: string; kind: string; amount: string; details: { base?: string; from?: number | string; percent?: number | string } | null }[]
   positions: { id: number; name: string; is_work: boolean; quantity: string; sold_price: string; returned_quantity: string }[]
   payments?: { id?: number; amount: string; method: 'cash' | 'bank'; register: string; register_id?: number }[]
 }
@@ -809,6 +810,19 @@ function SaleModal({ sale, registers, canReturn, canChangePay, onClose, onReturn
         </ul>
       )}
       {(sale.payments ?? []).length === 0 && <p className="mb-4 text-right text-sm text-muted">Способ оплаты не указан{Number(sale.paid) > 0 ? '' : ' (в долг)'}</p>}
+      <div className="mb-4 rounded-lg border border-line-soft bg-head px-3 py-2.5 text-sm">
+        <p className="flex justify-between gap-3"><span className="text-muted">Продавец</span><span className="font-semibold">{sale.seller ?? '—'}</span></p>
+        {(sale.salary ?? []).map((ev, i) => (
+          <p key={i} className="mt-1 flex justify-between gap-3">
+            <span className="text-muted">{ev.kind === 'tip' ? 'Зарплата (чаевые)' : 'Зарплата'}: {ev.employee}</span>
+            <span className="num font-semibold">
+              {money(ev.amount)}
+              {ev.details?.percent != null && <span className="font-normal text-muted"> · {ev.details.percent}% от {ev.details.base === 'summ' ? 'суммы' : 'прибыли'}{ev.details.from != null ? ` ${money(String(ev.details.from))}` : ''}</span>}
+            </span>
+          </p>
+        ))}
+        {(sale.salary ?? []).length === 0 && <p className="mt-1 text-xs text-muted">Зарплата по чеку не начислена (нет правила для продавца или нет прав видеть суммы)</p>}
+      </div>
       {tipDone && <p className="mb-3 text-sm text-success">{tipDone}</p>}
       {error && !tipping && !returning && <p role="alert" className="mb-3 text-right text-sm text-danger">{error}</p>}
       {tipping ? (
