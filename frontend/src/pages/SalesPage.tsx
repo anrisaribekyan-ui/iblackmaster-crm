@@ -63,13 +63,14 @@ export default function SalesPage() {
   const [discount, setDiscount] = useState(0) // %
   const [discountSum, setDiscountSum] = useState('')
   const [payId, setPayId] = useState('')
+  const [tip, setTip] = useState('')
   const [split, setSplit] = useState(false)
   const [payments, setPayments] = useState<Payment[]>([])
   const [showBuyer, setShowBuyer] = useState(false)
   const [phone, setPhone] = useState('')
   const [buyer, setBuyer] = useState<{ id: number; name: string } | null>(null)
   const [error, setError] = useState('')
-  const [done, setDone] = useState<{ id: number; number: string; total: number; debt: number } | null>(null)
+  const [done, setDone] = useState<{ id: number; number: string; total: number; debt: number; tip: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const [history, setHistory] = useState<SaleRow[] | null>(null)
   const [historyTotal, setHistoryTotal] = useState(0)
@@ -219,7 +220,18 @@ export default function SalesPage() {
         payments: pays,
       })
       if (option && !split) remember(`sale:pay:${locationId}`, option.id)
-      setDone({ id: sale.id, number: sale.number, total: Number(sale.total_price), debt: Number(sale.debt) })
+      let tipNote = ''
+      if (Number(tip) > 0) {
+        const tipOption = option ?? options.find((o) => String(o.registerId) === String(pays[0]?.cash_register_id) && o.isBank === pays[0]?.is_bank) ?? options[0]
+        try {
+          await api.post(`/sales/${sale.id}/tips`, { cash_register_id: tipOption.registerId, is_bank: tipOption.isBank, amount: tip })
+          tipNote = tip
+        } catch (e) {
+          setError(`Чек пробит, но чаевые не приняты: ${e instanceof ApiError ? e.message : 'ошибка'}. Примите их в карточке чека.`)
+        }
+      }
+      setTip('')
+      setDone({ id: sale.id, number: sale.number, total: Number(sale.total_price), debt: Number(sale.debt), tip: Number(tipNote) || 0 })
       try { navigator.vibrate?.(15) } catch { /* не все телефоны умеют */ }
       setLines([])
       setPayments([])
@@ -414,6 +426,13 @@ export default function SalesPage() {
             )}
           </div>
 
+          {can('operationCashRegisterAccess') && (
+            <label className="grid gap-1 text-sm">
+              <span className="font-semibold text-ink">Чаевые, ₽ <span className="font-normal text-muted">· половина продавцу в зарплату, половина в кассе</span></span>
+              <input className={`${inputClass} num w-40`} type="number" min="0" inputMode="numeric" placeholder="0" value={tip} onChange={(e) => setTip(e.target.value)} />
+            </label>
+          )}
+
           {can('discountSaleAccess') && (
             <div>
               <p className="mb-2 text-sm font-semibold text-ink">Скидка</p>
@@ -458,6 +477,7 @@ export default function SalesPage() {
           {done && (
             <div role="status" key={done.id} className="pop-in rounded-lg bg-success/10 p-3 text-sm">
               <p className="font-medium text-success">✓ Чек {done.number} на {money(done.total)} пробит</p>
+              {done.tip > 0 && <p className="text-muted">Чаевые {money(done.tip)} · всего принято {money(done.total + done.tip)}</p>}
               {done.debt > 0 && <p className="text-muted">Долг покупателя {money(done.debt)}</p>}
               <button className="mt-1 text-accent" onClick={() => void api.get<SaleDetail>(`/sales/${done.id}`).then(setViewing)}>Открыть / печать</button>
             </div>

@@ -349,6 +349,7 @@ export default function OrderDetailPage() {
   }
 
   // Выданный или удалённый заказ не редактируется
+  const tipsTotal = (detail?.transactions ?? []).filter((t) => t.cash_item_type === 'tip' && t.is_income).reduce((sum, t) => sum + Number(t.amount), 0)
   const isClosed = detail?.status.group === 'closed' || Boolean(detail?.order.is_deleted)
   // Себестоимость видна с правом просмотра закупочных цен, редактируется с правом orderPurchasePriceAccess
   const canSeeCost = can('purchasePriceAccess') || can('orderPurchasePriceAccess')
@@ -769,7 +770,8 @@ export default function OrderDetailPage() {
           <div className="flex items-end gap-5 md:justify-end">
             <div>
               <p className="text-xs text-white/50">Итого</p>
-              <p className="num text-2xl font-semibold leading-tight">{formatMoney(detail.order.total_price)}</p>
+              <p className="num text-2xl font-semibold leading-tight">{formatMoney(Number(detail.order.total_price) + tipsTotal)}</p>
+              {tipsTotal > 0 && <p className="text-xs text-white/60">работы {formatMoney(detail.order.total_price)} + чаевые {formatMoney(tipsTotal)}</p>}
             </div>
             {Number(detail.debt) > 0 && (
               <div>
@@ -1052,7 +1054,7 @@ export default function OrderDetailPage() {
                 </div>
               )}
               <div className="grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
-                <div className="text-sm text-muted">Оплачено <strong className="ml-2 text-ink num">{formatMoney(detail.order.paid)}</strong></div>
+                <div className="text-sm text-muted">Оплачено <strong className="ml-2 text-ink num">{formatMoney(Number(detail.order.paid) + tipsTotal)}</strong>{tipsTotal > 0 && <span className="ml-2 text-xs">в т.ч. чаевые {formatMoney(tipsTotal)}</span>}</div>
                 <div className="text-sm text-muted">Долг <strong className="ml-2 text-ink num">{formatMoney(detail.debt)}</strong></div>
                 {can('discountSaleAccess') && !isClosed && (
                   <div className="flex items-end gap-2 sm:col-span-2">
@@ -1094,7 +1096,7 @@ export default function OrderDetailPage() {
         </div>
         <aside className="space-y-4">
           <section className="rounded-xl border border-line bg-surface p-4">
-            <header className="mb-3 flex items-center justify-between"><h2 className="font-semibold">Оплаты</h2><strong className="num">{formatMoney(detail.order.paid)}</strong></header>
+            <header className="mb-3 flex items-center justify-between"><h2 className="font-semibold">Оплаты</h2><strong className="num">{formatMoney(Number(detail.order.paid) + tipsTotal)}</strong></header>
             <p className="mb-3 text-sm text-muted">Долг: <strong className="text-ink num">{formatMoney(detail.debt)}</strong></p>
             <div className="flex flex-wrap gap-2">
               {can('operationCashRegisterAccess') && !detail.order.is_deleted && <>
