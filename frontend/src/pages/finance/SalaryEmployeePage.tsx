@@ -39,6 +39,7 @@ type EventItem = {
   details: { base_value?: string; value?: string; value_type?: string } | null
   is_manual: boolean
   note: string | null
+  author?: string | null
 }
 type Payout = {
   id: number
@@ -47,6 +48,7 @@ type Payout = {
   is_bank: boolean
   cash_register_id: number
   note: string | null
+  author?: string | null
 }
 type Location = { id: number; name: string }
 type CashRegister = { id: number; name: string; location_id: number | null; accepts_cash: boolean; accepts_bank: boolean }
@@ -265,7 +267,7 @@ export default function SalaryEmployeePage() {
                                   {events.map((event) => (
                                     <tr key={event.id}>
                                       <td className="whitespace-nowrap px-2 py-1.5">{formatDateTime(event.date)}</td>
-                                      <td className="px-2 py-1.5">{event.kind_title}{event.note ? ` · ${event.note}` : ''}</td>
+                                      <td className="px-2 py-1.5">{event.kind_title}{event.note ? ` · ${event.note}` : ''}{event.is_manual && event.author ? ` · ${event.author}` : ''}</td>
                                       <td className="px-2 py-1.5">
                                         {event.order_id ? (
                                           <Link className="text-accent hover:underline" to={`/orders/${event.order_id}`}>Заказ {event.order_number}</Link>
@@ -333,7 +335,7 @@ export default function SalaryEmployeePage() {
                   <td className="whitespace-nowrap px-3 py-2">{formatDateTime(payout.date)}</td>
                   <td className="num px-3 py-2 text-right font-medium">{money(payout.amount)}</td>
                   <td className="px-3 py-2">{payout.is_bank ? 'Безнал' : 'Наличные'}</td>
-                  <td className="px-3 py-2">{payout.note || '—'}</td>
+                  <td className="px-3 py-2">{payout.note || '—'}{payout.author ? <small className="block text-xs text-muted">{payout.author}</small> : null}</td>
                 </tr>
               ))}
             </tbody>

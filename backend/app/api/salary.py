@@ -248,6 +248,7 @@ def salary_events(
                 "details": event.details,
                 "is_manual": event.is_manual,
                 "note": event.note,
+                "author": (db.get(Employee, event.created_by_id).short_name if event.created_by_id else None),
             }
         )
     return result
@@ -341,7 +342,8 @@ def salary_payouts(employee_id: int, db: DbSession, me: CurrentEmployee):
         .limit(200)
     ).all()
     return [
-        {"id": t.id, "date": t.date, "amount": t.amount, "is_bank": t.is_bank, "cash_register_id": t.cash_register_id, "note": t.note}
+        {"id": t.id, "date": t.date, "amount": t.amount, "is_bank": t.is_bank, "cash_register_id": t.cash_register_id, "note": t.note,
+         "author": (db.get(Employee, t.created_by_id).short_name if t.created_by_id else None)}
         for t in items
     ]
 
