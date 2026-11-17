@@ -336,7 +336,7 @@ def get_sale(sale_id: int, db: DbSession, me: CurrentEmployee):
         "total_price": sale.total_price,
         "paid": sale.paid,
         "payments": [
-            {"id": t.id, "amount": t.amount, "method": "bank" if t.is_bank else "cash", "register": r.name, "register_id": r.id}
+            {"id": t.id, "author": (db.get(Employee, t.created_by_id).short_name if t.created_by_id else None), "date": t.date, "amount": t.amount, "method": "bank" if t.is_bank else "cash", "register": r.name, "register_id": r.id}
             for t, r in pay_rows
         ],
         "discount_percent": sale.discount_percent,

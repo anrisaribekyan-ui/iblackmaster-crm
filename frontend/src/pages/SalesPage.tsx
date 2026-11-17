@@ -29,7 +29,7 @@ type SaleRow = { id: number; number: string; date: string; total_price: string; 
 type SaleDetail = SaleRow & {
   salary?: { employee: string; kind: string; amount: string; details: { base?: string; from?: number | string; percent?: number | string } | null }[]
   positions: { id: number; name: string; is_work: boolean; quantity: string; sold_price: string; returned_quantity: string }[]
-  payments?: { id?: number; amount: string; method: 'cash' | 'bank'; register: string; register_id?: number }[]
+  payments?: { id?: number; author?: string | null; amount: string; method: 'cash' | 'bank'; register: string; register_id?: number }[]
 }
 const payMethod = (method: string) => (method === 'bank' ? 'Безнал' : 'Наличные')
 
@@ -799,7 +799,7 @@ function SaleModal({ sale, registers, canReturn, canChangePay, onClose, onReturn
         <ul className="mb-4 grid justify-items-end gap-1.5 text-sm text-muted">
           {(sale.payments ?? []).map((pay, i) => (
             <li key={i} className="flex flex-wrap items-center justify-end gap-2">
-              <span>{payMethod(pay.method)} · {pay.register}: <span className="num">{money(pay.amount)}</span></span>
+              <span>{payMethod(pay.method)} · {pay.register}: <span className="num">{money(pay.amount)}</span>{pay.author ? ` · ${pay.author}` : ''}</span>
               {canChangePay && pay.id != null && (
                 <button type="button" disabled={switching === pay.id} onClick={() => void switchPay(pay)} className="switch-pay-btn inline-flex h-8 items-center rounded-md px-2.5 text-[13px] font-semibold disabled:opacity-50">
                   Сменить на {pay.method === 'bank' ? 'наличные' : 'безнал'}

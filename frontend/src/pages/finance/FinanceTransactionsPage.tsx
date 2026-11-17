@@ -29,6 +29,7 @@ type Transaction = {
   sale_id: number | null
   stock_document_id: number | null
   note: string | null
+  author: string | null
   is_deleted: boolean
 }
 type TransactionPage = { items: Transaction[]; total: number; page: number }
@@ -146,11 +147,12 @@ export default function FinanceTransactionsPage() {
         if (all.length >= result.total || result.items.length === 0) break
         page += 1
       }
-      const headers = ['Дата', 'Касса', 'Статья', 'Заказ', 'Тип', 'Сумма', 'Комментарий']
+      const headers = ['Дата', 'Касса', 'Статья', 'Автор', 'Заказ', 'Тип', 'Сумма', 'Комментарий']
       const rows = all.map((tx) => [
         formatDate(tx.date),
         `${locationLabel(tx.location_id)} · ${tx.cash_register_name ?? 'Касса'}`,
         tx.cash_item_name ?? '',
+        tx.author ?? '',
         tx.order_number ?? tx.sale_number ?? '',
         tx.is_bank ? 'Безнал' : 'Наличные',
         `${tx.is_income ? '' : '-'}${Number(tx.amount)}`,
@@ -231,6 +233,7 @@ export default function FinanceTransactionsPage() {
                               </Link>
                             )}
                             {transaction.sale_number && <small className="mt-0.5 block text-[13px] text-muted">Продажа {transaction.sale_number}</small>}
+                            <small className="mt-0.5 block text-[13px] text-muted">{transaction.author ?? 'Автоматически'}</small>
                           </td>
                           <td className="hidden px-3 py-2 md:table-cell">{transaction.is_bank ? 'Безнал' : 'Наличные'}</td>
                           <td className={`num whitespace-nowrap px-3 py-2 text-right font-medium ${transaction.is_income ? 'text-success' : 'text-danger'}`}>

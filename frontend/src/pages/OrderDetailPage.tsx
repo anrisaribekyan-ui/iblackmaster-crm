@@ -80,6 +80,7 @@ type Transaction = {
   cash_item_name: string
   cash_item_type: string | null
   cash_register_name: string
+  author?: string | null
 }
 type OrderDetail = {
   order: Record<string, unknown> & {
@@ -1111,7 +1112,7 @@ export default function OrderDetailPage() {
                       <span>{transaction.cash_item_type === 'bankPercent' ? 'Комиссия банка' : `${transaction.cash_item_type === 'tip' ? 'Чаевые' : transaction.is_income ? 'Оплата' : 'Возврат'}, ${transaction.is_bank ? 'безнал' : 'наличные'}`}</span>
                       <strong className={`num ${transaction.is_income ? '' : 'text-danger'}`}>{transaction.is_income ? '' : '−'}{formatMoney(transaction.amount)}</strong>
                     </div>
-                    <small className="text-muted">{formatDate(transaction.date)} · {transaction.cash_register_name}{transaction.note ? ` · ${transaction.note}` : ''}</small>
+                    <small className="text-muted">{formatDate(transaction.date)} · {transaction.cash_register_name}{transaction.author ? ` · ${transaction.author}` : ''}{transaction.note ? ` · ${transaction.note}` : ''}</small>
                     {can('changeTransactionAccess') && can('operationCashRegisterAccess') && !detail.order.is_deleted && (transaction.cash_item_type === 'order' || transaction.cash_item_type === 'orderReturn') && (
                       <button type="button" onClick={() => openSwitch(transaction)} className="switch-pay-btn mt-2 flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold">
                         <span aria-hidden>⇄</span> Сменить способ: на {transaction.is_bank ? 'наличные' : 'безнал'}
