@@ -73,7 +73,7 @@ export default function FinanceTransactionsPage() {
       if (filters.itemId) params.set('cash_item_id', filters.itemId)
       if (filters.dateFrom) params.set('date_from', filters.dateFrom)
       if (filters.dateTo) params.set('date_to', filters.dateTo)
-      if (filters.deleted && canViewDeleted) params.set('deleted', 'true')
+      if (canViewDeleted) params.set(filters.deleted ? 'deleted' : 'with_deleted', 'true')
       const [result, activeLocations, activeRegisters, activeItems] = await Promise.all([
         api.get<TransactionPage>(`/transactions?${params.toString()}`),
         api.get<Location[]>('/locations'),
@@ -222,7 +222,7 @@ export default function FinanceTransactionsPage() {
                     {data.items.map((transaction) => {
                       const linked = transaction.order_id !== null || transaction.sale_id !== null || transaction.stock_document_id !== null
                       return (
-                        <tr key={transaction.id} className={transaction.is_deleted ? 'text-muted' : ''}>
+                        <tr key={transaction.id} className={transaction.is_deleted ? 'text-muted line-through decoration-muted/70 [&_button]:no-underline' : ''}>
                           <td className="whitespace-nowrap px-3 py-2">{formatDate(transaction.date)}</td>
                           <td className="hidden px-3 py-2 md:table-cell">{transaction.cash_register_name ?? 'Касса'}<small className="block text-xs text-muted">{shortLocation(locationLabel(transaction.location_id))}</small></td>
                           <td className="px-3 py-2">
@@ -234,6 +234,15 @@ export default function FinanceTransactionsPage() {
                             )}
                             {transaction.sale_number && <small className="mt-0.5 block text-[13px] text-muted">Продажа {transaction.sale_number}</small>}
                             <small className="mt-0.5 block text-[13px] text-muted">{transaction.author ?? 'Автоматически'}</small>
+                            {canChange && <div className="mt-1.5 md:hidden">{transaction.is_deleted ? (
+                                <button disabled={actionId === transaction.id} className="text-accent disabled:opacity-60" onClick={() => void updateTransaction(transaction, true)}>
+                                  Восстановить
+                                </button>
+                              ) : !linked ? (
+                                <button disabled={actionId === transaction.id} className="inline-flex h-9 items-center text-danger disabled:opacity-60 md:h-auto" onClick={() => {
+                                  void confirmDialog('Удалить транзакцию?').then((ok) => { if (ok) void updateTransaction(transaction, false) })
+                                }}>Удалить</button>
+                              ) : <span className="text-muted">В документе</span>}</div>}
                           </td>
                           <td className="hidden px-3 py-2 md:table-cell">{transaction.is_bank ? 'Безнал' : 'Наличные'}</td>
                           <td className={`num whitespace-nowrap px-3 py-2 text-right font-medium ${transaction.is_income ? 'text-success' : 'text-danger'}`}>
@@ -242,12 +251,12 @@ export default function FinanceTransactionsPage() {
                           <td className="hidden max-w-64 truncate px-3 py-2 md:table-cell">{transaction.note || '—'}</td>
                           {canChange && (
                             <td className="hidden whitespace-nowrap px-3 py-2 md:table-cell">
-                              {filters.deleted ? (
+                              {transaction.is_deleted ? (
                                 <button disabled={actionId === transaction.id} className="text-accent disabled:opacity-60" onClick={() => void updateTransaction(transaction, true)}>
                                   Восстановить
                                 </button>
                               ) : !linked ? (
-                                <button disabled={actionId === transaction.id} className="text-danger disabled:opacity-60" onClick={() => {
+                                <button disabled={actionId === transaction.id} className="inline-flex h-9 items-center text-danger disabled:opacity-60 md:h-auto" onClick={() => {
                                   void confirmDialog('Удалить транзакцию?').then((ok) => { if (ok) void updateTransaction(transaction, false) })
                                 }}>Удалить</button>
                               ) : <span className="text-muted">В документе</span>}

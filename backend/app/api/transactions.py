@@ -106,15 +106,17 @@ def list_transactions(
     date_from: date | None = None,
     date_to: date | None = None,
     deleted: bool = False,
+    with_deleted: bool = False,
     page: int = Query(default=1, ge=1),
 ):
-    if deleted and not has_permission(me, "viewDeleteTransactionAccess"):
+    if (deleted or with_deleted) and not has_permission(me, "viewDeleteTransactionAccess"):
         raise Forbidden("Нет права видеть удалённые транзакции")
     allowed = location_ids(me)
     if location_id is not None:
         check_location(me, location_id)
     query = select(Transaction).order_by(Transaction.date.desc(), Transaction.id.desc())
-    query = query.where(Transaction.is_deleted.is_(deleted))
+    if not with_deleted or deleted:
+        query = query.where(Transaction.is_deleted.is_(deleted))
     if allowed:
         query = query.where(or_(Transaction.location_id.is_(None), Transaction.location_id.in_(allowed)))
     if location_id is not None:
