@@ -267,6 +267,7 @@ class OrderFile(Base):
     mimetype: Mapped[str] = mapped_column(String(100))
     size: Mapped[int]
     path: Mapped[str] = mapped_column(String(500))
+    expires_at: Mapped[datetime | None] = mapped_column(index=True)  # None — хранить всегда
 
 
 class QuickOrder(Base, TimestampMixin):

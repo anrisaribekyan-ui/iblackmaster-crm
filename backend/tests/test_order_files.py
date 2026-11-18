@@ -64,3 +64,31 @@ def test_delete_rules(client, auth_headers, db, order, owner):
                        files=[("files", ("a.jpg", photo(100, 100), "image/jpeg"))]).json()[0]
     assert client.delete(f"/api/orders/{order.id}/files/{item['id']}", headers=auth_headers).status_code == 204
     assert client.get(f"/api/orders/{order.id}/files", headers=auth_headers).json() == []
+
+
+def test_any_file_with_retention_and_purge(client, auth_headers, db, order, uploads):
+    from datetime import timedelta
+
+    from app.api.order_files import purge_expired
+    from app.db import utcnow
+
+    # Прочий файл без выбора срока — час; фото без выбора — навсегда; «never» — навсегда
+    r = client.post(f"/api/orders/{order.id}/files", headers=auth_headers,
+                    files=[("files", ("прошивка.zip", b"PK\x03\x04data", "application/zip")), ("files", ("a.jpg", photo(100, 100), "image/jpeg"))])
+    assert r.status_code == 200, r.text
+    zipf, img = r.json()
+    assert zipf["expires_at"] is not None and img["expires_at"] is None
+    r2 = client.post(f"/api/orders/{order.id}/files", headers=auth_headers, data={"keep": "never"}, files=[("files", ("n.txt", b"hello", "text/plain"))])
+    assert r2.json()[0]["expires_at"] is None
+    r3 = client.post(f"/api/orders/{order.id}/files", headers=auth_headers, data={"keep": "30d"}, files=[("files", ("m.txt", b"hello", "text/plain"))])
+    assert r3.json()[0]["expires_at"] is not None
+    assert client.post(f"/api/orders/{order.id}/files", headers=auth_headers, data={"keep": "5y"}, files=[("files", ("x.txt", b"1", "text/plain"))]).status_code == 400
+    # Скачивается как вложение, а не открывается на странице
+    d = client.get(f"/api/orders/{order.id}/files/{zipf['id']}", headers=auth_headers)
+    assert d.headers["content-disposition"].startswith("attachment")
+    # Просрочка: удаляется и из базы, и с диска
+    item = db.get(OrderFile, zipf["id"])
+    item.expires_at = utcnow().replace(tzinfo=None) - timedelta(minutes=1)
+    db.commit()
+    assert purge_expired(db) == 1
+    assert db.get(OrderFile, zipf["id"]) is None

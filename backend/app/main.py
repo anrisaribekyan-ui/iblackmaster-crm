@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -57,6 +58,21 @@ from app.errors import BusinessError
 STATUS_BY_CODE = {"not_found": 404, "forbidden": 403, "unauthorized": 401, "bad_credentials": 401}
 
 
+async def _purge_files_loop():
+    """Раз в 10 минут удаляет файлы заказов с истёкшим сроком хранения."""
+    from app.api.order_files import purge_expired
+
+    while True:
+        try:
+            def run():
+                with SessionLocal() as db:
+                    purge_expired(db)
+            await asyncio.to_thread(run)
+        except Exception:
+            logging.getLogger("uvicorn.error").exception("Не удалось очистить просроченные файлы")
+        await asyncio.sleep(600)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     # SQLite (разработка) — таблицы создаются сами. PostgreSQL (сервер) — только через миграции:
@@ -66,7 +82,9 @@ async def lifespan(_: FastAPI):
     elif settings.jwt_secret == "change-me-in-production" or len(settings.jwt_secret) < 32:
         raise RuntimeError("Задайте JWT_SECRET длиной от 32 символов (openssl rand -hex 32)")
     notifications.start_worker(SessionLocal)  # SMS-очередь; ничего не делает, если шлюз не настроен
+    purge_task = asyncio.create_task(_purge_files_loop())
     yield
+    purge_task.cancel()
 
 
 app = FastAPI(title="iBlackMaster CRM", version="0.1.0", lifespan=lifespan)

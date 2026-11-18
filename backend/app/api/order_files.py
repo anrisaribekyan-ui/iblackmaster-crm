@@ -9,7 +9,7 @@ import uuid
 from datetime import timedelta
 from pathlib import Path
 
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 
@@ -24,7 +24,11 @@ router = APIRouter(tags=["Файлы заказа"])
 
 MAX_SIZE = 20 * 1024 * 1024
 MAX_FILES = 30
-ALLOWED = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "application/pdf"}
+IMAGES = {"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}
+INLINE = IMAGES | {"application/pdf"}  # только их браузер показывает прямо на странице, остальное — скачивается
+BLOCKED_EXT = {".html", ".htm", ".svg", ".xhtml", ".js", ".mjs", ".exe", ".bat", ".cmd", ".scr", ".com", ".msi", ".ps1", ".vbs", ".jar"}
+# Срок хранения: «никогда» — None. Фото при приёме хранятся всегда (доказательство), остальное по умолчанию час
+KEEP = {"1h": timedelta(hours=1), "12h": timedelta(hours=12), "10d": timedelta(days=10), "30d": timedelta(days=30), "never": None}
 FULL_SIDE = 1920
 THUMB_SIDE = 400
 
@@ -68,7 +72,22 @@ def file_dict(item: OrderFile, names: dict[int, str]) -> dict:
         "mimetype": item.mimetype,
         "size": item.size,
         "is_image": item.mimetype.startswith("image/"),
+        "expires_at": item.expires_at,
     }
+
+
+def purge_expired(db) -> int:
+    """Удаляет файлы с истёкшим сроком хранения (с диска и из базы)."""
+    now = utcnow()
+    items = db.scalars(select(OrderFile).where(OrderFile.expires_at.is_not(None), OrderFile.expires_at <= now.replace(tzinfo=None))).all()
+    for item in items:
+        path = Path(settings.uploads_dir) / item.path
+        db.delete(item)
+        path.unlink(missing_ok=True)
+        _thumb_path(path).unlink(missing_ok=True)
+    if items:
+        db.commit()
+    return len(items)
 
 
 def _names(db, items) -> dict[int, str]:
@@ -81,16 +100,20 @@ def list_files(order_id: int, db: DbSession, me: CurrentEmployee):
     from app.api.orders import get_order_for_employee
 
     order = get_order_for_employee(db, order_id, me, include_deleted=True)
+    purge_expired(db)
     items = db.scalars(select(OrderFile).where(OrderFile.order_id == order.id).order_by(OrderFile.id)).all()
     names = _names(db, items)
     return [file_dict(i, names) for i in items]
 
 
 @router.post("/orders/{order_id}/files")
-async def upload_files(order_id: int, db: DbSession, me: CurrentEmployee, files: list[UploadFile] = File(...)):
+async def upload_files(order_id: int, db: DbSession, me: CurrentEmployee, files: list[UploadFile] = File(...), keep: str | None = Form(default=None)):
     from app.api.orders import get_order_for_employee
 
     order = get_order_for_employee(db, order_id, me)
+    if keep is not None and keep not in KEEP:
+        raise BusinessError("Неизвестный срок хранения")
+    purge_expired(db)
     existing = len(db.scalars(select(OrderFile.id).where(OrderFile.order_id == order.id)).all())
     if existing + len(files) > MAX_FILES:
         raise BusinessError(f"У заказа не больше {MAX_FILES} файлов")
@@ -100,9 +123,11 @@ async def upload_files(order_id: int, db: DbSession, me: CurrentEmployee, files:
     written: list[Path] = []
     try:
         for upload in files:
-            mimetype = (upload.content_type or "").lower()
-            if mimetype not in ALLOWED:
-                raise BusinessError(f"«{upload.filename}»: можно загружать только фото и PDF")
+            mimetype = (upload.content_type or "").lower() or "application/octet-stream"
+            if Path(upload.filename or "").suffix.lower() in BLOCKED_EXT:
+                raise BusinessError(f"«{upload.filename}»: такой тип файла загружать нельзя")
+            if mimetype not in INLINE:
+                mimetype = "application/octet-stream"
             raw = await upload.read(MAX_SIZE + 1)
             if len(raw) > MAX_SIZE:
                 raise BusinessError(f"«{upload.filename}» больше 20 МБ")
@@ -110,14 +135,17 @@ async def upload_files(order_id: int, db: DbSession, me: CurrentEmployee, files:
                 raise BusinessError(f"«{upload.filename}» пустой")
             target = folder / uuid.uuid4().hex
             data = raw
-            if mimetype.startswith("image/"):
+            if mimetype in IMAGES:
                 converted = _save_image(raw, target)
                 if converted is not None:
                     data, mimetype = converted
                     written.append(_thumb_path(target))
             target.write_bytes(data)
             written.append(target)
+            # Фото без выбора — навсегда; прочие файлы без выбора — час
+            period = KEEP[keep] if keep is not None else (None if mimetype.startswith("image/") else KEEP["1h"])
             item = OrderFile(
+                expires_at=(utcnow() + period).replace(tzinfo=None) if period else None,
                 order_id=order.id,
                 employee_id=me.id,
                 filename=(upload.filename or "файл")[:300],
@@ -158,7 +186,8 @@ def download_file(order_id: int, file_id: int, db: DbSession, me: CurrentEmploye
         return FileResponse(_thumb_path(path), media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})
     if not path.exists():
         raise NotFound("Файл")
-    return FileResponse(path, media_type=item.mimetype, filename=item.filename, content_disposition_type="inline",
+    return FileResponse(path, media_type=item.mimetype, filename=item.filename,
+                        content_disposition_type="inline" if item.mimetype in INLINE else "attachment",
                         headers={"Cache-Control": "private, max-age=86400"})
 
 

@@ -12,6 +12,22 @@ type OrderFileItem = {
   mimetype: string
   size: number
   is_image: boolean
+  expires_at: string | null
+}
+
+const KEEP_OPTIONS = [['1h', '1 час'], ['12h', '12 часов'], ['10d', '10 дней'], ['30d', '30 дней'], ['never', 'Никогда']] as const
+type Keep = (typeof KEEP_OPTIONS)[number][0]
+
+const toDate = (v: string) => new Date(v.endsWith('Z') || v.includes('+') ? v : `${v}Z`)
+/** «Удалится через 40 мин / 5 ч / 3 дн» — чтобы сотрудник видел, сколько файл ещё проживёт. */
+function leftLabel(expires: string | null): string | null {
+  if (!expires) return null
+  const ms = toDate(expires).getTime() - Date.now()
+  if (ms <= 0) return 'удаляется'
+  const min = Math.ceil(ms / 60000)
+  if (min < 60) return `${min} мин`
+  if (min < 48 * 60) return `${Math.ceil(min / 60)} ч`
+  return `${Math.ceil(min / 1440)} дн`
 }
 
 const stamp = (v: string) =>
@@ -39,11 +55,11 @@ function Thumb({ orderId, item, onOpen }: { orderId: number; item: OrderFileItem
         url ? <img src={url} alt={item.filename} className="h-full w-full object-cover" /> : <span className="text-xs text-muted">…</span>
       ) : (
         <span className="flex h-full flex-col items-center justify-center gap-1 p-1 text-xs text-muted">
-          <span className="text-base font-semibold text-ink">PDF</span>
+          <span className="text-base font-semibold text-ink">{(item.filename.split('.').pop() ?? 'файл').slice(0, 5).toUpperCase()}</span>
           <span className="line-clamp-2 break-all">{item.filename}</span>
         </span>
       )}
-      <span className="absolute inset-x-0 bottom-0 bg-black/55 px-1 py-0.5 text-[10px] tabular-nums text-white">{stamp(item.created_at)}</span>
+      <span className="absolute inset-x-0 bottom-0 bg-black/55 px-1 py-0.5 text-[10px] tabular-nums text-white">{stamp(item.created_at)}{leftLabel(item.expires_at) ? ` · ещё ${leftLabel(item.expires_at)}` : ''}</span>
     </button>
   )
 }
@@ -58,6 +74,7 @@ export default function OrderPhotos({ orderId, disabled, onChanged }: { orderId:
   const [confirmDelete, setConfirmDelete] = useState(false)
   const camera = useRef<HTMLInputElement>(null)
   const picker = useRef<HTMLInputElement>(null)
+  const [keep, setKeep] = useState<Keep>('1h')
 
   const load = useCallback(async () => {
     try {
@@ -69,10 +86,11 @@ export default function OrderPhotos({ orderId, disabled, onChanged }: { orderId:
   }, [orderId])
   useEffect(() => { void load() }, [load])
 
-  const upload = async (files: FileList | null) => {
+  const upload = async (files: FileList | null, keepValue?: Keep) => {
     if (!files || files.length === 0) return
     const form = new FormData()
     Array.from(files).forEach((f) => form.append('files', f))
+    if (keepValue) form.append('keep', keepValue)
     setUploading(true)
     setError('')
     try {
@@ -93,7 +111,14 @@ export default function OrderPhotos({ orderId, disabled, onChanged }: { orderId:
       const blob = await api.blob(`/orders/${orderId}/files/${item.id}`)
       const url = URL.createObjectURL(blob)
       if (item.is_image) setViewing({ item, url })
-      else window.open(url, '_blank')
+      else if (item.mimetype === 'application/pdf') window.open(url, '_blank')
+      else {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = item.filename
+        link.click()
+        setTimeout(() => URL.revokeObjectURL(url), 10000)
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Не удалось открыть файл')
     }
@@ -124,21 +149,27 @@ export default function OrderPhotos({ orderId, disabled, onChanged }: { orderId:
   return (
     <section className="rounded-xl border border-line bg-surface p-4">
       <header className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="mr-auto font-semibold">Фото устройства</h2>
-        <input ref={camera} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => void upload(e.target.files)} />
-        <input ref={picker} type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => void upload(e.target.files)} />
+        <h2 className="mr-auto font-semibold">Фото и файлы</h2>
+        <input ref={camera} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => void upload(e.target.files, 'never')} />
+        <input ref={picker} type="file" multiple hidden onChange={(e) => void upload(e.target.files, keep)} />
         <button type="button" disabled={disabled || uploading} onClick={() => camera.current?.click()}
           className="rounded-md bg-ink px-3 py-1.5 text-sm text-white disabled:opacity-50">
           {uploading ? 'Загружаю…' : 'Сфотографировать'}
         </button>
         <button type="button" disabled={disabled || uploading} onClick={() => picker.current?.click()}
           className="rounded-md border border-line px-3 py-1.5 text-sm disabled:opacity-50">
-          Из файлов
+          Прикрепить файл
         </button>
+        <label className="flex items-center gap-1.5 text-sm text-muted">
+          Хранить
+          <select aria-label="Срок хранения файла" className="h-9 rounded-md border border-line bg-surface px-2 text-sm text-ink" value={keep} onChange={(e) => setKeep(e.target.value as Keep)}>
+            {KEEP_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
       </header>
       {error && <p role="alert" className="mb-2 text-sm text-danger">{error}</p>}
       {items.length === 0 ? (
-        <p className="text-sm text-muted">Снимите аппарат при приёме: сколы, трещины, вмятины. Фото с датой — защита в споре «вы разбили».</p>
+        <p className="text-sm text-muted">Снимите аппарат при приёме: сколы, трещины, вмятины. Фото с камеры хранятся всегда. К заказу можно прикрепить и любой файл: он удалится через выбранный срок (по умолчанию час).</p>
       ) : (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6">
           {items.map((item) => <Thumb key={item.id} orderId={orderId} item={item} onOpen={() => void open(item)} />)}
