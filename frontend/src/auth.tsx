@@ -14,6 +14,7 @@ export type Me = {
   location_ids: number[]
   /** Подсказки и экскурсии, которые сотрудник уже видел */
   seen_tips: string[]
+  background_version: string | null
 }
 
 type AuthState = {

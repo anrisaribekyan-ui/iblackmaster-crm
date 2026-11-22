@@ -1,13 +1,15 @@
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, File, Response, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
 from app.api.deps import CurrentEmployee, DbSession, check_location, location_ids, require
-from app.errors import BusinessError, NotFound
+from app.errors import BusinessError, Forbidden, NotFound
 from app.models import Employee, Location, Role
+from app.services import employee_backgrounds
 from app.permissions import PERMISSIONS, SCOPES
 from app.db import utcnow
 from app.security import hash_password
@@ -71,6 +73,7 @@ class EmployeeOut(BaseModel):
     is_owner: bool
     is_active: bool
     location_ids: list[int]
+    background_version: str | None = None
 
 
 class EmployeeShortOut(BaseModel):
@@ -95,7 +98,7 @@ def role_out(role: Role) -> RoleOut:
     return RoleOut.model_validate(role)
 
 
-def employee_out(employee: Employee) -> EmployeeOut:
+def employee_out(employee: Employee, db: DbSession) -> EmployeeOut:
     return EmployeeOut(
         id=employee.id,
         name=employee.name,
@@ -111,6 +114,7 @@ def employee_out(employee: Employee) -> EmployeeOut:
         is_owner=employee.is_owner,
         is_active=employee.is_active,
         location_ids=sorted(location.id for location in employee.locations),
+        background_version=employee_backgrounds.current_version(db, employee.id),
     )
 
 
@@ -192,7 +196,7 @@ def delete_role(role_id: int, db: DbSession):
 @router.get("/employees", response_model=list[EmployeeOut], dependencies=[Depends(require("settingAccess"))])
 def list_employees(db: DbSession):
     employees = db.scalars(select(Employee).order_by(Employee.surname, Employee.name, Employee.id)).all()
-    return [employee_out(employee) for employee in employees]
+    return [employee_out(employee, db) for employee in employees]
 
 
 @router.post("/employees", response_model=EmployeeOut, dependencies=[Depends(require("settingAccess"))])
@@ -215,7 +219,7 @@ def create_employee(data: EmployeeCreate, db: DbSession, me: CurrentEmployee):
 
         mail.send(employee.email, "Ваш вход в CRM iBlackMaster", "welcome",
                   name=first_name(employee), email=employee.email, role=role.name)
-    return employee_out(employee)
+    return employee_out(employee, db)
 
 
 @router.put("/employees/{employee_id}", response_model=EmployeeOut, dependencies=[Depends(require("settingAccess"))])
@@ -234,7 +238,7 @@ def update_employee(employee_id: int, data: EmployeeUpdate, db: DbSession, me: C
     employee.role = role
     employee.locations = locations
     db.commit()
-    return employee_out(employee)
+    return employee_out(employee, db)
 
 
 @router.post(
@@ -268,6 +272,47 @@ def deactivate_employee(employee_id: int, db: DbSession):
     db.commit()
     return Response(status_code=204)
 
+
+
+
+def _background_employee(db: DbSession, employee_id: int) -> Employee:
+    employee = db.get(Employee, employee_id)
+    if employee is None:
+        raise NotFound("Сотрудник")
+    return employee
+
+
+@router.get("/employees/{employee_id}/background")
+def get_employee_background(employee_id: int, db: DbSession, me: CurrentEmployee):
+    """Картинка доступна только самому сотруднику и владельцу CRM, не по открытой ссылке."""
+    if not me.is_owner and me.id != employee_id:
+        raise Forbidden("Нет доступа к фону другого сотрудника")
+    _background_employee(db, employee_id)
+    path = employee_backgrounds.current_path(db, employee_id)
+    if path is None:
+        raise NotFound("Фон сотрудника")
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, no-store"})
+
+
+@router.post("/employees/{employee_id}/background")
+async def upload_employee_background(
+    employee_id: int, db: DbSession, me: CurrentEmployee, file: UploadFile = File(...)
+):
+    if not me.is_owner:
+        raise Forbidden("Назначать фон может только владелец CRM")
+    _background_employee(db, employee_id)
+    raw = await file.read(employee_backgrounds.MAX_UPLOAD_BYTES + 1)
+    version = employee_backgrounds.save(db, employee_id, raw, file.content_type or "")
+    return {"background_version": version}
+
+
+@router.delete("/employees/{employee_id}/background", status_code=204)
+def remove_employee_background(employee_id: int, db: DbSession, me: CurrentEmployee):
+    if not me.is_owner:
+        raise Forbidden("Удалять фон может только владелец CRM")
+    _background_employee(db, employee_id)
+    employee_backgrounds.remove(db, employee_id)
+    return Response(status_code=204)
 
 @router.get("/employees/short", response_model=list[EmployeeShortOut])
 def list_employees_short(

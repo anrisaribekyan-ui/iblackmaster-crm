@@ -45,6 +45,33 @@ export const MENU: { to: string; label: string; icon: string; permission?: strin
 
 export default function Layout() {
   const { me, logout, can, resetTips } = useAuth()
+  // Фон берём с сервера только для вошедшего сотрудника. Blob URL не раскрывает токен.
+  useEffect(() => {
+    const root = document.documentElement
+    let active = true
+    let objectUrl: string | null = null
+    root.removeAttribute('data-personal-wallpaper')
+    root.style.removeProperty('--personal-wallpaper')
+    if (me?.background_version) {
+      api.blob(`/employees/${me.id}/background`).then((blob) => {
+        if (!active) return
+        objectUrl = URL.createObjectURL(blob)
+        root.style.setProperty('--personal-wallpaper', `url("${objectUrl}")`)
+        root.dataset.personalWallpaper = 'true'
+      }).catch(() => {
+        if (active) {
+          root.removeAttribute('data-personal-wallpaper')
+          root.style.removeProperty('--personal-wallpaper')
+        }
+      })
+    }
+    return () => {
+      active = false
+      root.removeAttribute('data-personal-wallpaper')
+      root.style.removeProperty('--personal-wallpaper')
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [me?.id, me?.background_version])
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [tourOpen, setTourOpen] = useState(false)
   const [forcedTip, setForcedTip] = useState<string | null>(null)

@@ -31,6 +31,7 @@ type Employee = {
   is_owner: boolean
   is_active: boolean
   location_ids: number[]
+  background_version: string | null
 }
 type Permission = { code: string; title: string; parent: string | null }
 type PermissionSection = { section: string; permissions: Permission[] }
@@ -41,13 +42,14 @@ type EmployeeEditor = { kind: 'employee'; employee?: Employee } | { kind: 'passw
 const inputClass = 'w-full rounded-md border border-line bg-surface px-3 py-2'
 
 export default function StaffPage() {
-  const { can } = useAuth()
+  const { can, me, retry } = useAuth()
   const [tab, setTab] = useState<'employees' | 'roles'>('employees')
   const [employees, setEmployees] = useState<Employee[] | null>(null)
   const [roles, setRoles] = useState<Role[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [catalog, setCatalog] = useState<PermissionCatalog | null>(null)
   const [editor, setEditor] = useState<EmployeeEditor | null>(null)
+  const [wallpaperEmployee, setWallpaperEmployee] = useState<Employee | null>(null)
   const [editingRole, setEditingRole] = useState<Role | null | undefined>(undefined)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -220,6 +222,7 @@ export default function StaffPage() {
                         {can('settingAccess') && (
                           <span className="flex gap-2 whitespace-nowrap text-sm">
                                                         <button className="text-muted" onClick={() => setEditor({ kind: 'password', employee })}>Пароль</button>
+                            {me?.is_owner && <button className="text-accent" onClick={() => setWallpaperEmployee(employee)}>Фон</button>}
                             {employee.is_active && !employee.is_owner && <button className="text-danger" onClick={() => void deactivate(employee)}>Отключить</button>}
                           </span>
                         )}
@@ -272,6 +275,17 @@ export default function StaffPage() {
           onClose={() => setEditor(null)}
           onSubmit={saveEmployee}
           onPassword={editor.employee ? () => setEditor({ kind: 'password', employee: editor.employee! }) : undefined}
+        />
+      )}
+      {wallpaperEmployee && me?.is_owner && (
+        <EmployeeWallpaperModal
+          key={wallpaperEmployee.id}
+          employee={wallpaperEmployee}
+          onClose={() => setWallpaperEmployee(null)}
+          onChanged={() => {
+            void load()
+            if (me.id === wallpaperEmployee.id) retry()
+          }}
         />
       )}
       {editor?.kind === 'password' && (
@@ -369,6 +383,109 @@ function EmployeeForm({
           <button disabled={saving} className="rounded-md bg-accent font-semibold px-3 py-2 text-accent-ink disabled:opacity-60">{saving ? 'Сохранение…' : 'Сохранить'}</button>
         </div>
       </form>
+    </Modal>
+  )
+}
+
+
+function EmployeeWallpaperModal({ employee, onClose, onChanged }: {
+  employee: Employee
+  onClose: () => void
+  onChanged: () => void
+}) {
+  const [version, setVersion] = useState<string | null>(employee.background_version)
+  const [preview, setPreview] = useState<string | null>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!version) {
+      setPreview(null)
+      return
+    }
+    let active = true
+    let url: string | null = null
+    api.blob(`/employees/${employee.id}/background`).then((blob) => {
+      if (!active) return
+      url = URL.createObjectURL(blob)
+      setPreview(url)
+    }).catch(() => { if (active) setError('Не удалось загрузить текущий фон') })
+    return () => {
+      active = false
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [employee.id, version])
+
+  const upload = async () => {
+    if (!file) return
+    if (file.size > 8 * 1024 * 1024) {
+      setError('Файл должен быть не больше 8 МБ')
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const data = await api.upload<{ background_version: string }>(`/employees/${employee.id}/background`, form)
+      setVersion(data.background_version)
+      setFile(null)
+      onChanged()
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Не удалось назначить фон')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async () => {
+    if (!(await confirmDialog(`Удалить персональный фон сотрудника «${employee.short_name}»?`))) return
+    setBusy(true)
+    setError('')
+    try {
+      await api.del(`/employees/${employee.id}/background`)
+      setVersion(null)
+      setPreview(null)
+      setFile(null)
+      onChanged()
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Не удалось удалить фон')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal title={`Персональный фон · ${employee.short_name}`} onClose={onClose}>
+      <div className="grid gap-3">
+        <p className="text-sm text-muted">Фотография появится только у этого сотрудника на всех устройствах после обновления CRM. Назначает и удаляет фон только владелец.</p>
+        {preview ? (
+          <img src={preview} alt="Текущий персональный фон" className="h-36 w-full rounded-lg border border-line object-cover" />
+        ) : (
+          <div className="grid h-24 place-items-center rounded-lg border border-dashed border-line text-sm text-muted">
+            Персональный фон не назначен
+          </div>
+        )}
+        <label className="grid gap-1 text-sm text-muted">
+          Выберите фотографию (JPG, PNG или WebP; до 8 МБ)
+          <input
+            className="block w-full text-ink"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            disabled={busy}
+          />
+        </label>
+        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+        <div className="flex flex-wrap justify-end gap-2">
+          {version && <button type="button" disabled={busy} onClick={() => void remove()} className="mr-auto rounded-md border border-danger px-3 py-2 text-danger disabled:opacity-60">Удалить фон</button>}
+          <button type="button" onClick={onClose} className="rounded-md border border-line px-3 py-2">Закрыть</button>
+          <button type="button" disabled={!file || busy} onClick={() => void upload()} className="rounded-md bg-accent px-3 py-2 font-semibold text-accent-ink disabled:opacity-60">
+            {busy ? 'Сохранение…' : 'Назначить фон'}
+          </button>
+        </div>
+      </div>
     </Modal>
   )
 }
