@@ -248,7 +248,7 @@ export default function FinanceTransactionsPage() {
                           <td className="hidden px-3 py-2 md:table-cell">{transaction.is_bank ? 'Безнал' : 'Наличные'}</td>
                           <td className={`num whitespace-nowrap px-3 py-2 text-right font-medium ${transaction.is_income ? 'text-success' : 'text-danger'}`}>
                             {transaction.is_income ? '+' : '−'}{money(transaction.amount)}
-                            <small className="block text-xs font-normal text-muted">остаток {money(transaction.balance_after)}<span className="md:hidden"> · {transaction.is_bank ? 'безнал' : 'нал'}</span></small>
+                            <small className="block mt-0.5 text-[13px] font-normal text-ink-2">остаток {money(transaction.balance_after)}<span className="md:hidden"> · {transaction.is_bank ? 'безнал' : 'нал'}</span></small>
                           </td>
                           <td className="hidden max-w-64 truncate px-3 py-2 md:table-cell">{transaction.note || '—'}</td>
                           {canChange && (
