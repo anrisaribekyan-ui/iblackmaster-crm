@@ -6,10 +6,20 @@ from PIL import Image
 from sqlalchemy import select
 
 from app.config import settings
-from app.models import Employee, Location
-from app.security import create_access_token
+from app.models import Employee, Location, Role
+from app.security import create_access_token, hash_password
 
-from test_staff import make_employee
+
+def make_employee(db, *, name, email, permissions, location):
+    role = Role(name=f"Роль {email}", permissions=permissions, scopes={})
+    employee = Employee(
+        name=name, short_name=name, email=email,
+        password_hash=hash_password("password123", rounds=4),
+        role=role, locations=[location],
+    )
+    db.add(employee)
+    db.commit()
+    return employee
 
 
 def png_bytes() -> bytes:
