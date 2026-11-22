@@ -42,6 +42,7 @@ class MeOut(BaseModel):
     scopes: dict[str, str]
     location_ids: list[int]
     seen_tips: list[str] = []
+    background_version: str | None = None
 
 
 @router.post("/login", response_model=LoginOut)
@@ -53,8 +54,9 @@ def login(data: LoginIn, db: DbSession):
 
 
 @router.get("/me", response_model=MeOut)
-def me(employee: CurrentEmployee):
+def me(employee: CurrentEmployee, db: DbSession):
     from app.permissions import ALL_PERMISSION_CODES, FULL_SCOPES
+    from app.services import employee_backgrounds
 
     return MeOut(
         id=employee.id,
@@ -68,6 +70,7 @@ def me(employee: CurrentEmployee):
         scopes=FULL_SCOPES if employee.is_owner else (employee.role.scopes or {}),
         location_ids=[loc.id for loc in employee.locations],
         seen_tips=list(employee.seen_tips or []),
+        background_version=employee_backgrounds.current_version(db, employee.id),
     )
 
 
