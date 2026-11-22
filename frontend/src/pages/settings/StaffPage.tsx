@@ -275,6 +275,7 @@ export default function StaffPage() {
           onClose={() => setEditor(null)}
           onSubmit={saveEmployee}
           onPassword={editor.employee ? () => setEditor({ kind: 'password', employee: editor.employee! }) : undefined}
+          onWallpaper={editor.employee && me?.is_owner ? () => { setWallpaperEmployee(editor.employee!); setEditor(null) } : undefined}
         />
       )}
       {wallpaperEmployee && me?.is_owner && (
@@ -326,6 +327,7 @@ function EmployeeForm({
   onClose,
   onSubmit,
   onPassword,
+  onWallpaper,
 }: {
   employee?: Employee
   roles: Role[]
@@ -335,6 +337,7 @@ function EmployeeForm({
   onClose: () => void
   onSubmit: (event: FormEvent<HTMLFormElement>, selectedLocations: number[]) => void
   onPassword?: () => void
+  onWallpaper?: () => void
 }) {
   const [selectedLocations, setSelectedLocations] = useState<number[]>(employee?.location_ids ?? [])
   const toggleLocation = (id: number) => setSelectedLocations((current) =>
@@ -376,6 +379,12 @@ function EmployeeForm({
             </label>
           ))}
         </fieldset>
+        {onWallpaper && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-canvas p-3 sm:col-span-2">
+            <span className="font-medium">Персональный фон сотрудника</span>
+            <button type="button" className="rounded-md border border-line bg-surface px-3 py-2 text-accent" onClick={onWallpaper}>Настроить фон</button>
+          </div>
+        )}
         {error && <p role="alert" className="text-sm text-danger sm:col-span-2">{error}</p>}
         <div className="flex flex-wrap items-center justify-end gap-2 sm:col-span-2">
           {onPassword && <button type="button" className="mr-auto rounded-md border border-line px-3 py-2" onClick={onPassword}>Сменить пароль</button>}
