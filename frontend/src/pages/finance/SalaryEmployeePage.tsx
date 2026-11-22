@@ -50,6 +50,7 @@ type Payout = {
   cash_register_id: number
   note: string | null
   author?: string | null
+  balance_after?: string
 }
 type Location = { id: number; name: string }
 type CashRegister = { id: number; name: string; location_id: number | null; accepts_cash: boolean; accepts_bank: boolean }
