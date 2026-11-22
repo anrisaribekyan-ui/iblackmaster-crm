@@ -119,6 +119,7 @@ export default function OrderCreatePage() {
   const [orderTypeId, setOrderTypeId] = useState('')
   const [fields, setFields] = useState<FormField[]>([])
   const [values, setValues] = useState<FormValues>({})
+  const [clientWish, setClientWish] = useState('')
   const [problems, setProblems] = useState<Choice[]>([])
   const [completeSets, setCompleteSets] = useState<Choice[]>([])
   const [howKnows, setHowKnows] = useState<Choice[]>([])
@@ -377,7 +378,7 @@ export default function OrderCreatePage() {
         deadline: localInputToIso(values.deadline as string | null),
         is_urgent: Boolean(values.isUrgent),
         how_know_id: howKnowId,
-        custom_fields: customFields,
+        custom_fields: { ...customFields, client_wish: clientWish.trim() },
         master_id: toOptionalNumber(values.master),
         manager_id: toOptionalNumber(values.manager),
         quick_order_id: quickOrder?.id ?? null,
@@ -586,6 +587,21 @@ export default function OrderCreatePage() {
                 </section>
               ))}
             </div>
+          )}
+          {!fieldsLoading && fields.length > 0 && (
+            <section className="rounded-xl border border-line bg-surface p-4">
+              <label className="grid gap-1 text-sm text-muted">
+                <span className="font-semibold text-ink">Пожелание клиента</span>
+                <textarea
+                  className={inputClass}
+                  rows={3}
+                  maxLength={2000}
+                  value={clientWish}
+                  onChange={(event) => setClientWish(event.target.value)}
+                  placeholder="Например, сохранить данные или согласовать стоимость до ремонта"
+                />
+              </label>
+            </section>
           )}
           {Boolean(values.prepayment) && (
             <section className="grid gap-3 rounded-xl border border-accent bg-surface p-4 sm:grid-cols-3">

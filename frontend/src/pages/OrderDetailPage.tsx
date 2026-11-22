@@ -688,6 +688,7 @@ export default function OrderDetailPage() {
 
   const isDeleted = Boolean(detail.order.is_deleted)
   const deletedEvent = isDeleted ? [...detail.history].reverse().find((item) => item.title === 'Заказ удалён') : undefined
+  const clientWish = String((detail.order.custom_fields as Record<string, unknown> | undefined)?.client_wish ?? '').trim()
 
   return (
     <section>
@@ -863,6 +864,7 @@ export default function OrderDetailPage() {
                       )
                       : <Info key={field.id} label={field.label} value={displayValue(field, detail, masters, managers, howKnows)} />
                 ))}
+                {!(can('changeOrderInfoAccess') && !isDeleted) && <Info label="Пожелание клиента" value={clientWish || '—'} />}
               </div>
               {can('changeOrderInfoAccess') && !isDeleted && (
                 <OrderInfoEditor
@@ -883,6 +885,12 @@ export default function OrderDetailPage() {
           ) : (
             <section className="rounded-xl border border-line bg-surface p-4">
               <h2 className="sr-only">Работы и материалы</h2>
+              {clientWish && (
+                <div className="mb-4 rounded-lg border border-accent-line bg-accent-soft p-3">
+                  <p className="mb-1 text-xs font-semibold">Пожелание клиента</p>
+                  <p className="whitespace-pre-wrap break-words text-sm">{clientWish}</p>
+                </div>
+              )}
               {(!isClosed || (can('operationCashRegisterAccess') && !detail.order.is_deleted)) && (
                 <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
                   {!isClosed && (
@@ -1465,10 +1473,13 @@ function OrderInfoEditor({
   saving: boolean
   onSave: (payload: Record<string, unknown>) => Promise<void>
 }) {
-  const initial = () => Object.fromEntries(fields.map((field) => {
-    const raw = fieldValue(field, detail)
-    return [field.key, field.data_type === 'dateTime' ? isoToLocalInput(raw as string | null) : raw]
-  })) as OrderFieldValues
+  const initial = () => ({
+    ...Object.fromEntries(fields.map((field) => {
+      const raw = fieldValue(field, detail)
+      return [field.key, field.data_type === 'dateTime' ? isoToLocalInput(raw as string | null) : raw]
+    })),
+    client_wish: String((detail.order.custom_fields as Record<string, unknown> | undefined)?.client_wish ?? ''),
+  }) as OrderFieldValues
   const [saved] = useState<OrderFieldValues>(initial)
   const [values, setValues] = useState<OrderFieldValues>(saved)
   const dirty = JSON.stringify(values) !== JSON.stringify(saved)
@@ -1492,6 +1503,7 @@ function OrderInfoEditor({
         payload[key] = value
       }
     }
+    customFields.client_wish = String(values.client_wish ?? '').trim()
     payload.custom_fields = customFields
     setError('')
     try {
@@ -1541,6 +1553,17 @@ function OrderInfoEditor({
             </label>
           )
         })}
+        <label className="grid gap-1 text-sm text-muted sm:col-span-2">
+          Пожелание клиента
+          <textarea
+            className={inputClass}
+            rows={3}
+            maxLength={2000}
+            value={String(values.client_wish ?? '')}
+            onChange={(event) => setValues((current) => ({ ...current, client_wish: event.target.value }))}
+            placeholder="Например, сохранить данные или согласовать стоимость до ремонта"
+          />
+        </label>
         {error && <p role="alert" className="text-sm text-danger sm:col-span-2">{error}</p>}
         {dirty && (
           // Появляется, как только что-то поменяли: отдельной кнопки «Изменить» не нужно

@@ -67,6 +67,34 @@ def test_create_order_with_new_counteragent_and_read_card(client, auth_headers, 
     assert detail.json()["debt"] == "0.00"
 
 
+def test_client_wish_can_be_saved_and_updated(client, auth_headers, db):
+    location = db.scalars(select(Location).order_by(Location.sort)).first()
+    order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
+    payload = order_payload(location.id, order_type.id, {"name": "Клиент с пожеланием"})
+    payload["custom_fields"]["client_wish"] = "Согласовать цену до ремонта"
+
+    created = client.post("/api/orders", json=payload, headers=auth_headers)
+    assert created.status_code == 200, created.text
+    order_id = created.json()["id"]
+    detail = client.get(f"/api/orders/{order_id}", headers=auth_headers)
+    assert detail.json()["order"]["custom_fields"] == {
+        "custom_note": "Проверить",
+        "client_wish": "Согласовать цену до ремонта",
+    }
+
+    updated = client.put(
+        f"/api/orders/{order_id}",
+        json={"custom_fields": {**detail.json()["order"]["custom_fields"], "client_wish": "Не стирать данные"}},
+        headers=auth_headers,
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["custom_fields"] == {
+        "custom_note": "Проверить",
+        "client_wish": "Не стирать данные",
+    }
+    assert db.get(Order, order_id).custom_fields["client_wish"] == "Не стирать данные"
+
+
 def test_print_receipt_contains_order_details_and_escapes_html(client, auth_headers, db):
     location = db.scalars(select(Location).order_by(Location.sort)).first()
     order_type = db.scalars(select(OrderType).order_by(OrderType.sort)).first()
