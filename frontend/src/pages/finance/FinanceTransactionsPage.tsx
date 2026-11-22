@@ -147,7 +147,7 @@ export default function FinanceTransactionsPage() {
         if (all.length >= result.total || result.items.length === 0) break
         page += 1
       }
-      const headers = ['Дата', 'Касса', 'Статья', 'Автор', 'Заказ', 'Тип', 'Сумма', 'Комментарий']
+      const headers = ['Дата', 'Касса', 'Статья', 'Автор', 'Заказ', 'Тип', 'Сумма', 'Остаток после', 'Комментарий']
       const rows = all.map((tx) => [
         formatDate(tx.date),
         `${locationLabel(tx.location_id)} · ${tx.cash_register_name ?? 'Касса'}`,
@@ -156,6 +156,7 @@ export default function FinanceTransactionsPage() {
         tx.order_number ?? tx.sale_number ?? '',
         tx.is_bank ? 'Безнал' : 'Наличные',
         `${tx.is_income ? '' : '-'}${Number(tx.amount)}`,
+        String(Number(tx.balance_after)),
         tx.note ?? '',
       ])
       downloadCsv('транзакции.csv', headers, rows)
@@ -247,6 +248,7 @@ export default function FinanceTransactionsPage() {
                           <td className="hidden px-3 py-2 md:table-cell">{transaction.is_bank ? 'Безнал' : 'Наличные'}</td>
                           <td className={`num whitespace-nowrap px-3 py-2 text-right font-medium ${transaction.is_income ? 'text-success' : 'text-danger'}`}>
                             {transaction.is_income ? '+' : '−'}{money(transaction.amount)}
+                            <small className="block text-xs font-normal text-muted">остаток {money(transaction.balance_after)}<span className="md:hidden"> · {transaction.is_bank ? 'безнал' : 'нал'}</span></small>
                           </td>
                           <td className="hidden max-w-64 truncate px-3 py-2 md:table-cell">{transaction.note || '—'}</td>
                           {canChange && (

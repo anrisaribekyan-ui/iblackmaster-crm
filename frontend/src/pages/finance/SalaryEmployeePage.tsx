@@ -40,6 +40,7 @@ type EventItem = {
   is_manual: boolean
   note: string | null
   author?: string | null
+  balance_after?: string
 }
 type Payout = {
   id: number
@@ -335,7 +336,7 @@ export default function SalaryEmployeePage() {
                   <td className="whitespace-nowrap px-3 py-2">{formatDateTime(payout.date)}</td>
                   <td className="num px-3 py-2 text-right font-medium">{money(payout.amount)}</td>
                   <td className="px-3 py-2">{payout.is_bank ? 'Безнал' : 'Наличные'}</td>
-                  <td className="px-3 py-2">{payout.note || '—'}{payout.author ? <small className="block text-xs text-muted">{payout.author}</small> : null}</td>
+                  <td className="px-3 py-2">{payout.note || '—'}{payout.author || payout.balance_after != null ? <small className="block text-xs text-muted">{[payout.author, payout.balance_after != null ? `в кассе ${money(payout.balance_after)}` : null].filter(Boolean).join(' · ')}</small> : null}</td>
                 </tr>
               ))}
             </tbody>

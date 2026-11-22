@@ -641,6 +641,7 @@ def get_order(order_id: int, db: DbSession, me: CurrentEmployee):
                 "cash_item_name": transaction.cash_item.name,
                 "cash_item_type": transaction.cash_item.type,
                 "cash_register_name": transaction.cash_register.name,
+                "balance_after": transaction.balance_after,
                 "author": (db.get(Employee, transaction.created_by_id).short_name if transaction.created_by_id else None),
             }
             for transaction in transactions
