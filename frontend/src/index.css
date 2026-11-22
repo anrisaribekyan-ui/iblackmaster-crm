@@ -530,3 +530,19 @@ html[data-theme="glass"] .sms-bubble { background: color-mix(in srgb, var(--colo
    яркий оранжевый остаётся для текста, рамок и фокуса */
 html[data-theme="dark"] .bg-accent, html[data-theme="glass"] .bg-accent { background-color: #e64823; }
 html[data-theme="dark"] .bg-accent:not(:disabled):hover, html[data-theme="glass"] .bg-accent:not(:disabled):hover { background-color: #f05a33; }
+
+
+/* Персональные обои сотрудника: только фон приложения, без изменения цветов карточек,
+   форм и таблиц. Обычные темы (включая glass) продолжают работать. */
+html[data-personal-wallpaper="true"] body {
+  background-color: #23262b;
+  background-image: linear-gradient(rgb(255 255 255 / 0.52), rgb(255 255 255 / 0.62)), var(--personal-wallpaper);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+html[data-theme="dark"][data-personal-wallpaper="true"] body,
+html[data-theme="glass"][data-personal-wallpaper="true"] body {
+  background-image: linear-gradient(rgb(0 0 0 / 0.38), rgb(0 0 0 / 0.55)), var(--personal-wallpaper);
+}
