@@ -8,7 +8,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from app.api.deps import CurrentEmployee, DbSession
+from app.api.deps import CurrentEmployee, DbSession, REPORT_ONLY_PERMISSIONS, reports_only, reports_only_location
 from app.errors import BusinessError
 from app.db import utcnow
 from app.models import EmailCode, Employee
@@ -41,6 +41,7 @@ class MeOut(BaseModel):
     permissions: list[str]
     scopes: dict[str, str]
     location_ids: list[int]
+    reports_only: bool = False
     seen_tips: list[str] = []
     background_version: str | None = None
 
@@ -58,17 +59,19 @@ def me(employee: CurrentEmployee, db: DbSession):
     from app.permissions import ALL_PERMISSION_CODES, FULL_SCOPES
     from app.services import employee_backgrounds
 
+    restricted = reports_only(employee)
     return MeOut(
         id=employee.id,
         short_name=employee.short_name,
         email=employee.email,
         role_id=employee.role_id,
         role_name=employee.role.name,
-        home_page=employee.role.home_page,
+        home_page="analytics" if restricted else employee.role.home_page,
         is_owner=employee.is_owner,
-        permissions=ALL_PERMISSION_CODES if employee.is_owner else (employee.role.permissions or []),
-        scopes=FULL_SCOPES if employee.is_owner else (employee.role.scopes or {}),
-        location_ids=[loc.id for loc in employee.locations],
+        permissions=REPORT_ONLY_PERMISSIONS if restricted else (ALL_PERMISSION_CODES if employee.is_owner else (employee.role.permissions or [])),
+        scopes={} if restricted else (FULL_SCOPES if employee.is_owner else (employee.role.scopes or {})),
+        location_ids=[reports_only_location(db)] if restricted else [loc.id for loc in employee.locations],
+        reports_only=restricted,
         seen_tips=list(employee.seen_tips or []),
         background_version=employee_backgrounds.current_version(db, employee.id),
     )
