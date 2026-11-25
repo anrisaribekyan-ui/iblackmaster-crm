@@ -83,14 +83,15 @@ def test_cash_payment_changes_register_and_client_balance(db, owner):
     assert db.get(Counteragent, order.counteragent_id).balance == Decimal("1500")
 
 
-def test_bank_payment_to_terminal_creates_bank_fee(db, owner):
+def test_bank_payment_to_terminal_does_not_create_duplicate_fee(db, owner):
     order = make_order(db, owner)
-    term = terminal(db)  # 9.7% комиссии
+    term = terminal(db)
+    term.bank_percent = Decimal("9.7")  # существующая настройка старой базы
     orders.pay(db, order, owner, cash_register_id=term.id, amount="1000", is_bank=True)
     txs = db.scalars(select(Transaction).where(Transaction.order_id == order.id)).all()
     fee = [t for t in txs if t.cash_item.type == CashItemType.BANK_PERCENT]
-    assert len(fee) == 1 and fee[0].amount == Decimal("97.00")
-    assert term.bank_balance == Decimal("903.00")
+    assert not fee
+    assert term.bank_balance == Decimal("1000.00")
     # Комиссия не меняет долг клиента
     assert db.get(Counteragent, order.counteragent_id).balance == Decimal("1000")
 

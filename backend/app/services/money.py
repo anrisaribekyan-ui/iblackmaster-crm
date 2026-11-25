@@ -4,7 +4,7 @@
 - amount всегда положительный, направление — от статьи (CashItem.is_income).
 - Безнал (is_bank=True) и наличные учитываются раздельно: bank_balance / cash_balance.
 - Приход безналом в кассу с bank_percent > 0 автоматически создаёт парный расход
-  «Комиссия банка (эквайринг)».
+  «Комиссия банка (эквайринг)», кроме терминала с совокупной ставкой.
 - Статьи с affects_balance меняют баланс контрагента:
     приход от контрагента  → balance += amount (он нам заплатил)
     расход контрагенту     → balance -= amount (мы ему заплатили / вернули)
@@ -136,7 +136,7 @@ def create_transaction(
     _apply(db, tx, +1)
     db.flush()
 
-    if with_bank_fee and is_bank and cash_item.is_income and reg.bank_percent > 0:
+    if with_bank_fee and is_bank and cash_item.is_income and reg.bank_percent > 0 and reg.name.strip().casefold() != "терминал":
         fee = (amount * reg.bank_percent / 100).quantize(CENT, rounding=ROUND_HALF_UP)
         if fee > 0:
             fee_tx = create_transaction(

@@ -18,7 +18,6 @@ type ProfitRow = {
   cost: number
   gross: number
   salary: number
-  bank_fee: number
   expenses: number
   tax: number
   fixed: number
@@ -73,7 +72,7 @@ function fillKeys(rows: ProfitRow[], groupBy: GroupBy): ProfitRow[] {
   const end = new Date(`${rows[rows.length - 1].key}T00:00:00Z`)
   for (let d = new Date(`${rows[0].key}T00:00:00Z`); d <= end; ) {
     const key = d.toISOString().slice(0, 10)
-    result.push(byKey.get(key) ?? { key, orders: 0, sales: 0, revenue: 0, cost: 0, gross: 0, salary: 0, bank_fee: 0, expenses: 0, tax: 0, fixed: 0, share: 0, net: 0, margin: null })
+    result.push(byKey.get(key) ?? { key, orders: 0, sales: 0, revenue: 0, cost: 0, gross: 0, salary: 0, expenses: 0, tax: 0, fixed: 0, share: 0, net: 0, margin: null })
     if (groupBy === 'month') d.setUTCMonth(d.getUTCMonth() + 1)
     else d.setUTCDate(d.getUTCDate() + (groupBy === 'week' ? 7 : 1))
   }
@@ -125,8 +124,8 @@ export default function ProfitReport({ range, locationId, filenameBase }: { rang
 
   const download = () => {
     if (!data) return
-    const headers = ['Период', 'Заказов', 'Чеков', 'Выручка', 'Себестоимость', 'Валовая прибыль', 'Зарплата', 'Комиссия банка', 'Расходы по кассам', 'Налог', 'Постоянные расходы', 'Доли от прибыли', 'Чистая прибыль', 'Рентабельность, %']
-    const line = (r: ProfitRow, name: string) => [name, r.orders, r.sales, r.revenue, r.cost, r.gross, r.salary, r.bank_fee, r.expenses, r.tax, r.fixed, r.share, r.net, r.margin ?? '']
+    const headers = ['Период', 'Заказов', 'Чеков', 'Выручка', 'Себестоимость', 'Валовая прибыль', 'Зарплата', 'Расходы по кассам', 'Налог и банковская комиссия', 'Постоянные расходы', 'Доли от прибыли', 'Чистая прибыль', 'Рентабельность, %']
+    const line = (r: ProfitRow, name: string) => [name, r.orders, r.sales, r.revenue, r.cost, r.gross, r.salary, r.expenses, r.tax, r.fixed, r.share, r.net, r.margin ?? '']
     downloadCsv(`${filenameBase}.csv`, headers, [...data.rows.map((r) => line(r, periodLabel(r.key, groupBy))), line(data.total, 'Итого')])
   }
 
@@ -159,7 +158,7 @@ export default function ProfitReport({ range, locationId, filenameBase }: { rang
           <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Tile label="Выручка" value={rub(t.revenue)} note={`${t.orders} заказ. · ${t.sales} чек.`} />
             <Tile label="Валовая прибыль" value={signed(t.gross)} note={`минус запчасти и товар ${rub(t.cost)}`} />
-            <Tile label="Чистая прибыль" value={signed(t.net)} note={`минус зарплата, комиссии, расходы`} accent={t.net < 0 ? 'bad' : 'good'} />
+            <Tile label="Чистая прибыль" value={signed(t.net)} note={`минус зарплата, налог с комиссией, расходы`} accent={t.net < 0 ? 'bad' : 'good'} />
             <Tile label="Рентабельность" value={percent(t.margin)} note="чистая прибыль / выручка" />
           </div>
 
@@ -189,9 +188,8 @@ export default function ProfitReport({ range, locationId, filenameBase }: { rang
                 <Line label="− Себестоимость" value={rub(t.cost)} hint="запчасти в заказах и проданный товар по закупке" />
                 <Line label="= Валовая прибыль" value={signed(t.gross)} strong />
                 <Line label="− Зарплата" value={rub(t.salary)} hint="начисленная за период, а не выплаченная" />
-                <Line label="− Комиссия банка" value={rub(t.bank_fee)} />
                 <Line label="− Расходы по кассам" value={rub(t.expenses)} hint="то, что проведено расходом в кассах" />
-                <Line label="− Налог" value={rub(t.tax)} hint={data.tax_percent ? `${data.tax_percent} % от поступлений по терминалу` : 'не настроен'} />
+                <Line label="− Налог и банковская комиссия" value={rub(t.tax)} hint={data.tax_percent ? `${data.tax_percent} % от поступлений по терминалу` : 'не настроен'} />
                 <Line label="− Постоянные расходы" value={rub(t.fixed)} hint="аренда, свет, уборка и др.: месячная сумма по дням периода" />
                 <Line label="− Доли от прибыли" value={rub(t.share)} hint={data.share_items.map((i) => `${i.name} ${rub(i.amount)}`).join(', ') || 'не настроены'} />
                 <Line label="= Чистая прибыль" value={signed(t.net)} strong />
@@ -211,7 +209,7 @@ export default function ProfitReport({ range, locationId, filenameBase }: { rang
               <thead className="bg-head">
                 <tr>
                   <th className="px-3 py-2 font-medium">Период</th>
-                  {['Выручка', 'Себестоимость', 'Валовая', 'Зарплата', 'Комиссия', 'Расходы', 'Налог', 'Пост. расходы', 'Доли', 'Чистая', '%'].map((h) => (
+                  {['Выручка', 'Себестоимость', 'Валовая', 'Зарплата', 'Расходы', 'Налог и банковская комиссия', 'Пост. расходы', 'Доли', 'Чистая', '%'].map((h) => (
                     <th key={h} className="whitespace-nowrap px-3 py-2 text-right font-medium">{h}</th>
                   ))}
                 </tr>
@@ -270,7 +268,6 @@ function TableRow({ row, name }: { row: ProfitRow; name: string }) {
       <td className={cell}>{rub(row.cost)}</td>
       <td className={cell}>{signed(row.gross)}</td>
       <td className={cell}>{rub(row.salary)}</td>
-      <td className={cell}>{rub(row.bank_fee)}</td>
       <td className={cell}>{rub(row.expenses)}</td>
       <td className={cell}>{rub(row.tax)}</td>
       <td className={cell}>{rub(row.fixed)}</td>

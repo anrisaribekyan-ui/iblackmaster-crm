@@ -186,8 +186,8 @@ def test_reports_profit_gross_and_net(client, auth_headers, db):
     assert r.status_code == 200, r.text
     total = r.json()["total"]
     assert total["revenue"] == 1500 and total["cost"] == 600 and total["gross"] == 900
-    assert total["salary"] == 150 and total["bank_fee"] == 20 and total["expenses"] == 100
-    assert total["net"] == 900 - 150 - 20 - 100
+    assert total["salary"] == 150 and total["bank_fee"] == 0 and total["expenses"] == 100
+    assert total["net"] == 900 - 150 - 100
     assert total["orders"] == 1 and total["sales"] == 1
     assert [i["name"] for i in r.json()["expense_items"]] == ["Аренда тест"]
     assert all(row["key"].endswith("-01") for row in r.json()["rows"])
@@ -216,6 +216,7 @@ def test_reports_profit_tax_and_fixed_expenses(client, auth_headers, db):
     for item, amount, is_income in ((income, "10000", True), (refund, "2000", False)):
         db.add(Transaction(date=utcnow(), cash_register_id=register.id, cash_item_id=item.id, is_income=is_income, is_bank=True,
                            amount=Decimal(amount), balance_after=Decimal("0"), location_id=order.location_id))
+    _expense(db, "Историческая комиссия", "970", type_="bankPercent", location_id=order.location_id)
     db.commit()
     body = {
         "tax_percent": 10,
@@ -231,9 +232,10 @@ def test_reports_profit_tax_and_fixed_expenses(client, auth_headers, db):
     r = client.get(f"/api/reports/profit?date_from={date_from}&date_to={date_to}&group_by=month", headers=auth_headers)
     assert r.status_code == 200, r.text
     total = r.json()["total"]
+    assert total["bank_fee"] == 0
     assert total["tax"] == 800  # (10000 − 2000) × 10%
     assert 2000 <= total["fixed"] <= 3800  # 34100 в месяц, 2–3 дня периода
-    before_share = total["gross"] - total["salary"] - total["bank_fee"] - total["expenses"] - total["tax"] - total["fixed"]
+    before_share = total["gross"] - total["salary"] - total["expenses"] - total["tax"] - total["fixed"]
     assert abs(total["share"] - max(before_share, 0) * 0.05) <= 1  # 5 % от прибыли после всех расходов
     assert total["net"] == before_share - total["share"]
     assert r.json()["share_items"][0]["name"] == "Доля тест"

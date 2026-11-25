@@ -378,7 +378,7 @@ def report_profit(
     group_by: Literal["day", "week", "month"] = "day",
 ):
     """Выручка (выданные заказы + чеки) → валовая прибыль (минус себестоимость) → чистая прибыль
-    (минус начисленная зарплата, комиссия банка и расходы по кассам)."""
+    (минус начисленная зарплата, налог с комиссией и расходы по кассам)."""
     if not has_permission(me, "marginPriceAccess"):
         raise Forbidden("Нет права видеть себестоимость и прибыль")
     allowed = _allowed(db, me, location_id)
@@ -446,14 +446,15 @@ def report_profit(
     for date_, amount, name, type_ in db.execute(tx_query):
         b = buckets[_bucket(date_, group_by)]
         if type_ == "bankPercent":
-            b["bank_fee"] += amount
+            # Исторические комиссии уже покрыты совокупной ставкой; не вычитаем повторно.
+            continue
         elif type_ in NOT_EXPENSE_TYPES or any(word in name.lower() for word in NOT_EXPENSE_NAMES):
             skipped_items[name] += amount
         else:
             b["expenses"] += amount
             expense_items[name] += amount
 
-    # Налог: процент от поступлений по облагаемым кассам (терминал) за вычетом возвратов покупателям
+    # Налог и банковская комиссия: совокупный процент от поступлений по облагаемым кассам (терминал) за вычетом возвратов покупателям
     cfg = settings_service.get(db, "profit")
     tax_percent = Decimal(str(cfg.get("tax_percent") or 0))
     tax_registers = [int(i) for i in cfg.get("tax_register_ids") or []]
@@ -510,7 +511,7 @@ def report_profit(
 
     def finish(key: str, b: dict) -> dict:
         gross = b["revenue"] - b["cost"]
-        net = gross - b["salary"] - b["bank_fee"] - b["expenses"] - b["tax"] - b["fixed"]
+        net = gross - b["salary"] - b["expenses"] - b["tax"] - b["fixed"]
         share = Decimal("0")
         for item in shares:
             part = max(net, Decimal("0")) * Decimal(str(item["percent"])) / 100
