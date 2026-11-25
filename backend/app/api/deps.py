@@ -10,12 +10,13 @@
 
 from typing import Annotated
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.errors import BusinessError, Forbidden
-from app.models import Employee
+from app.models import Employee, Location
 from app.permissions import PERMISSIONS
 from app.security import decode_access_token, token_issued_at
 
@@ -27,7 +28,31 @@ class Unauthorized(BusinessError):
         super().__init__("Требуется вход в систему", code="unauthorized")
 
 
-def get_current_employee(db: DbSession, authorization: Annotated[str | None, Header()] = None) -> Employee:
+REPORT_ONLY_PERMISSIONS = ["reportAccess", "marginPriceAccess", "purchasePriceAccess"]
+REPORT_ONLY_PATHS = frozenset({
+    "/api/auth/me", "/api/locations", "/api/reports/orders", "/api/reports/works",
+    "/api/reports/sales", "/api/reports/cashflow", "/api/reports/stock-value", "/api/reports/profit",
+})
+
+
+def reports_only(employee: Employee) -> bool:
+    return not employee.is_owner and (
+        employee.email.strip().casefold() == "gor@iblackmaster.local"
+        or (employee.name.strip().casefold() == "гор" and (employee.surname or "").strip().casefold() == "сарибекян")
+        or employee.short_name.strip().casefold() == "сарибекян гор"
+    )
+
+
+def reports_only_location(db: Session) -> int:
+    ids = db.scalars(select(Location.id).where(
+        Location.name == "iBlackMaster (ТК 1000 мелочей)", Location.is_active.is_(True)
+    )).all()
+    if len(ids) != 1:
+        raise Forbidden("Локация 1000 мелочей не определена однозначно")
+    return ids[0]
+
+
+def get_current_employee(db: DbSession, request: Request, authorization: Annotated[str | None, Header()] = None) -> Employee:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise Unauthorized()
     employee_id = decode_access_token(authorization.split(" ", 1)[1])
@@ -41,6 +66,9 @@ def get_current_employee(db: DbSession, authorization: Annotated[str | None, Hea
         issued = token_issued_at(authorization.split(" ", 1)[1])
         if issued is None or issued < int(employee.password_changed_at.timestamp()):
             raise Unauthorized()
+    if reports_only(employee):
+        if request.method != "GET" or request.url.path.rstrip("/") not in REPORT_ONLY_PATHS:
+            raise Forbidden("Доступны только отчёты по точке 1000 мелочей")
     return employee
 
 
@@ -52,6 +80,8 @@ def has_permission(employee: Employee, code: str) -> bool:
         raise ValueError(f"Неизвестное право: {code}")  # опечатка в коде — падаем сразу
     if employee.is_owner:
         return True
+    if reports_only(employee):
+        return code in REPORT_ONLY_PERMISSIONS
     return code in (employee.role.permissions or [])
 
 
@@ -59,6 +89,8 @@ def scope_of(employee: Employee, key: str) -> str:
     """Значение права-выбора: none | all | own | locations. Владелец — всегда all."""
     if employee.is_owner:
         return "all"
+    if reports_only(employee):
+        return "none"
     return (employee.role.scopes or {}).get(key, "none")
 
 
