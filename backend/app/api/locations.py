@@ -3,7 +3,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import CurrentEmployee, DbSession, location_ids, require
+from app.api.deps import CurrentEmployee, DbSession, location_ids, require, reports_only, reports_only_location
 from app.errors import BusinessError, NotFound
 from app.models import Location
 
@@ -61,7 +61,7 @@ def list_locations(db: DbSession, me: CurrentEmployee):
         .where(Location.is_active.is_(True))
         .order_by(Location.sort, Location.id)
     )
-    allowed = location_ids(me)
+    allowed = {reports_only_location(db)} if reports_only(me) else location_ids(me)
     if allowed:
         query = query.where(Location.id.in_(allowed))
     return [location_out(location) for location in db.scalars(query).all()]
