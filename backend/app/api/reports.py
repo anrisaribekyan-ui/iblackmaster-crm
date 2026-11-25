@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 
 from app.services import settings as settings_service
-from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids, require
+from app.api.deps import CurrentEmployee, DbSession, check_location, has_permission, location_ids, require, reports_only, reports_only_location
 from app.errors import Forbidden
 from app.models import (
     CashItem,
@@ -55,6 +55,11 @@ def _moscow_day(value: datetime) -> str:
 
 
 def _allowed(db: DbSession, me: CurrentEmployee, location_id: int | None) -> set[int]:
+    if reports_only(me):
+        target = reports_only_location(db)
+        if location_id is not None and location_id != target:
+            raise Forbidden("Нет доступа к этой локации")
+        return {target}
     allowed = location_ids(me)
     if location_id is not None:
         check_location(me, location_id)
@@ -276,7 +281,7 @@ def report_cashflow(
         Transaction.date < period_to,
     )
     if allowed:
-        query = query.where(or_(Transaction.location_id.is_(None), Transaction.location_id.in_(allowed)))
+        query = query.where(Transaction.location_id.in_(allowed) if reports_only(me) else or_(Transaction.location_id.is_(None), Transaction.location_id.in_(allowed)))
     transactions = db.scalars(query).all()
 
     registers = dict(db.execute(select(CashRegister.id, CashRegister.name)).all()) if group_by == "cash_register" else {}
@@ -382,6 +387,8 @@ def report_profit(
     if not has_permission(me, "marginPriceAccess"):
         raise Forbidden("Нет права видеть себестоимость и прибыль")
     allowed = _allowed(db, me, location_id)
+    if reports_only(me):
+        location_id = next(iter(allowed))
     period_from = _ensure_utc(date_from)
     period_to = _ensure_utc(date_to)
 
