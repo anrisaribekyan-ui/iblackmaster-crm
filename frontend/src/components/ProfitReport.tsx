@@ -7,6 +7,7 @@ import BarList from './charts/BarList'
 import { compact, dayLong, dayShort, rub } from './charts/format'
 import Skeleton from './Skeleton'
 import ProfitSettings from './ProfitSettings'
+import { useAuth } from '../auth'
 
 type GroupBy = 'day' | 'week' | 'month'
 
@@ -83,6 +84,7 @@ const signed = (v: number) => (v < 0 ? `−${rub(-v)}` : rub(v))
 const percent = (v: number | null) => (v === null ? '—' : `${v.toLocaleString('ru-RU')} %`)
 
 export default function ProfitReport({ range, locationId, filenameBase }: { range: { from: string; to: string } | null; locationId: string; filenameBase: string }) {
+  const { me } = useAuth()
   const [groupBy, setGroupBy] = useState<GroupBy>('day')
   const [data, setData] = useState<ProfitData | null>(null)
   const [error, setError] = useState('')
@@ -132,7 +134,7 @@ export default function ProfitReport({ range, locationId, filenameBase }: { rang
   const t = data?.total
   return (
     <div className={loading && data ? 'opacity-60 transition-opacity' : ''}>
-      <ProfitSettings onSaved={() => setReload((n) => n + 1)} />
+      {!me?.reports_only && <ProfitSettings onSaved={() => setReload((n) => n + 1)} />}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="flex rounded-md border border-line bg-surface p-0.5" role="group" aria-label="Группировка">
           {GROUPS.map(([value, title]) => (
