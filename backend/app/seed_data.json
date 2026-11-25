@@ -88,7 +88,7 @@
    "name": "Терминал",
    "accepts_cash": false,
    "accepts_bank": true,
-   "bank_percent": "9.7",
+   "bank_percent": "0",
    "allow_negative": true,
    "allow_internal_move": true,
    "is_default": false
