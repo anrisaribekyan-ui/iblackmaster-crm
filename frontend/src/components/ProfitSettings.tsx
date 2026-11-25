@@ -7,7 +7,7 @@ type Fixed = { name: string; amount: number; location_id: number | null }
 type Share = { name: string; percent: number; location_id: number | null }
 type Cfg = { tax_percent: number; tax_register_ids: number[]; fixed: Fixed[]; shares: Share[] }
 
-/** Налог и постоянные расходы за месяц: из них складывается «чистая» прибыль. */
+/** Налог, банковская комиссия и постоянные расходы за месяц: из них складывается «чистая» прибыль. */
 export default function ProfitSettings({ onSaved }: { onSaved: () => void }) {
   const { can } = useAuth()
   const { locations, registers } = useLocationsAndRegisters()
@@ -42,19 +42,19 @@ export default function ProfitSettings({ onSaved }: { onSaved: () => void }) {
   const total = cfg.fixed.reduce((sum, f) => sum + (Number(f.amount) || 0), 0)
   return (
     <details className="mb-4 rounded-xl border border-line bg-surface p-4">
-      <summary className="cursor-pointer font-semibold">Налог и постоянные расходы</summary>
+      <summary className="cursor-pointer font-semibold">Налог, банковская комиссия и постоянные расходы</summary>
       <p className="mt-2 text-sm text-muted">
-        Налог берётся процентом от поступлений по выбранным кассам (за вычетом возвратов). Постоянные расходы вводятся за месяц и делятся по дням периода.
+        Налог и банковская комиссия учитываются одной ставкой от поступлений по выбранным кассам (за вычетом возвратов). Постоянные расходы вводятся за месяц и делятся по дням периода.
         Оклад сотрудников сюда не вносится: он идёт через зарплату.
       </p>
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="text-sm">
-          Налог, %
+          Налог и банковская комиссия, %
           <input type="number" min={0} max={100} step="0.1" disabled={!editable} className={`${inputClass} mt-1 w-24`} value={cfg.tax_percent}
             onChange={(e) => setCfg({ ...cfg, tax_percent: Number(e.target.value) })} />
         </label>
         <fieldset className="text-sm">
-          <legend className="mb-1">С каких касс считать налог</legend>
+          <legend className="mb-1">С каких касс считать совокупные 10% (или настроенную ставку)</legend>
           <div className="flex flex-wrap gap-3">
             {registers.map((r) => (
               <label key={r.id} className="flex items-center gap-1.5">
