@@ -152,13 +152,13 @@ const MARGIN_COLUMNS: Column[] = [
 ]
 
 export default function AnalyticsPage() {
-  const { can } = useAuth()
+  const { can, me } = useAuth()
   const canProfit = can('marginPriceAccess')
   const [tab, setTab] = useState<TabKey>(canProfit ? 'profit' : 'orders')
   const [groupBy, setGroupBy] = useState('master')
   const [isWork, setIsWork] = useState(true)
   const [locations, setLocations] = useState<Location[]>([])
-  const [locationId, setLocationId] = useState('')
+  const [locationId, setLocationId] = useState(me?.reports_only ? String(me.location_ids[0] ?? '') : '')
   const [period, setPeriod] = useState<Period>('today')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -281,7 +281,7 @@ export default function AnalyticsPage() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <label className="sr-only" htmlFor="an-location">Локация</label>
         <select id="an-location" className="rounded-md border border-line bg-surface px-3 py-2" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-          <option value="">Все локации</option>
+          {!me?.reports_only && <option value="">Все локации</option>}
           {locations.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
         <div className="flex max-w-full overflow-x-auto rounded-md border border-line bg-surface p-0.5" role="group" aria-label="Период">

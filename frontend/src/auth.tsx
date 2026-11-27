@@ -12,6 +12,7 @@ export type Me = {
   permissions: string[]
   scopes: Record<string, string>
   location_ids: number[]
+  reports_only?: boolean
   /** Подсказки и экскурсии, которые сотрудник уже видел */
   seen_tips: string[]
   background_version: string | null

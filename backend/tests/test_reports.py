@@ -256,3 +256,31 @@ def test_import_archive_orders_is_idempotent_and_counts_in_profit(client, auth_h
     r = client.get(f"/api/reports/profit?date_from=2026-09-30T21:00:00Z&date_to=2026-10-31T21:00:00Z&group_by=month&location_id={location.id}", headers=auth_headers)
     total = r.json()["total"]
     assert total["revenue"] >= 6000 and total["orders"] >= 1
+
+
+def test_gor_reports_only_location_and_read_only(client, db):
+    target = db.scalars(select(Location).where(Location.name == "iBlackMaster (ТК 1000 мелочей)")).one()
+    other = base_order(db)
+    own = base_order(db)
+    own.location_id = target.id
+    own.total_price = Decimal("2500")
+    own.total_purchase = Decimal("500")
+    gor = db.scalars(select(Employee).where(Employee.short_name == "Сарибекян Гор")).first()
+    if gor is None:
+        gor = make_employee(db, name="Сарибекян Гор", email="gor-reports@test.ru", permissions=[], location=target)
+    gor.password_hash = hash_password("password123", rounds=4)
+    db.commit()
+    headers = login(client, gor.email)
+    me = client.get("/api/auth/me", headers=headers).json()
+    assert me["reports_only"] is True and me["location_ids"] == [target.id]
+    assert {x["id"] for x in client.get("/api/locations", headers=headers).json()} == {target.id}
+    start, end = period()
+    params = f"date_from={start}&date_to={end}"
+    for route in ("orders", "works", "sales", "cashflow", "stock-value", "profit"):
+        assert client.get(f"/api/reports/{route}?{params}&location_id={other.location_id}", headers=headers).status_code == 403
+        assert client.get(f"/api/reports/{route}?{params}", headers=headers).status_code == 200
+    profit = client.get(f"/api/reports/profit?{params}", headers=headers).json()["total"]
+    assert profit["revenue"] == 2500
+    for path in ("/api/orders", "/api/dashboard", "/api/cash-registers", "/api/reports/profit/settings", "/api/employees"):
+        assert client.get(path, headers=headers).status_code == 403
+    assert client.put("/api/reports/profit/settings", json={}, headers=headers).status_code == 403

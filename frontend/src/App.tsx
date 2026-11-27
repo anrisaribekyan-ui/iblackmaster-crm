@@ -48,7 +48,8 @@ const DocumentsPage = lazy(() => import('./pages/store/DocumentsPage'))
 const InventoryPage = lazy(() => import('./pages/store/InventoryPage'))
 
 function Protected({ children }: { children: ReactNode }) {
-  const { me, loading, offline, retry } = useAuth()
+  const { me, loading, offline, retry, logout } = useAuth()
+  const location = useLocation()
   if (loading) return <div className="p-6"><Skeleton rows={6} /></div>
   if (!me && offline) {
     return (
@@ -60,6 +61,16 @@ function Protected({ children }: { children: ReactNode }) {
     )
   }
   if (!me) return <Navigate to="/login" replace />
+  if (me.reports_only) {
+    if (location.pathname !== '/analytics') return <Navigate to="/analytics" replace />
+    return <main className="mx-auto max-w-7xl p-4 md:p-6">
+      <header className="mb-4 flex items-center justify-between gap-3">
+        <span className="font-semibold">iBlackMaster · 1000 мелочей</span>
+        <button className="rounded-md border border-line bg-surface px-3 py-2" onClick={logout}>Выйти</button>
+      </header>
+      <AnalyticsPage />
+    </main>
+  }
   return <>{children}</>
 }
 
