@@ -327,6 +327,13 @@ export default function OrdersPage() {
                       <div className="mt-2.5 flex items-end justify-between gap-3 text-sm">
                         <div className="min-w-0">
                           <p className="break-words">{order.counteragent.name}</p>
+                          {order.counteragent.phones?.split(',').map((raw) => raw.trim()).filter(Boolean).map((phone, index) => {
+                            const digits = phone.replace(/\D/g, '')
+                            const dial = digits.length === 11 && digits.startsWith('8') ? '+7' + digits.slice(1) : digits.length === 11 ? '+' + digits : digits
+                            return digits.length >= 7 ? (
+                              <a key={index} href={`tel:${dial}`} className="relative z-10 block w-fit break-words text-xs font-medium text-accent underline-offset-2 hover:underline" aria-label={`Позвонить ${formatPhone(phone)}`}>{formatPhone(phone)}</a>
+                            ) : <p key={index} className="break-words text-xs text-muted">{formatPhone(phone)}</p>
+                          })}
                           <p className={`text-xs ${overdue ? 'font-semibold text-danger' : 'text-muted'}`}>
                             {formatDate(order.created_at)}{order.deadline ? ` · срок ${formatDate(order.deadline)}` : ''}
                           </p>
